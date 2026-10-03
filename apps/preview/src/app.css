@@ -1,0 +1,42 @@
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #f3eee8; color: #2a1a1f; }
+.shell { display: grid; grid-template-columns: 340px 1fr; min-height: 100svh; }
+.panel { padding: 1.25rem; background: #fff; border-right: 1px solid #e6ddd3; overflow-y: auto; max-height: 100svh; font-size: 0.9rem; }
+.panel h1 { font-size: 1.1rem; margin: 0 0 1rem; }
+.panel h1 span { font-weight: 400; color: #8a7a70; }
+.panel h2 { font-size: 0.95rem; margin: 1.5rem 0 0.5rem; }
+.panel label { display: grid; gap: 0.25rem; margin-bottom: 0.75rem; }
+.panel label.row { display: flex; gap: 0.5rem; align-items: center; }
+.panel select, .panel button { font: inherit; padding: 0.45rem 0.6rem; border: 1px solid #d8cdc2; border-radius: 6px; background: #fff; }
+.panel button { cursor: pointer; }
+.panel button:hover { background: #faf5ef; }
+.buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.5rem 0; }
+.panel ol, .panel ul { padding-left: 1.1rem; margin: 0; }
+.panel li { margin-bottom: 0.3rem; }
+.muted { color: #8a7a70; }
+.note { background: #fff4e0; padding: 0.5rem 0.6rem; border-radius: 6px; }
+.ok { color: #15803d; font-weight: 600; margin: 0 0 0.5rem; }
+.bad { color: #b91c1c; font-weight: 600; margin: 0 0 0.5rem; }
+li.error { color: #b91c1c; }
+li.warning { color: #8a5a00; }
+small.essential { color: #b91c1c; }
+small.richer { color: #8a7a70; }
+.stage { display: grid; place-items: center; padding: 1.5rem; }
+.phone { width: 390px; max-width: 100%; height: min(844px, calc(100svh - 3rem)); border-radius: 36px; background: #111; padding: 10px; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.6); }
+.phone-screen {
+  position: relative; height: 100%; border-radius: 27px; overflow: hidden; background: #fff;
+  transform: translateZ(0); /* makes this box the containing block for position:fixed descendants */
+  --mfy-screen: calc(min(844px, 100svh - 3rem) - 20px); /* what "full screen" means inside the frame */
+}
+.phone-scroll { height: 100%; overflow-y: auto; scrollbar-width: none; }
+.phone-scroll::-webkit-scrollbar { display: none; }
+
+/* On a real phone: show the page first, edge to edge, with the controls below it. */
+@media (max-width: 800px) {
+  .shell { display: flex; flex-direction: column; }
+  .stage { order: -1; padding: 0; display: block; }
+  .phone { width: 100%; height: 86svh; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+  .phone-screen { border-radius: 0; --mfy-screen: 86svh; }
+  .panel { max-height: none; border-right: 0; border-top: 1px solid #e6ddd3; }
+}

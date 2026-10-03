@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "id": "birthday-countdown",
+    "title": "Birthday surprise with a countdown",
+    "occasions": ["birthday"],
+    "relationships": ["partner", "friend"],
+    "moods": ["romantic", "festive"],
+    "tags": ["bday", "birthday", "janmadin", "surprise", "countdown"],
+    "languages": ["en"],
+    "visibility": "public"
+  },
+  "content": {
+    "schemaVersion": 1,
+    "settings": {
+      "opening": { "kind": "envelope", "text": "Open your surprise" },
+      "theme": { "preset": "marigold-sun" },
+      "ambience": { "kind": "confetti", "intensity": "low" },
+      "languages": { "default": "en", "available": ["en"] }
+    },
+    "blocks": [
+      {
+        "id": "blk_hero02", "type": "hero", "v": 1,
+        "fields": {
+          "recipient": "Their name",
+          "title": "Happy Birthday",
+          "subtitle": "Something is waiting for you",
+          "cover": null,
+          "layout": "centered"
+        },
+        "ph": ["recipient", "subtitle", "cover"],
+        "style": { "align": "center", "space": "lg", "anim": "fade-up", "bg": "default" },
+        "visible": true
+      },
+      {
+        "id": "blk_count01", "type": "countdown", "v": 1,
+        "fields": { "title": "Until your day", "target": null, "endMessage": "It's today!" },
+        "ph": ["title", "target", "endMessage"],
+        "style": { "align": "center", "space": "lg", "anim": "none", "bg": "soft" },
+        "visible": true
+      },
+      {
+        "id": "blk_letter2", "type": "letter", "v": 1,
+        "fields": {
+          "salutation": "Dear you,",
+          "body": "Start with a memory that makes you smile, then say the thing you have never said out loud.",
+          "closing": "With all my love,",
+          "paper": "plain"
+        },
+        "ph": ["salutation", "body", "closing"],
+        "style": { "align": "left", "space": "lg", "anim": "none", "bg": "default" },
+        "visible": true
+      },
+      {
+        "id": "blk_gallery2", "type": "gallery", "v": 1,
+        "fields": { "layout": "carousel", "items": [] },
+        "ph": ["items"],
+        "style": { "align": "center", "space": "lg", "anim": "none", "bg": "soft" },
+        "visible": true
+      },
+      {
+        "id": "blk_sign02", "type": "signature", "v": 1,
+        "fields": { "message": "With love,", "name": "Your name" },
+        "ph": ["message", "name"],
+        "style": { "align": "center", "space": "lg", "anim": "none", "bg": "default" },
+        "visible": true
+      }
+    ]
+  }
+}
