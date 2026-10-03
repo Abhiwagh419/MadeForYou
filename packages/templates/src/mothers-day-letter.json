@@ -2,25 +2,62 @@
   "meta": {
     "id": "mothers-day-letter",
     "title": "A letter for Maa",
-    "titleI18n": { "hi": "माँ के नाम एक चिट्ठी" },
-    "occasions": ["mothers-day"],
-    "relationships": ["mother"],
-    "moods": ["emotional"],
-    "tags": ["maa", "mom", "mummy", "amma", "aai", "ammi", "mother", "letter"],
-    "languages": ["en", "hi"],
+    "titleI18n": {
+      "hi": "माँ के नाम एक चिट्ठी"
+    },
+    "occasions": [
+      "mothers-day"
+    ],
+    "relationships": [
+      "mother"
+    ],
+    "moods": [
+      "emotional"
+    ],
+    "tags": [
+      "maa",
+      "mom",
+      "mummy",
+      "amma",
+      "aai",
+      "ammi",
+      "mother",
+      "letter"
+    ],
+    "languages": [
+      "en",
+      "hi"
+    ],
     "visibility": "public"
   },
   "content": {
     "schemaVersion": 1,
     "settings": {
-      "opening": { "kind": "envelope", "text": "Tap to open" },
-      "theme": { "preset": "rose-garden" },
-      "ambience": { "kind": "petals", "intensity": "low" },
-      "languages": { "default": "en", "available": ["en", "hi"] }
+      "opening": {
+        "kind": "envelope",
+        "text": "Tap to open"
+      },
+      "theme": {
+        "preset": "rose-garden"
+      },
+      "ambience": {
+        "kind": "petals",
+        "intensity": "low"
+      },
+      "languages": {
+        "default": "en",
+        "available": [
+          "en",
+          "hi"
+        ]
+      },
+      "tap": "hearts"
     },
     "blocks": [
       {
-        "id": "blk_hero01", "type": "hero", "v": 1,
+        "id": "blk_hero01",
+        "type": "hero",
+        "v": 1,
         "fields": {
           "recipient": "Maa",
           "title": "Happy Mother's Day",
@@ -28,36 +65,92 @@
           "cover": null,
           "layout": "centered"
         },
-        "ph": ["recipient", "subtitle", "cover"],
-        "i18n": { "hi": { "recipient": "माँ", "title": "मातृ दिवस की शुभकामनाएँ", "subtitle": "बहुत सारे प्यार के साथ, सिर्फ़ तुम्हारे लिए" } },
-        "style": { "align": "center", "space": "lg", "anim": "fade-up", "bg": "default" },
+        "ph": [
+          "recipient",
+          "subtitle",
+          "cover"
+        ],
+        "i18n": {
+          "hi": {
+            "recipient": "माँ",
+            "title": "मातृ दिवस की शुभकामनाएँ",
+            "subtitle": "बहुत सारे प्यार के साथ, सिर्फ़ तुम्हारे लिए"
+          }
+        },
+        "style": {
+          "align": "center",
+          "space": "lg",
+          "anim": "none",
+          "bg": "default"
+        },
         "visible": true
       },
       {
-        "id": "blk_letter1", "type": "letter", "v": 1,
+        "id": "blk_letter1",
+        "type": "letter",
+        "v": 1,
         "fields": {
           "salutation": "Dear Maa,",
           "body": "There are things I never say out loud.\n\nStart with a small memory: the way you wait up, the tea you make, the words you repeat. Then tell her what they meant to you.",
           "closing": "With all my love,",
           "paper": "cream"
         },
-        "ph": ["salutation", "body", "closing"],
-        "i18n": { "hi": { "salutation": "प्रिय माँ,", "closing": "ढेर सारे प्यार के साथ," } },
-        "style": { "align": "left", "space": "lg", "anim": "none", "bg": "soft" },
+        "ph": [
+          "salutation",
+          "body",
+          "closing"
+        ],
+        "i18n": {
+          "hi": {
+            "salutation": "प्रिय माँ,",
+            "closing": "ढेर सारे प्यार के साथ,"
+          }
+        },
+        "style": {
+          "align": "left",
+          "space": "lg",
+          "anim": "fade-up",
+          "bg": "soft"
+        },
         "visible": true
       },
       {
-        "id": "blk_gallery1", "type": "gallery", "v": 1,
-        "fields": { "layout": "polaroid", "items": [] },
-        "ph": ["items"],
-        "style": { "align": "center", "space": "lg", "anim": "none", "bg": "default" },
+        "id": "blk_gallery1",
+        "type": "gallery",
+        "v": 1,
+        "fields": {
+          "layout": "polaroid",
+          "items": []
+        },
+        "ph": [
+          "items"
+        ],
+        "style": {
+          "align": "center",
+          "space": "lg",
+          "anim": "none",
+          "bg": "default"
+        },
         "visible": true
       },
       {
-        "id": "blk_sign01", "type": "signature", "v": 1,
-        "fields": { "message": "With love,", "name": "Your name" },
-        "ph": ["message", "name"],
-        "style": { "align": "center", "space": "lg", "anim": "none", "bg": "default" },
+        "id": "blk_sign01",
+        "type": "signature",
+        "v": 1,
+        "fields": {
+          "message": "With love,",
+          "name": "Your name"
+        },
+        "ph": [
+          "message",
+          "name"
+        ],
+        "style": {
+          "align": "center",
+          "space": "lg",
+          "anim": "fade",
+          "bg": "default"
+        },
         "visible": true
       }
     ]

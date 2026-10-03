@@ -91,10 +91,20 @@ export function App() {
             {Object.entries(THEMES).map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}
           </select>
         </label>
+        <label>Tap effect
+          <select
+            value={content.settings.tap}
+            onChange={(e) => setContent({ ...content, settings: { ...content.settings, tap: e.target.value as Content["settings"]["tap"] } })}
+          >
+            <option value="none">None</option>
+            <option value="hearts">Hearts</option>
+            <option value="sparkles">Sparkles</option>
+          </select>
+        </label>
         <label className="row"><input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} /> Skip opening screen</label>
 
         <div className="buttons">
-          <button onClick={() => setReplay((n) => n + 1)}>Replay opening</button>
+          <button onClick={() => setReplay((n) => n + 1)}>Replay animations</button>
           <button onClick={() => { setContent(fillDemo(content)); setNote(""); }}>Answer all questions</button>
           <button
             onClick={() => {

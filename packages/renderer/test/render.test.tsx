@@ -7,6 +7,9 @@ import { PageRenderer, parseTarget, splitRemaining } from "../src";
 const html = (content: Content, props: Partial<Parameters<typeof PageRenderer>[0]> = {}) =>
   renderToStaticMarkup(<PageRenderer content={content} skipOpening {...props} />);
 
+/** Visible text of the markup: tags removed, entities decoded, spaces collapsed. */
+const plain = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+
 describe("PageRenderer", () => {
   it("renders every launch template", () => {
     for (const t of templates) {
@@ -20,13 +23,13 @@ describe("PageRenderer", () => {
     const t = templates.find((x) => x.meta.id === "mothers-day-letter")!;
     const out = html(t.content, { skipOpening: false });
     expect(out).toContain("Tap to open");
-    expect(out).not.toContain("Happy Mother&#x27;s Day");
+    expect(plain(out)).not.toContain("Happy Mother's Day");
   });
 
   it("switches language and falls back to the default", () => {
     const t = templates.find((x) => x.meta.id === "mothers-day-letter")!;
-    expect(html(t.content, { lang: "hi" })).toContain("मातृ दिवस की शुभकामनाएँ");
-    expect(html(t.content, { lang: "mr" })).toContain("Happy Mother&#x27;s Day");
+    expect(plain(html(t.content, { lang: "hi" }))).toContain("मातृ दिवस की शुभकामनाएँ");
+    expect(plain(html(t.content, { lang: "mr" }))).toContain("Happy Mother's Day");
   });
 
   it("greys out placeholder fields", () => {
@@ -95,10 +98,10 @@ describe("editing and translations", () => {
     const c = mothersDay();
     const next = setField(c, c.blocks[0]!.id, "recipient", "Priya");
     const out = html(next, { lang: "hi" });
-    expect(out).toContain("Priya");
+    expect(plain(out)).toContain("Priya");
     expect(out).not.toContain("माँ</p>");
     // template-authored Hindi that the user did not change is still shown
-    expect(out).toContain("मातृ दिवस की शुभकामनाएँ");
+    expect(plain(out)).toContain("मातृ दिवस की शुभकामनाएँ");
   });
 });
 
@@ -115,5 +118,39 @@ describe("themes are whole looks", () => {
     const out = html(t.content);
     expect(out).toContain("--mfy-frame-radius:50%");
     expect(out).toContain("Rozha One");
+  });
+});
+
+describe("dynamic layer", () => {
+  const mothers = () => structuredClone(templates.find((x) => x.meta.id === "mothers-day-letter")!.content);
+
+  it("splits the headline into indexed words so CSS can stagger them", () => {
+    const out = html(mothers());
+    expect(out).toContain('<span class="mfy-word" style="--i:0">Happy</span>');
+    expect(out).toContain('<span class="mfy-word" style="--i:2">Day</span>');
+    expect(plain(out)).toContain("Happy Mother's Day");
+  });
+
+  it("marks the page with its theme so each theme can have its own halo", () => {
+    expect(html(mothers())).toContain('data-theme="rose-garden"');
+  });
+
+  it("marks blocks that reveal on scroll, and hides nothing without scripts", () => {
+    const out = html(mothers());
+    expect(out).toContain('data-reveal="fade-up"');
+    expect(out).toContain('data-in="false"');
+    expect(out).not.toContain("mfy-armed"); // content only hides after the page is armed on the client
+  });
+
+  it("indexes letter paragraphs for the line-by-line unfold", () => {
+    expect(html(mothers())).toMatch(/<p style="--i:1">/);
+  });
+
+  it("renders the tap layer only when a tap effect is chosen", () => {
+    const c = mothers();
+    expect(c.settings.tap).toBe("hearts");
+    expect(html(c)).toContain("mfy-taps");
+    c.settings.tap = "none";
+    expect(html(c)).not.toContain("mfy-taps");
   });
 });

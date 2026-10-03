@@ -28,7 +28,7 @@
 .mfy-ph { opacity: 0.5; }
 
 /* ---------- block shell ---------- */
-.mfy-block { padding-inline: 1.25rem; background: var(--mfy-bg); }
+.mfy-block { padding-inline: 1.25rem; background: var(--mfy-bg); overflow-x: clip; }
 .mfy-bg-soft { background: var(--mfy-soft); }
 .mfy-bg-accent { background: var(--mfy-primary); color: var(--mfy-on-primary); }
 /* Two neighbours on the same background read as one section: only one gap between them. */
@@ -74,8 +74,10 @@
 .mfy-hero-sub { color: var(--mfy-muted); margin-top: 1rem; max-width: 26rem; margin-inline: auto; }
 
 /* The cover frame's shape (arch, medallion or rounded square) comes from the theme. */
+.mfy-frame-wrap { position: relative; width: var(--mfy-frame-width); }
 .mfy-frame {
-  width: var(--mfy-frame-width);
+  position: relative; /* paints above the halo */
+  width: 100%;
   aspect-ratio: var(--mfy-frame-ratio);
   border-radius: var(--mfy-frame-radius);
   overflow: hidden;
@@ -85,7 +87,8 @@
 .mfy-frame img { width: 100%; height: 100%; object-fit: cover; }
 .mfy-frame-empty { background: linear-gradient(160deg, var(--mfy-soft), color-mix(in srgb, var(--mfy-accent) 35%, var(--mfy-soft))); }
 .mfy-hero-split { text-align: left; justify-items: start; }
-.mfy-hero-fullbleed .mfy-frame { width: 100%; aspect-ratio: 4 / 5; }
+.mfy-hero-fullbleed .mfy-frame-wrap { width: 100%; }
+.mfy-hero-fullbleed .mfy-frame { aspect-ratio: 4 / 5; }
 
 /* ---------- text ---------- */
 .mfy-prose { max-width: 32rem; margin-inline: auto; }
@@ -226,8 +229,6 @@
   .mfy-env:active { transform: scale(0.98); }
   .mfy-amb-petals, .mfy-amb-confetti { animation: mfy-fall linear infinite; }
   .mfy-amb-stars, .mfy-amb-diyas { animation: mfy-twinkle ease-in-out infinite; }
-  .mfy-anim-fade { animation: mfy-fade 0.9s ease-out backwards; }
-  .mfy-anim-fade-up { animation: mfy-fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mfy-ambience { display: none; }
@@ -235,10 +236,99 @@
 @keyframes mfy-lift { to { transform: translateY(1.5rem); opacity: 0; } }
 @keyframes mfy-fall { from { transform: translateY(-5vh) rotate(0); } to { transform: translateY(110vh) rotate(300deg); } }
 @keyframes mfy-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.8; } }
-@keyframes mfy-fade { from { opacity: 0; } }
-@keyframes mfy-fade-up { from { opacity: 0; transform: translateY(1.25rem); } }
 
 /* ---------- embeds ---------- */
 .mfy-music { position: fixed; z-index: 5; right: 0.75rem; bottom: 0.75rem; border: 0; border-radius: 12px; }
 .mfy-music-yt { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .mfy-music-sp { width: min(18rem, calc(100% - 1.5rem)); height: 80px; }
+
+/* =====================================================================
+   Dynamic layer
+   Per-theme halo behind the cover, a floating cover, entrances that play
+   when a block scrolls into view, and tap effects. Motion uses only
+   opacity and the individual transform properties (translate, scale,
+   rotate), which stay on the GPU and are cheap on mid-range Android.
+   ===================================================================== */
+
+.mfy-word { display: inline-block; }
+
+/* halo: static by default, animated below only if motion is welcome */
+.mfy-frame-wrap::before { content: ""; position: absolute; pointer-events: none; border-radius: 50%; }
+[data-theme="rose-garden"] .mfy-frame-wrap::before {
+  inset: -16%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--mfy-primary) 26%, transparent), transparent);
+}
+[data-theme="marigold-sun"] .mfy-frame-wrap::before {
+  inset: -22%;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--mfy-accent) 60%, transparent) 0 5deg, transparent 5deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 60%, #000 63%, #000 80%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent 60%, #000 63%, #000 80%, transparent 100%);
+}
+[data-theme="midnight-stars"] .mfy-frame-wrap::before {
+  inset: -14%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--mfy-primary) 20%, transparent), transparent);
+}
+[data-theme="midnight-stars"] .mfy-ph { opacity: 0.72; } /* sample text must stay readable on dark */
+
+/* tap effect layer */
+.mfy-taps { position: fixed; inset: 0; z-index: 6; overflow: hidden; pointer-events: none; }
+.mfy-tap { position: absolute; margin: -13px 0 0 -13px; color: var(--mfy-primary); }
+.mfy-tap[data-v="1"] { color: var(--mfy-accent); }
+.mfy-tap[data-v="2"] { color: color-mix(in srgb, var(--mfy-primary) 55%, white); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* blocks that opt in (style.anim) arrive as they scroll into view */
+  .mfy-armed .mfy-block[data-reveal] {
+    transition: opacity 0.85s ease, translate 0.85s cubic-bezier(0.2, 0.7, 0.2, 1), scale 0.85s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .mfy-armed .mfy-block[data-reveal][data-in="false"] { opacity: 0; }
+  .mfy-armed .mfy-block[data-reveal="fade-up"][data-in="false"] { translate: 0 1.5rem; }
+  .mfy-armed .mfy-block[data-reveal="zoom"][data-in="false"] { scale: 0.94; }
+
+  /* the headline's words rise one after another */
+  .mfy-word {
+    transition: opacity 0.7s ease, translate 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition-delay: calc(var(--i, 0) * 90ms + 120ms);
+  }
+  .mfy-armed .mfy-block[data-in="false"] .mfy-word { opacity: 0; translate: 0 0.55em; }
+
+  /* letters and messages unfold line by line */
+  .mfy-letter-body p, .mfy-prose p {
+    transition: opacity 0.8s ease, translate 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition-delay: calc(var(--i, 0) * 170ms + 200ms);
+  }
+  .mfy-armed .mfy-block[data-in="false"] :is(.mfy-letter-body, .mfy-prose) p { opacity: 0; translate: 0 0.6rem; }
+
+  /* photos drop in one by one, and lift when pressed */
+  .mfy-tile {
+    transition: opacity 0.7s ease, translate 0.8s cubic-bezier(0.2, 0.8, 0.2, 1.1), scale 0.25s ease;
+    transition-delay: calc(var(--i, 0) * 110ms), calc(var(--i, 0) * 110ms), 0s;
+  }
+  .mfy-armed .mfy-block[data-in="false"] .mfy-tile { opacity: 0; translate: 0 1.75rem; scale: 0.94; }
+  .mfy-tile:active { scale: 1.05; }
+
+  /* the cover floats; the halo breathes (rose, midnight) or turns (marigold) */
+  .mfy-frame-wrap { animation: mfy-float 7s ease-in-out infinite; }
+  [data-theme="rose-garden"] .mfy-frame-wrap::before,
+  [data-theme="midnight-stars"] .mfy-frame-wrap::before { animation: mfy-breathe 5s ease-in-out infinite; }
+  [data-theme="marigold-sun"] .mfy-frame-wrap::before { animation: mfy-spin 90s linear infinite; }
+
+  /* countdown digits tick when they change (the element is re-created per value) */
+  .mfy-count dd { animation: mfy-tick 0.4s ease-out; }
+
+  /* envelope seal invites a tap */
+  .mfy-env[data-opening="false"] .mfy-seal { animation: mfy-pulse 2.2s ease-in-out infinite; }
+
+  .mfy-tap { animation: mfy-rise 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+}
+
+@keyframes mfy-float { 50% { translate: 0 -8px; } }
+@keyframes mfy-breathe { 50% { scale: 1.1; opacity: 0.7; } }
+@keyframes mfy-spin { to { rotate: 360deg; } }
+@keyframes mfy-tick { from { opacity: 0.15; translate: 0 -0.25em; } }
+@keyframes mfy-pulse { 50% { scale: 1.12; } }
+@keyframes mfy-rise {
+  0% { opacity: 0; scale: 0.4; translate: 0 0; }
+  15% { opacity: 1; scale: 1.1; }
+  100% { opacity: 0; scale: 1; translate: var(--dx, 0px) -110px; }
+}

@@ -209,3 +209,26 @@ describe("setField (editing keeps translations honest)", () => {
     expect(validateContent(next).ok).toBe(true);
   });
 });
+
+describe("motion settings", () => {
+  it("accepts the zoom entrance and the tap effects, and rejects anything else", () => {
+    const c = starterSkeleton();
+    c.blocks[0]!.style.anim = "zoom";
+    c.settings.tap = "sparkles";
+    expect(validateContent(c).ok).toBe(true);
+    (c.settings as { tap: string }).tap = "fireworks";
+    expect(validateContent(c).ok).toBe(false);
+  });
+
+  it("defaults to no tap effect and no entrance animation", () => {
+    const c = starterSkeleton();
+    expect(c.settings.tap).toBe("none");
+    expect(c.blocks.every((b) => b.style.anim === "none")).toBe(true);
+  });
+
+  it("keeps the tap effect when a page is shared as a template (it is not personal)", () => {
+    const c = starterSkeleton();
+    c.settings.tap = "hearts";
+    expect(stripPersonal(c).content.settings.tap).toBe("hearts");
+  });
+});

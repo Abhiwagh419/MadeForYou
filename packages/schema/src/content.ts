@@ -14,6 +14,8 @@ export const SettingsSchema = z
       })
       .default({}),
     theme: z.object({ preset: z.string().max(40).default("rose-garden") }).default({}),
+    // What happens where the visitor taps the page. Off by default: not every page is a happy one.
+    tap: z.enum(["none", "hearts", "sparkles"]).default("none"),
     ambience: z
       .object({
         kind: z.enum(["none", "petals", "diyas", "stars", "confetti"]).default("none"),
@@ -39,8 +41,8 @@ export const SettingsSchema = z
 export const StyleSchema = z.object({
   align: z.enum(["left", "center", "right"]).default("center"),
   space: z.enum(["sm", "md", "lg"]).default("md"),
-  // Motion is opt-in: one deliberate entrance beats animating everything.
-  anim: z.enum(["none", "fade", "fade-up"]).default("none"),
+  // Revealed as the block scrolls into view. Motion is opt-in per block.
+  anim: z.enum(["none", "fade", "fade-up", "zoom"]).default("none"),
   bg: z.enum(["default", "soft", "accent"]).default("default"),
 });
 

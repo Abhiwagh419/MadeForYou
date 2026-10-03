@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import type { Block } from "@madeforyou/schema";
 import { useFields, useRender } from "./context";
 import { label } from "./labels";
@@ -6,6 +6,8 @@ import { label } from "./labels";
 type P = { block: Block };
 
 const paragraphs = (s: string) => s.split(/\n{2,}/).filter((p) => p.trim() !== "");
+/** Index used by CSS to stagger entrances: style="--i: 2". */
+const idx = (i: number) => ({ "--i": i }) as CSSProperties;
 
 export function Hero({ block }: P) {
   const x = useFields(block);
@@ -17,12 +19,21 @@ export function Hero({ block }: P) {
   return (
     <div className={`mfy-hero mfy-hero-${layout}`}>
       {showFrame && (
-        <div className={`mfy-frame ${coverUrl ? "" : `mfy-frame-empty ${x.ph("cover")}`}`}>
-          {coverUrl && <img src={coverUrl} alt={cover?.alt ?? ""} decoding="async" />}
+        <div className="mfy-frame-wrap">
+          <div className={`mfy-frame ${coverUrl ? "" : `mfy-frame-empty ${x.ph("cover")}`}`}>
+            {coverUrl && <img src={coverUrl} alt={cover?.alt ?? ""} decoding="async" />}
+          </div>
         </div>
       )}
       <div className="mfy-hero-text">
-        <h1 className={`mfy-hero-title ${x.ph("title")}`}>{x.t("title")}</h1>
+        <h1 className={`mfy-hero-title ${x.ph("title")}`}>
+          {x.t("title").split(/\s+/).filter(Boolean).map((w, i) => (
+            <Fragment key={i}>
+              {i > 0 && " "}
+              <span className="mfy-word" style={idx(i)}>{w}</span>
+            </Fragment>
+          ))}
+        </h1>
         <p className={`mfy-hero-recipient ${x.ph("recipient")}`}>{x.t("recipient")}</p>
         {sub && <p className={`mfy-hero-sub ${x.ph("subtitle")}`}>{sub}</p>}
       </div>
@@ -38,7 +49,7 @@ export function TextBlock({ block }: P) {
       {heading && <h2 className={`mfy-h2 ${x.ph("heading")}`}>{heading}</h2>}
       <div className={`mfy-prose ${x.ph("body")}`}>
         {paragraphs(x.t("body")).map((p, i) => (
-          <p key={i}>{p}</p>
+          <p key={i} style={idx(i)}>{p}</p>
         ))}
       </div>
     </div>
@@ -52,7 +63,7 @@ export function Letter({ block }: P) {
       <p className={`mfy-salutation ${x.ph("salutation")}`}>{x.t("salutation")}</p>
       <div className={`mfy-letter-body ${x.ph("body")}`}>
         {paragraphs(x.t("body")).map((p, i) => (
-          <p key={i}>{p}</p>
+          <p key={i} style={idx(i)}>{p}</p>
         ))}
       </div>
       <p className={`mfy-closing ${x.ph("closing")}`}>{x.t("closing")}</p>
@@ -78,7 +89,7 @@ export function Gallery({ block }: P) {
         const url = x.url(it.image);
         const alt = x.ref(it.image)?.alt ?? it.caption ?? "";
         return (
-          <li key={i} className="mfy-tile" data-tone={i % 4} aria-hidden={sample || undefined}>
+          <li key={i} className="mfy-tile" data-tone={i % 4} style={idx(i)} aria-hidden={sample || undefined}>
             <figure>
               {url ? <img src={url} alt={alt} loading="lazy" decoding="async" /> : <span className="mfy-tile-fill" />}
               {it.caption && <figcaption>{it.caption}</figcaption>}
@@ -143,7 +154,7 @@ export function Countdown({ block }: P) {
           {units.map(([k, v]) => (
             <div key={k}>
               <dt>{label(lang, k)}</dt>
-              <dd>{v === null ? "–" : String(v).padStart(2, "0")}</dd>
+              <dd key={v === null ? "-" : v}>{v === null ? "–" : String(v).padStart(2, "0")}</dd>
             </div>
           ))}
         </dl>
@@ -171,15 +182,46 @@ export const COMPONENTS: Record<string, (p: P) => ReactElement> = {
   signature: Signature,
 };
 
+/**
+ * Wraps every block. `data-in` flips to true once the block scrolls into view;
+ * CSS uses it to play entrances at the moment they can be seen (not on page load,
+ * when below-the-fold blocks would animate where nobody is looking).
+ */
 export function BlockView({ block }: P) {
   const C = COMPONENTS[block.type];
+  const ref = useRef<HTMLElement>(null);
+  const [seen, setSeen] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setSeen(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   if (!C) return null; // validation rejects unknown types; this is only a safety net
   const s = block.style;
   return (
     <section
+      ref={ref}
       id={block.id}
       data-block={block.type}
-      className={`mfy-block mfy-bg-${s.bg} mfy-space-${s.space} mfy-align-${s.align} mfy-anim-${s.anim}`}
+      data-in={seen}
+      data-reveal={s.anim === "none" ? undefined : s.anim}
+      className={`mfy-block mfy-bg-${s.bg} mfy-space-${s.space} mfy-align-${s.align}`}
     >
       <div className="mfy-inner">
         <C block={block} />

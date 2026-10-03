@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import type { AssetRef, Content } from "@madeforyou/schema";
 import { BRAND, themeToCssVars } from "@madeforyou/ui";
 import { Ambience } from "./Ambience";
@@ -6,6 +6,10 @@ import { BlockView } from "./blocks";
 import { RenderCtx } from "./context";
 import { Music } from "./Music";
 import { Opening } from "./Opening";
+import { useTapEffect } from "./Tap";
+
+// useLayoutEffect warns on the server; this picks the right one for each side.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export interface PageRendererProps {
   content: Content;
@@ -24,6 +28,10 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
   const activeLang = lang ?? settings.languages.default;
   const gated = !skipOpening && settings.opening.kind !== "none";
   const [opened, setOpened] = useState(!gated);
+  // Entrances only hide content once scripts are running, so a page without JS still shows everything.
+  const [armed, setArmed] = useState(false);
+  useIsoLayoutEffect(() => setArmed(true), []);
+  const tap = useTapEffect(settings.tap);
 
   const ctx = useMemo(
     () => ({ lang: activeLang, defaultLang: settings.languages.default, resolveAsset }),
@@ -33,7 +41,8 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
   return (
     <RenderCtx.Provider value={ctx}>
       <div
-        className="mfy-page"
+        className={`mfy-page ${armed ? "mfy-armed" : ""}`}
+        data-theme={settings.theme.preset}
         lang={activeLang}
         style={themeToCssVars(settings.theme.preset) as CSSProperties}
       >
@@ -42,11 +51,12 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
         ) : (
           <>
             <Ambience kind={settings.ambience.kind} intensity={settings.ambience.intensity} />
-            <main className="mfy-main">
+            <main className="mfy-main" onPointerUp={tap.onPointerUp}>
               {content.blocks.filter((b) => b.visible).map((b) => (
                 <BlockView key={b.id} block={b} />
               ))}
             </main>
+            {tap.layerEl}
             <footer className="mfy-footer">
               {/* Always on: with no ads and no paid tier, this is the growth loop. */}
               {BRAND.domain ? <a href={`https://${BRAND.domain}`}>{BRAND.badgeText}</a> : <span>{BRAND.badgeText}</span>}
