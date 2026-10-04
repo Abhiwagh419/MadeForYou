@@ -19,7 +19,7 @@ export const hero: BlockDef = {
   label: "Hero / Cover",
   fields: {
     recipient: f.text(60, {
-      personal: true, guided: true, required: true,
+      personal: true, guided: true, required: true, nameLike: true,
       prompt: "Who is this made for?", placeholder: "Their name",
     }),
     title: f.text(80, {
@@ -60,7 +60,7 @@ export const letter: BlockDef = {
   label: "Letter",
   fields: {
     salutation: f.text(80, {
-      personal: true, guided: true,
+      personal: true, guided: true, nameLike: true,
       prompt: "Who is the letter to?", placeholder: "Dear you,",
     }),
     body: f.longtext(5000, {
@@ -125,7 +125,7 @@ export const signature: BlockDef = {
       prompt: "Add a last line above your name", placeholder: "With love,",
     }),
     name: f.text(60, {
-      personal: true, guided: true, required: true,
+      personal: true, guided: true, required: true, nameLike: true,
       prompt: "Your name", placeholder: "Your name",
     }),
   },

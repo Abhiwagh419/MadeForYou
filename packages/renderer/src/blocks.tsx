@@ -20,7 +20,7 @@ export function Hero({ block }: P) {
     <div className={`mfy-hero mfy-hero-${layout}`}>
       {showFrame && (
         <div className="mfy-frame-wrap">
-          <div className={`mfy-frame ${coverUrl ? "" : `mfy-frame-empty ${x.ph("cover")}`}`}>
+          <div className={`mfy-frame ${coverUrl ? "" : "mfy-frame-empty"}`}>
             {coverUrl && <img src={coverUrl} alt={cover?.alt ?? ""} decoding="async" />}
           </div>
         </div>

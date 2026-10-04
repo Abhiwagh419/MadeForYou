@@ -85,7 +85,7 @@
   box-shadow: 0 0 0 0.35rem var(--mfy-bg), 0 0 0 0.45rem var(--mfy-primary);
 }
 .mfy-frame img { width: 100%; height: 100%; object-fit: cover; }
-.mfy-frame-empty { background: linear-gradient(160deg, var(--mfy-soft), color-mix(in srgb, var(--mfy-accent) 35%, var(--mfy-soft))); }
+.mfy-frame-empty { background: linear-gradient(160deg, color-mix(in srgb, var(--mfy-primary) 10%, var(--mfy-soft)), color-mix(in srgb, var(--mfy-accent) 38%, var(--mfy-soft))); }
 .mfy-hero-split { text-align: left; justify-items: start; }
 .mfy-hero-fullbleed .mfy-frame-wrap { width: 100%; }
 .mfy-hero-fullbleed .mfy-frame { aspect-ratio: 4 / 5; }
@@ -261,8 +261,8 @@
 [data-theme="marigold-sun"] .mfy-frame-wrap::before {
   inset: -22%;
   background: repeating-conic-gradient(color-mix(in srgb, var(--mfy-accent) 60%, transparent) 0 5deg, transparent 5deg 15deg);
-  -webkit-mask: radial-gradient(closest-side, transparent 60%, #000 63%, #000 80%, transparent 100%);
-  mask: radial-gradient(closest-side, transparent 60%, #000 63%, #000 80%, transparent 100%);
+  -webkit-mask: radial-gradient(closest-side, transparent 73%, #000 77%, #000 88%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent 73%, #000 77%, #000 88%, transparent 100%);
 }
 [data-theme="midnight-stars"] .mfy-frame-wrap::before {
   inset: -14%;
@@ -332,3 +332,8 @@
   15% { opacity: 1; scale: 1.1; }
   100% { opacity: 0; scale: 1; translate: var(--dx, 0px) -110px; }
 }
+
+/* Static mode: thumbnails and cards. No motion, no overlays, content always visible. */
+.mfy-static *, .mfy-static *::before, .mfy-static *::after { animation: none !important; transition: none !important; }
+.mfy-static .mfy-footer { display: none; }
+.mfy-static .mfy-block { overflow: hidden; }

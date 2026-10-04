@@ -158,7 +158,7 @@ describe("publish check", () => {
   });
 });
 
-import { setField } from "../src";
+import { personalNames, setField } from "../src";
 
 describe("setField (editing keeps translations honest)", () => {
   const withHindi = (): Content => {
@@ -230,5 +230,15 @@ describe("motion settings", () => {
     const c = starterSkeleton();
     c.settings.tap = "hearts";
     expect(stripPersonal(c).content.settings.tap).toBe("hearts");
+  });
+});
+
+describe("personalNames", () => {
+  it("returns typed names but not sample text or common words", () => {
+    expect(personalNames(starterSkeleton())).toEqual([]);
+    const c = filledPage();
+    const names = personalNames(c);
+    expect(names).toEqual(expect.arrayContaining(["priya", "abhi"]));
+    expect(names).not.toContain("dear");
   });
 });

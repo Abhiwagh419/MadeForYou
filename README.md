@@ -12,7 +12,8 @@ Needs Node 20+ and pnpm 9 (`npm i -g pnpm`).
 pnpm install
 pnpm test          # schema, templates and renderer tests
 pnpm typecheck
-pnpm preview       # opens the phone-frame preview app
+pnpm studio        # the website: home, search, guided mode, editor, publish, share, dashboard
+pnpm renderer-lab  # the old phone-frame harness for renderer work
 ```
 
 ## Layout
@@ -23,6 +24,7 @@ pnpm preview       # opens the phone-frame preview app
 | `packages/renderer` | JSON to page. Never imports the editor. Imports schema as types only, so zod stays out of the recipient bundle |
 | `packages/templates` | Launch templates as JSON, validated at load. CI fails on a bad template |
 | `packages/ui` | Brand constant and theme tokens |
+| `apps/studio` | The website, runs fully in the browser for now: home, search, template preview, guided mode, editor, publish, share (link, WhatsApp, QR), dashboard, share-as-template, and the visitor page with password and unlock gates. Pages and photos are stored in this browser (localStorage and IndexedDB) until the backend exists |
 | `apps/preview` | Vite app to see templates on a phone-sized frame and try guided mode, publish check and "share as template" |
 
 Planned, not created yet: `packages/editor`, `packages/i18n`, `apps/web` (Next.js on Cloudflare), `supabase/`.
@@ -46,3 +48,9 @@ template stripping and the publish check automatically.
 ## Editing rule
 
 Never assign `block.fields` directly. Use `setField()` from the schema package: it clears the placeholder flag and drops stale translations of that field, so a template's Hindi "माँ" can never hide the name a user typed.
+
+## Studio notes
+
+- Everything is local to the browser. The share link only opens on the same device until Supabase and Cloudflare are connected (milestones M0-M2). Password and unlock gates are enforced in the browser only for now; once live they move to the server.
+- A store selector must return a stable value. Select `s.pages`, then derive lists with `useMemo`; a selector that builds a new array each call re-renders forever (a test covers the dashboard).
+- Share-as-template refuses titles and search words that contain a name typed on the page (`personalNames`).

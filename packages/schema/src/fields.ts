@@ -15,6 +15,8 @@ export interface FieldTags {
   prompt?: string;
   /** Sample value shown (greyed) until the user fills the field. */
   placeholder?: unknown;
+  /** Holds a person's name. Used to stop names leaking into public template titles and tags. */
+  nameLike?: boolean;
 }
 
 export type FieldDef =

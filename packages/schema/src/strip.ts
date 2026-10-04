@@ -60,3 +60,31 @@ export function stripPersonal(content: Content, opts: StripOptions = {}): { cont
 
   return { content: { ...content, settings, blocks }, report };
 }
+
+const COMMON = new Set([
+  "dear", "my", "to", "hi", "hello", "love", "darling", "the", "and", "for", "with", "you", "your", "yours", "from",
+  "maa", "mom", "mummy", "papa", "dad", "bhaiya", "bhai", "didi", "behen", "sir", "madam", "mam", "friend", "yaar", "favourite", "person",
+]);
+
+/**
+ * Names the user actually typed (recipient, signature, salutation), lowercased. A public
+ * template's title and search words are checked against these so "For Priya" cannot be
+ * published as a template. A guard against slips, not a guarantee.
+ */
+export function personalNames(content: Content): string[] {
+  const out = new Set<string>();
+  for (const b of content.blocks) {
+    const def = registry[b.type];
+    if (!def) continue;
+    for (const [name, f] of Object.entries(def.fields)) {
+      if (!f.nameLike || b.ph.includes(name)) continue;
+      const v = b.fields[name];
+      if (typeof v !== "string") continue;
+      for (const w of v.split(/[\s,.;:!?'"“”()\-/]+/)) {
+        const t = w.trim().toLowerCase();
+        if (t.length >= 3 && !COMMON.has(t)) out.add(t);
+      }
+    }
+  }
+  return [...out];
+}
