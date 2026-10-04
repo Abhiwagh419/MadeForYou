@@ -100,6 +100,14 @@ export function savePage(id: string, patch: Partial<Omit<PageRecord, "id">>) {
   set({ ...state, pages: { ...state.pages, [id]: { ...cur, ...patch, updatedAt: now() } } });
 }
 
+/** Insert or replace whole records (used when pages arrive from the server). */
+export function upsertPages(records: PageRecord[]) {
+  if (!records.length) return;
+  const pages = { ...state.pages };
+  for (const r of records) pages[r.id] = r;
+  set({ ...state, pages });
+}
+
 export function deletePage(id: string) {
   const { [id]: _gone, ...rest } = state.pages;
   set({ ...state, pages: rest });

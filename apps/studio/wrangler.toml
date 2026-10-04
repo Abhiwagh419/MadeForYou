@@ -1,0 +1,18 @@
+# Cloudflare Pages project: the website, the API (functions/) and the database and photo storage it uses.
+name = "madeforyou"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "madeforyou"
+database_id = "REPLACE_WITH_THE_ID_PRINTED_BY_wrangler_d1_create"
+migrations_dir = "../../packages/api/migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "madeforyou-files"
+
+[vars]
+ALLOW_DEV_AUTH = "0"
+# Set these as secrets, not here:  SESSION_SECRET  CLERK_JWKS_URL  CLERK_ISSUER  ADMIN_TOKEN

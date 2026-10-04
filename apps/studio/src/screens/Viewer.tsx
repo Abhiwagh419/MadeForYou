@@ -1,15 +1,18 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { PageRenderer } from "@madeforyou/renderer";
 import { BRAND, themeToCssVars } from "@madeforyou/ui";
+import type { Content } from "@madeforyou/schema";
+import { apiRaw } from "../lib/api";
 import { useAssets } from "../lib/assets";
+import { isRemote } from "../lib/config";
 import { useRoute } from "../lib/router";
 import { sha256 } from "../lib/util";
 import { useStore, type PageRecord } from "../state/store";
 import { Button } from "../ui/Button";
 import { Mark } from "../ui/Logo";
 
-function Centered({ page, children }: { page?: PageRecord; children: React.ReactNode }) {
-  const style = themeToCssVars(page?.content.settings.theme.preset ?? "rose-garden") as CSSProperties;
+function Centered({ page, preset, children }: { page?: PageRecord; preset?: string; children: React.ReactNode }) {
+  const style = themeToCssVars(preset ?? page?.content.settings.theme.preset ?? "rose-garden") as CSSProperties;
   return (
     <div className="gate" style={style}>
       <div className="gate-card">{children}</div>
@@ -45,7 +48,7 @@ function Open({ page }: { page: PageRecord }) {
   return <PageRenderer content={page.content} resolveAsset={resolve} />;
 }
 
-export function Viewer() {
+function LocalViewer() {
   const { slug = "" } = useRoute().params;
   const page = useStore((s) => Object.values(s.pages).find((p) => p.slug === slug && p.status === "published"));
   const [unlocked, setUnlocked] = useState(false);
@@ -97,4 +100,106 @@ export function Viewer() {
       <Open page={page} />
     </>
   );
+}
+
+/* ---------- online: the server decides what this visitor may receive ---------- */
+
+type Remote =
+  | { state: "loading" }
+  | { state: "missing" }
+  | { state: "ended" }
+  | { state: "error"; message: string }
+  | { state: "locked"; unlockAt: string; theme: string }
+  | { state: "password"; theme: string; error?: string }
+  | { state: "open"; title: string; content: Content; assetToken: string; owner: boolean; visibility: string };
+
+function RemoteOpen({ v }: { v: Extract<Remote, { state: "open" }> }) {
+  const resolve = useAssets(v.content, v.assetToken);
+  useEffect(() => {
+    document.title = v.title;
+  }, [v.title]);
+  return (
+    <>
+      {v.owner && v.visibility === "private" && <div className="ribbon">Only you can see this page</div>}
+      <PageRenderer content={v.content} resolveAsset={resolve} />
+    </>
+  );
+}
+
+function RemoteViewer() {
+  const { slug = "" } = useRoute().params;
+  const [v, setV] = useState<Remote>({ state: "loading" });
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const accept = (status: number, data: any) =>
+    setV(status === 200 || status === 404 || status === 410 || status === 401 ? (data as Remote) : { state: "error", message: data?.error ?? "Something went wrong. Please try again." });
+
+  const load = useCallback(async () => {
+    try {
+      const r = await apiRaw(`/p/${slug}`);
+      accept(r.status, r.data);
+    } catch {
+      setV({ state: "error", message: "We could not reach the server. Check your connection." });
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    setV({ state: "loading" });
+    load();
+  }, [load]);
+
+  if (v.state === "loading") return <Centered><p>Opening…</p></Centered>;
+  if (v.state === "missing") {
+    return (
+      <Centered>
+        <h1>This page is not here</h1>
+        <p>The link may be mistyped, or the page may have been taken down.</p>
+        <Button href="/" variant="secondary">Make your own</Button>
+      </Centered>
+    );
+  }
+  if (v.state === "ended") return <Centered><h1>This page has ended</h1><p>Its time is up, but the person who made it can always share it again.</p></Centered>;
+  if (v.state === "error") return <Centered><h1>Hmm</h1><p>{v.message}</p><Button onClick={load}>Try again</Button></Centered>;
+  if (v.state === "locked") {
+    return (
+      <Centered preset={v.theme}>
+        <p className="gate-eyebrow">Something is waiting for you</p>
+        <h1>Not just yet</h1>
+        <Countdown to={Date.parse(v.unlockAt)} onDone={load} />
+        <p>It opens on {new Date(v.unlockAt).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })}. Come back then.</p>
+      </Centered>
+    );
+  }
+  if (v.state === "password") {
+    return (
+      <Centered preset={v.theme}>
+        <h1>Enter the password</h1>
+        <p>The person who sent you this link will have told you.</p>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            try {
+              const r = await apiRaw(`/p/${slug}/open`, { json: { password: pw } });
+              if (r.status === 429) setV({ state: "password", theme: v.theme, error: r.data?.error });
+              else accept(r.status, r.data);
+            } catch {
+              setV({ state: "password", theme: v.theme, error: "We could not reach the server." });
+            }
+            setBusy(false);
+          }}
+        >
+          <input className="in in-lg" type="password" value={pw} onChange={(e) => setPw(e.target.value)} aria-label="Password" autoFocus />
+          {v.error && <p className="field-error">{v.error}</p>}
+          <Button type="submit" size="lg" disabled={busy || !pw}>Open</Button>
+        </form>
+      </Centered>
+    );
+  }
+  return <RemoteOpen v={v} />;
+}
+
+export function Viewer() {
+  return isRemote() ? <RemoteViewer /> : <LocalViewer />;
 }

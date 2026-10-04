@@ -9,3 +9,4 @@ export * from "./publish";
 export * from "./skeleton";
 export * from "./template";
 export * from "./edit";
+export * from "./access";

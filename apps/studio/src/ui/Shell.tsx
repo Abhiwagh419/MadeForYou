@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 import { BRAND } from "@madeforyou/ui";
+import { useSession } from "../lib/auth";
 import { useStore } from "../state/store";
 import { Button } from "./Button";
 import { Logo } from "./Logo";
 
 export function Topbar({ active }: { active?: "templates" | "me" }) {
   const count = useStore((s) => Object.keys(s.pages).length);
+  const session = useSession();
   return (
     <header className="topbar">
       <div className="wrap topbar-in">
@@ -14,6 +16,9 @@ export function Topbar({ active }: { active?: "templates" | "me" }) {
           <a href="#/templates" className={active === "templates" ? "on" : ""}>Templates</a>
           <a href="#/me" className={active === "me" ? "on" : ""}>My pages{count > 0 && <em>{count}</em>}</a>
         </nav>
+        {session.mode !== "none" && (session.userId
+          ? <Button variant="ghost" size="sm" onClick={session.signOut} title={session.label}>Sign out</Button>
+          : <Button variant="secondary" size="sm" onClick={session.signIn}>Sign in</Button>)}
         <Button href="#/templates" size="sm" icon="plus">Create</Button>
       </div>
     </header>

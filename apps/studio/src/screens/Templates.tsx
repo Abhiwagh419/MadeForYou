@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import type { Template } from "@madeforyou/schema";
-import { OCCASIONS, searchTemplates, templates } from "@madeforyou/templates";
+import { OCCASIONS, searchTemplates } from "@madeforyou/templates";
 import { useRoute } from "../lib/router";
 import { startFromScratch } from "../lib/actions";
-import { useStore } from "../state/store";
+import { useAllTemplates } from "../state/library";
 import { Button } from "../ui/Button";
 import { Segmented } from "../ui/Controls";
 import { SearchBox } from "../ui/SearchBox";
@@ -14,13 +14,10 @@ type Mood = "all" | "romantic" | "emotional" | "festive" | "funny" | "minimal";
 
 export function Templates() {
   const q = useRoute().query.get("q") ?? "";
-  const mine = useStore((s) => s.templates);
   const [mood, setMood] = useState<Mood>("all");
   const [lang, setLang] = useState<"all" | "hi">("all");
 
-  const mineList = useMemo(() => Object.values(mine).map((r) => r.template), [mine]);
-  const all = useMemo(() => [...mineList, ...templates], [mineList]);
-  const mineIds = useMemo(() => new Set(mineList.map((t) => t.meta.id)), [mineList]);
+  const { all, mineIds } = useAllTemplates();
   const res = useMemo(() => searchTemplates(q, all), [q, all]);
 
   const shown = res.results.filter(

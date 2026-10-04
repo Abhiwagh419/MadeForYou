@@ -2,12 +2,15 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { PageRenderer } from "@madeforyou/renderer";
 import { registry, type Content } from "@madeforyou/schema";
 import { useAssets } from "../lib/assets";
+import { useSession } from "../lib/auth";
+import { isRemote } from "../lib/config";
+import { pushPage } from "../lib/sync";
 import { go, useRoute } from "../lib/router";
 import { scrollToBlock } from "../lib/util";
 import {
   addBlock, duplicateBlock, editorReducer, initEditor, moveBlock, removeBlock, toggleVisible,
 } from "../state/editor";
-import { deletePage, savePage, useStore, type PageRecord } from "../state/store";
+import { deletePage, getState, savePage, useStore, type PageRecord } from "../state/store";
 import { Button } from "../ui/Button";
 import { Segmented, Sheet, toast, useMedia } from "../ui/Controls";
 import { Icon } from "../ui/Icon";
@@ -54,6 +57,9 @@ function EditorInner({ page }: { page: PageRecord }) {
   const [full, setFull] = useState(false);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState(page.title);
+  const [sync, setSync] = useState<"idle" | "syncing" | "ok" | "error">("idle");
+  const session = useSession();
+  const pushed = useRef<Content | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const mobile = useMedia("(max-width: 960px)");
 
@@ -72,6 +78,26 @@ function EditorInner({ page }: { page: PageRecord }) {
     }, 400);
     return () => clearTimeout(t);
   }, [content, page.content, page.id]);
+
+  // While signed in, changes also go to the server (a little after you pause), so a published page updates for visitors.
+  useEffect(() => {
+    if (!isRemote() || !session.userId || content === pushed.current) return;
+    const t = setTimeout(async () => {
+      const rec = getState().pages[page.id];
+      if (!rec) return;
+      setSync("syncing");
+      try {
+        await pushPage({ ...rec, content });
+        pushed.current = content;
+        setSync("ok");
+      } catch (e) {
+        setSync("error");
+        if (sync !== "error") toast((e as Error).message);
+      }
+    }, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, session.userId, page.id]);
 
   // keep the language valid if one is switched off
   useEffect(() => {
@@ -167,7 +193,9 @@ function EditorInner({ page }: { page: PageRecord }) {
       <header className="ed-top">
         <a className="guided-brand" href="#/me" aria-label="Back to my pages"><Mark size={24} /></a>
         <input className="ed-title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} maxLength={60} aria-label="Page name" />
-        <span className={`saved ${saving ? "saving" : ""}`}>{saving ? "Saving…" : <><Icon name="check" size={14} />Saved</>}</span>
+        <span className={`saved ${saving || sync === "error" ? "saving" : ""}`}>
+          {saving ? "Saving…" : sync === "error" ? "Saved here, not synced yet" : <><Icon name="check" size={14} />{sync === "ok" ? "Saved and synced" : "Saved"}</>}
+        </span>
         <span className="grow" />
         <Button variant="ghost" size="sm" icon="undo" aria-label="Undo" disabled={!state.past.length} onClick={() => dispatch({ type: "undo" })} />
         <Button variant="ghost" size="sm" icon="redo" aria-label="Redo" disabled={!state.future.length} onClick={() => dispatch({ type: "redo" })} />

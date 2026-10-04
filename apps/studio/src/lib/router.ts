@@ -31,12 +31,26 @@ export function parseHash(hash: string): Route {
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("hashchange", cb);
-  return () => window.removeEventListener("hashchange", cb);
+  window.addEventListener("popstate", cb);
+  return () => {
+    window.removeEventListener("hashchange", cb);
+    window.removeEventListener("popstate", cb);
+  };
 };
 
+/** Visitor links are real paths (/p/priya) so the server can add a link preview; the studio uses #/ routes. */
+export function parseLocation(pathname: string, hash: string): Route {
+  const m = pathname.match(/^\/p\/([\w-]+)\/?$/);
+  if (m) return { name: "view", params: { slug: m[1]! }, query: new URLSearchParams() };
+  return parseHash(hash);
+}
+
 export function useRoute(): Route {
-  const hash = useSyncExternalStore(subscribe, () => window.location.hash, () => "");
-  return useMemo(() => parseHash(hash), [hash]);
+  const key = useSyncExternalStore(subscribe, () => `${window.location.pathname}|${window.location.hash}`, () => "");
+  return useMemo(() => {
+    const [path = "/", hash = ""] = key.split("|");
+    return parseLocation(path, hash);
+  }, [key]);
 }
 
 export const go = (path: string) => {

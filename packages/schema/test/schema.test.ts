@@ -242,3 +242,26 @@ describe("personalNames", () => {
     expect(names).not.toContain("dear");
   });
 });
+
+import { assetIds, gateState, slugStatus } from "../src";
+
+describe("shared access rules", () => {
+  const now = Date.parse("2026-10-04T12:00:00Z");
+  it("orders the gates: ended, locked, password, open", () => {
+    expect(gateState({ hasPassword: false }, now)).toBe("open");
+    expect(gateState({ hasPassword: true }, now)).toBe("password");
+    expect(gateState({ hasPassword: true, unlockAt: "2026-12-01T00:00:00Z" }, now)).toBe("locked");
+    expect(gateState({ hasPassword: true, unlockAt: "2026-01-01T00:00:00Z" }, now)).toBe("password");
+    expect(gateState({ hasPassword: false, unlockAt: "2026-12-01T00:00:00Z", expiresAt: "2026-10-01T00:00:00Z" }, now)).toBe("ended");
+  });
+  it("finds every asset a page uses, once", () => {
+    const c = filledPage();
+    expect(assetIds(c).sort()).toEqual(["ast_secret1", "ast_secret2"]);
+  });
+  it("validates links", () => {
+    expect(slugStatus("priya-2026", () => false)).toBe("ok");
+    expect(slugStatus("api", () => false)).toBe("reserved");
+    expect(slugStatus("A", () => false)).toBe("short");
+    expect(slugStatus("taken-one", (s) => s === "taken-one")).toBe("taken");
+  });
+});

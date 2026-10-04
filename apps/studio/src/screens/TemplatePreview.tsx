@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { getOccasion, templates } from "@madeforyou/templates";
+import { getOccasion } from "@madeforyou/templates";
 import { THEMES } from "@madeforyou/ui";
-import { useStore } from "../state/store";
+import { useAllTemplates } from "../state/library";
 import { useRoute } from "../lib/router";
 import { startFromTemplate } from "../lib/actions";
 import { Button } from "../ui/Button";
@@ -11,8 +11,8 @@ import { NotFound, Shell } from "../ui/Shell";
 
 export function TemplatePreview() {
   const { id = "" } = useRoute().params;
-  const mine = useStore((s) => s.templates);
-  const t = useMemo(() => templates.find((x) => x.meta.id === id) ?? mine[id]?.template, [id, mine]);
+  const { all } = useAllTemplates();
+  const t = useMemo(() => all.find((x) => x.meta.id === id), [id, all]);
   const [lang, setLang] = useState("en");
   const [replay, setReplay] = useState(0);
 

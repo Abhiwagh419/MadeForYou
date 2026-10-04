@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local testing with `pnpm --filter @madeforyou/studio cf:dev`. Never commit .dev.vars.
+SESSION_SECRET=feelinglovedisthebestfeelingintheworld
+ALLOW_DEV_AUTH=1
+ADMIN_TOKEN=Abhiwagh419

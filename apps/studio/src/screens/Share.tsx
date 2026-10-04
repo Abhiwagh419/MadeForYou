@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { BRAND } from "@madeforyou/ui";
+import { isRemote } from "../lib/config";
 import { useRoute } from "../lib/router";
 import { formatWhen, pageUrl, waLink } from "../lib/util";
 import { useStore } from "../state/store";
@@ -53,12 +54,16 @@ export function Share() {
 
           <div className="share-actions">
             <Button size="lg" icon="whatsapp" href={waLink(message)} target="_blank" rel="noopener noreferrer">Send on WhatsApp</Button>
-            <Button size="lg" variant="secondary" icon="external" href={`#/p/${page.slug}`} target="_blank" rel="noopener">Open the page</Button>
+            <Button size="lg" variant="secondary" icon="external" href={url} target="_blank" rel="noopener">Open the page</Button>
           </div>
 
           <div className="note-box">
             <Icon name="globe" size={16} />
-            <span>This link works on this device while {BRAND.name} is being built. When it goes live, the same page and link will open for everyone.</span>
+            <span>
+              {isRemote()
+                ? "Anyone with this link can open it on any phone. If you edit the page, the changes go live within a few seconds."
+                : `This link works on this device while ${BRAND.name} is being built. When it goes live, the same page and link will open for everyone.`}
+            </span>
           </div>
 
           <div className="pcard">

@@ -4,6 +4,9 @@ import { OCCASIONS } from "@madeforyou/templates";
 import { go, useRoute } from "../lib/router";
 import { humanize, slugify } from "../lib/util";
 import { addTemplate, useStore } from "../state/store";
+import { useSession } from "../lib/auth";
+import { isRemote } from "../lib/config";
+import { pushTemplate } from "../lib/sync";
 import { Button } from "../ui/Button";
 import { Segmented, Switch, toast } from "../ui/Controls";
 import { Field } from "../ui/Fields";
@@ -23,6 +26,7 @@ function describe(v: unknown): string {
 export function TemplateFrom() {
   const { id = "" } = useRoute().params;
   const page = useStore((s) => s.pages[id]);
+  const session = useSession();
   const [keep, setKeep] = useState<Record<string, string[]>>({});
   const [title, setTitle] = useState("");
   const [occasion, setOccasion] = useState(OCCASIONS.find((o) => o.id === "birthday")?.id ?? "");
@@ -63,6 +67,9 @@ export function TemplateFrom() {
     if (!r.ok) return setError(r.issues.map((i) => i.message).join(". "));
     addTemplate(r.template, id);
     toast("Template created");
+    if (isRemote() && session.userId) {
+      pushTemplate(r.template, id).catch((e) => toast(`Saved here, but not to your account: ${(e as Error).message}`));
+    }
     go(`/t/${tid}`);
   };
 

@@ -1,4 +1,7 @@
 import { useEffect } from "react";
+import { useSession } from "./lib/auth";
+import { isRemote } from "./lib/config";
+import { pullPages, refreshOwnerToken } from "./lib/sync";
 import { Editor } from "./editor/Editor";
 import { useRoute } from "./lib/router";
 import { Dashboard } from "./screens/Dashboard";
@@ -10,8 +13,30 @@ import { TemplateFrom } from "./screens/TemplateFrom";
 import { TemplatePreview } from "./screens/TemplatePreview";
 import { Templates } from "./screens/Templates";
 import { Viewer } from "./screens/Viewer";
-import { Toaster } from "./ui/Controls";
+import { Toaster, toast } from "./ui/Controls";
 import { NotFound } from "./ui/Shell";
+
+/** When someone signs in: fetch their photo access, then bring their saved pages onto this device. */
+function SyncOnSignIn() {
+  const { userId } = useSession();
+  useEffect(() => {
+    if (!isRemote() || !userId) return;
+    let alive = true;
+    (async () => {
+      try {
+        await refreshOwnerToken();
+        const n = await pullPages();
+        if (alive && n) toast(`Brought ${n} page${n === 1 ? "" : "s"} from your account`);
+      } catch {
+        /* offline: everything keeps working on this device */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+  return null;
+}
 
 export function App() {
   const route = useRoute();
@@ -38,6 +63,7 @@ export function App() {
   return (
     <>
       {screen}
+      <SyncOnSignIn />
       <Toaster />
     </>
   );

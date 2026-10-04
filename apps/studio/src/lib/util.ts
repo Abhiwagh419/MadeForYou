@@ -1,3 +1,7 @@
+import { slugStatus, type SlugStatus } from "@madeforyou/schema";
+import { isRemote } from "./config";
+export { slugStatus, type SlugStatus };
+
 export const uid = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
 
 /** "End message" from "endMessage". */
@@ -18,14 +22,6 @@ export function slugify(s: string): string {
     .slice(0, 30);
 }
 
-const RESERVED = new Set(["admin", "api", "app", "edit", "new", "me", "p", "t", "www", "about", "help", "login", "make", "publish", "share", "templates", "home"]);
-export type SlugStatus = "ok" | "short" | "invalid" | "reserved" | "taken";
-export function slugStatus(slug: string, isTaken: (s: string) => boolean): SlugStatus {
-  if (slug.length < 3) return "short";
-  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) || slug.length > 30) return "invalid";
-  if (RESERVED.has(slug)) return "reserved";
-  return isTaken(slug) ? "taken" : "ok";
-}
 export const SLUG_MESSAGES: Record<SlugStatus, string> = {
   ok: "This link is available",
   short: "Use at least 3 characters",
@@ -67,7 +63,7 @@ export const waLink = (text: string) => `https://wa.me/?text=${encodeURIComponen
 
 export function pageUrl(slug: string): string {
   const { origin, pathname } = window.location;
-  return `${origin}${pathname}#/p/${slug}`;
+  return isRemote() ? `${origin}/p/${slug}` : `${origin}${pathname}#/p/${slug}`;
 }
 
 export async function sha256(text: string): Promise<string> {

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useSyncExternalStore } from "react";
 import type { AssetRef, Content } from "@madeforyou/schema";
+import { apiBase, isRemote } from "./config";
 import { uid } from "./util";
 
 /**
@@ -8,6 +9,19 @@ import { uid } from "./util";
  * a memory map takes over.
  */
 const urlCache = new Map<string, string>();
+
+/* Photos that are not on this device (a page pulled from the server) load through the API with a short-lived token. */
+let ownerToken: string | null = null;
+const tokenListeners = new Set<() => void>();
+export function setOwnerToken(t: string | null) {
+  ownerToken = t;
+  tokenListeners.forEach((l) => l());
+}
+const useOwnerToken = () => useSyncExternalStore((cb) => (tokenListeners.add(cb), () => tokenListeners.delete(cb)), () => ownerToken, () => ownerToken);
+const remoteUrl = (id: string, token?: string | null) => {
+  const t = token ?? ownerToken;
+  return isRemote() && t ? `${apiBase()}/a/${id}?t=${encodeURIComponent(t)}` : undefined;
+};
 const memory = new Map<string, Blob>();
 
 function openDb(): Promise<IDBDatabase> {
@@ -51,6 +65,8 @@ async function getBlob(id: string): Promise<Blob | undefined> {
   }
 }
 
+export const getLocalBlob = (id: string) => getBlob(id);
+
 export const MAX_EDGE = 1280;
 
 /** Resize to at most 1280px on the long edge and re-encode as WebP, in the browser, before storing. */
@@ -81,7 +97,8 @@ export async function saveImage(file: File): Promise<AssetRef> {
 const ID_RE = /ast_[A-Za-z0-9_-]{4,64}/g;
 
 /** Resolves asset references used in `content` to object URLs, re-rendering when they load. */
-export function useAssets(content: Content): (ref: AssetRef) => string | undefined {
+export function useAssets(content: Content, token?: string | null): (ref: AssetRef) => string | undefined {
+  const owner = useOwnerToken();
   const [version, bump] = useReducer((x: number) => x + 1, 0);
   const ids = useMemo(() => [...new Set(JSON.stringify(content).match(ID_RE) ?? [])], [content]);
 
@@ -104,7 +121,7 @@ export function useAssets(content: Content): (ref: AssetRef) => string | undefin
     };
   }, [ids]);
 
-  return useMemo(() => (ref: AssetRef) => urlCache.get(ref.asset), [version, ids]);
+  return useMemo(() => (ref: AssetRef) => urlCache.get(ref.asset) ?? remoteUrl(ref.asset, token), [version, ids, token, owner]);
 }
 
 export const assetUrl = (id: string) => urlCache.get(id);
@@ -112,6 +129,7 @@ export const assetUrl = (id: string) => urlCache.get(id);
 /** URL for one asset id (or undefined while loading / if it does not exist). */
 export function useAssetUrl(id?: string | null): string | undefined {
   const [, bump] = useReducer((x: number) => x + 1, 0);
+  useOwnerToken();
   useEffect(() => {
     if (!id || urlCache.has(id)) return;
     let alive = true;
@@ -124,5 +142,5 @@ export function useAssetUrl(id?: string | null): string | undefined {
       alive = false;
     };
   }, [id]);
-  return id ? urlCache.get(id) : undefined;
+  return id ? urlCache.get(id) ?? remoteUrl(id) : undefined;
 }

@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import { deletePage, deleteTemplate, duplicatePage, useStore, type PageRecord } from "../state/store";
+import { useSession } from "../lib/auth";
+import { isRemote } from "../lib/config";
+import { removeRemote } from "../lib/sync";
 import { formatWhen } from "../lib/util";
 import { go } from "../lib/router";
 import { Button } from "../ui/Button";
@@ -24,6 +27,7 @@ export function Dashboard() {
   const mine = useMemo(() => Object.values(templateMap), [templateMap]);
   const [tab, setTab] = useState<"pages" | "templates">("pages");
   const [doomed, setDoomed] = useState<PageRecord | null>(null);
+  const session = useSession();
 
   return (
     <Shell active="me">
@@ -37,6 +41,16 @@ export function Dashboard() {
       </div>
 
       <div className="wrap">
+        {isRemote() && (
+          <div className="note-box">
+            <span>
+              {session.userId
+                ? "Your pages are saved to your account, so you can open them on any device."
+                : "You are not signed in. Pages stay on this device only. Sign in and they are saved to your account."}
+            </span>
+            {!session.userId && <Button size="sm" onClick={session.signIn}>Sign in</Button>}
+          </div>
+        )}
         {tab === "pages" ? (
           pages.length === 0 ? (
             <div className="empty empty-left">
@@ -91,7 +105,14 @@ export function Dashboard() {
         <p>“{doomed?.title}” will be removed from this device. This cannot be undone.</p>
         <div className="cta-row">
           <Button variant="secondary" onClick={() => setDoomed(null)}>Keep it</Button>
-          <Button variant="danger" icon="trash" onClick={() => { if (doomed) deletePage(doomed.id); setDoomed(null); go("/me"); }}>Delete</Button>
+          <Button variant="danger" icon="trash" onClick={() => {
+            if (doomed) {
+              deletePage(doomed.id);
+              if (isRemote() && session.userId) removeRemote(doomed.id).catch(() => toast("Removed here. We will clear it from your account when you are back online"));
+            }
+            setDoomed(null);
+            go("/me");
+          }}>Delete</Button>
         </div>
       </Sheet>
     </Shell>

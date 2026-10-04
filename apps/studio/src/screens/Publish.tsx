@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
-import { checkPublishable, registry } from "@madeforyou/schema";
+import { useEffect, useMemo, useState } from "react";
+import { checkPublishable, registry, type SlugStatus } from "@madeforyou/schema";
 import { BRAND } from "@madeforyou/ui";
+import { api } from "../lib/api";
+import { useSession } from "../lib/auth";
+import { isRemote } from "../lib/config";
+import { publishRemote } from "../lib/sync";
 import { go, useRoute } from "../lib/router";
 import { SLUG_MESSAGES, formatWhen, sha256, slugStatus, slugSuggestions, slugify } from "../lib/util";
 import { savePage, slugTaken, useStore } from "../state/store";
@@ -44,20 +48,50 @@ function PublishInner({ id }: { id: string }) {
   const [useExpiry, setUseExpiry] = useState(!!page.access.expiresAt);
   const [expiry, setExpiry] = useState(toLocalInput(page.access.expiresAt));
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [serverStatus, setServerStatus] = useState<SlugStatus | null>(null);
+  const session = useSession();
+  const needSignIn = isRemote() && !session.userId;
 
   const check = useMemo(() => checkPublishable(page.content), [page.content]);
   const errors = check.issues.filter((i) => i.severity === "error");
   const warnings = check.issues.filter((i) => i.severity === "warning");
-  const status = slugStatus(slug, (s) => slugTaken(s, id));
+  const localStatus = slugStatus(slug, (s) => slugTaken(s, id));
+  // Online, the server is the judge of who already has a link.
+  const status: SlugStatus = localStatus !== "ok" ? localStatus : serverStatus ?? "ok";
+  useEffect(() => {
+    setServerStatus(null);
+    if (!isRemote() || localStatus !== "ok") return;
+    const t = setTimeout(() => {
+      api<{ status: SlugStatus }>(`/slug/${slug}?page=${id}`, { auth: false }).then((r) => setServerStatus(r.status)).catch(() => {});
+    }, 350);
+    return () => clearTimeout(t);
+  }, [slug, id, localStatus]);
   const pwNeeded = usePw && !page.access.passwordHash && pw.length < 4;
   const lockInvalid = useLock && (!unlock || new Date(unlock).getTime() <= Date.now());
   const expiryInvalid = useExpiry && (!expiry || new Date(expiry).getTime() <= Date.now());
-  const ready = check.canPublish && status === "ok" && !pwNeeded && !lockInvalid && !expiryInvalid;
+  const ready = check.canPublish && status === "ok" && !pwNeeded && !lockInvalid && !expiryInvalid && !needSignIn;
 
   const blockName = (bid: string) => registry[page.content.blocks.find((b) => b.id === bid)?.type ?? ""]?.label ?? "Block";
 
   const publish = async () => {
     setBusy(true);
+    setError("");
+    if (isRemote()) {
+      try {
+        await publishRemote(id, {
+          slug, visibility,
+          password: usePw ? (pw ? pw : undefined) : null,
+          unlockAt: useLock ? new Date(unlock).toISOString() : null,
+          expiresAt: useExpiry && expiry ? new Date(expiry).toISOString() : null,
+        });
+        go(`/share/${id}`);
+      } catch (e) {
+        setError((e as Error).message);
+        setBusy(false);
+      }
+      return;
+    }
     const passwordHash = usePw ? (pw ? await sha256(pw) : page.access.passwordHash) : undefined;
     savePage(id, {
       slug, status: "published", publishedAt: page.publishedAt ?? new Date().toISOString(),
@@ -76,6 +110,14 @@ function PublishInner({ id }: { id: string }) {
         <div className="publish-main">
           <a className="back" href={`#/edit/${id}`}>← Back to editor</a>
           <h1>Ready to share it?</h1>
+
+          {needSignIn && (
+            <section className="pcard">
+              <h2>Create your free account</h2>
+              <p className="field-hint">So your page lives on our servers and opens on any phone. It takes a few seconds, and your work so far is kept.</p>
+              <div><Button onClick={session.signIn}>Sign in or sign up</Button></div>
+            </section>
+          )}
 
           <section className="pcard">
             <h2><span className="num">1</span>Quick check</h2>
@@ -146,13 +188,16 @@ function PublishInner({ id }: { id: string }) {
               )}
             </div>
             {(usePw || useLock) && (
-              <p className="note-box"><Icon name="lock" size={16} />Once {BRAND.name} is live, passwords and locks are enforced on our servers, so locked content is never sent to anyone early. In this preview they are enforced in your browser only.</p>
+              <p className="note-box"><Icon name="lock" size={16} />{isRemote()
+                ? "Passwords and locks are enforced on our servers: a locked page is never sent to anyone before its time, not even to someone who looks at the network traffic."
+                : `Once ${BRAND.name} is live, passwords and locks are enforced on our servers, so locked content is never sent to anyone early. In this preview they are enforced in your browser only.`}</p>
             )}
           </section>
 
           <div className="publish-cta">
             <Button size="lg" iconRight="right" disabled={!ready || busy} onClick={publish}>{page.status === "published" ? "Update and share" : "Publish"}</Button>
-            {!ready && <p className="field-hint">{errors.length ? "Fix the red items above first." : status !== "ok" ? "Choose an available link." : "Check the options above."}</p>}
+            {error && <p className="field-error">{error}</p>}
+            {!ready && <p className="field-hint">{needSignIn ? "Sign in to publish." : errors.length ? "Fix the red items above first." : status !== "ok" ? "Choose an available link." : "Check the options above."}</p>}
           </div>
         </div>
 
