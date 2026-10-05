@@ -3,8 +3,8 @@ import type { Content } from "./content";
 /* ---------- limits shared by the browser and the server ---------- */
 export const LIMITS = {
   pagesPerUser: 30,
-  assetBytes: 5 * 1024 * 1024, // after the browser has compressed it, photos are ~200 KB
-  userBytes: 50 * 1024 * 1024,
+  assetBytes: 1.5 * 1024 * 1024, // photos are shrunk in the browser first, so they are usually 150-400 KB; D1 allows 2 MB per row
+  userBytes: 25 * 1024 * 1024,
   titleChars: 60,
 } as const;
 

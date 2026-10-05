@@ -23,7 +23,8 @@ export interface R2Like {
 
 export interface Env {
   DB: D1Like;
-  FILES: R2Like;
+  /** Optional. With no R2 bucket bound, photos are stored in the database (no payment card needed). */
+  FILES?: R2Like;
   /** Signs photo and gate tokens and peppers password hashes. Set with `wrangler pages secret put`. */
   SESSION_SECRET: string;
   CLERK_JWKS_URL?: string;

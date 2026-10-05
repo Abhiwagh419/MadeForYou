@@ -37,6 +37,20 @@ const isoOrNull = (v: unknown): string | null | undefined => {
   return new Date(v).toISOString();
 };
 
+/** Photo storage: R2 when a bucket is bound, otherwise the database itself. */
+async function putFile(env: Env, id: string, buf: ArrayBuffer, type: string): Promise<void> {
+  if (env.FILES) {
+    await env.FILES.put(`a/${id}`, buf, { httpMetadata: { contentType: type } });
+    return;
+  }
+  await env.DB.prepare("INSERT INTO asset_blobs (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data").bind(id, buf).run();
+}
+async function getFile(env: Env, id: string): Promise<BodyInit | null> {
+  if (env.FILES) return (await env.FILES.get(`a/${id}`))?.body ?? null;
+  const row = await env.DB.prepare("SELECT data FROM asset_blobs WHERE id = ?").bind(id).first<{ data: ArrayLike<number> }>();
+  return row ? (new Uint8Array(row.data) as unknown as BodyInit) : null;
+}
+
 class HttpError extends Error {
   constructor(public status: number, message: string, public extra?: Record<string, unknown>) {
     super(message);
@@ -282,9 +296,9 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const used = await c.env.DB.prepare("SELECT COALESCE(SUM(bytes), 0) AS n FROM assets WHERE owner_id = ?").bind(userId).first<{ n: number }>();
     if ((used?.n ?? 0) - (existing?.bytes ?? 0) + buf.byteLength > LIMITS.userBytes) throw new HttpError(413, "You have used all your free photo space. Delete some pages to free it up.");
 
-    await c.env.FILES.put(`a/${id}`, buf, { httpMetadata: { contentType: type } });
     await c.env.DB.prepare("INSERT INTO assets (id, owner_id, content_type, bytes, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET content_type = excluded.content_type, bytes = excluded.bytes")
       .bind(id, userId, type, buf.byteLength, iso()).run();
+    await putFile(c.env, id, buf, type);
     return c.json({ id, bytes: buf.byteLength });
   });
 
@@ -307,9 +321,9 @@ export function createApp(overrides: Partial<Deps> = {}) {
     }
     if (!allowed) return notFound();
 
-    const obj = await c.env.FILES.get(`a/${id}`);
-    if (!obj) return notFound();
-    return new Response(obj.body, { headers: { "Content-Type": asset.content_type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff" } });
+    const body = await getFile(c.env, id);
+    if (!body) return notFound();
+    return new Response(body, { headers: { "Content-Type": asset.content_type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff" } });
   });
 
   /* ------------------------------ templates ------------------------------ */
@@ -374,6 +388,19 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (action !== "approve" && action !== "reject") throw new HttpError(400, "Unknown action");
     const r = await c.env.DB.prepare("UPDATE templates SET status = ? WHERE id = ?").bind(action === "approve" ? "approved" : "rejected", c.req.param("id")).run();
     return c.json({ ok: true, changed: r.meta?.changes ?? 0 });
+  });
+  /** A quick look at how full the free database is. */
+  app.get("/admin/usage", async (c) => {
+    admin(c);
+    const one = async (q: string) => (await c.env.DB.prepare(q).first<{ n: number }>())?.n ?? 0;
+    return c.json({
+      users: await one("SELECT COUNT(*) AS n FROM users"),
+      pages: await one("SELECT COUNT(*) AS n FROM pages WHERE deleted_at IS NULL"),
+      published: await one("SELECT COUNT(*) AS n FROM pages WHERE status = 'published' AND deleted_at IS NULL"),
+      photos: await one("SELECT COUNT(*) AS n FROM assets"),
+      photoMegabytes: Math.round((await one("SELECT COALESCE(SUM(bytes), 0) AS n FROM assets")) / 1024 / 1024 * 10) / 10,
+      storage: c.env.FILES ? "r2" : "database (free limit 500 MB in total)",
+    });
   });
   app.get("/admin/templates/pending", async (c) => {
     admin(c);

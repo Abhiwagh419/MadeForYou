@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { generateKeyPair, SignJWT, exportJWK, createLocalJWKSet } from "jose";
@@ -10,14 +10,15 @@ import type { D1Like, D1PreparedStatement, Deps, Env, R2Like } from "./types";
 /** A D1-shaped database on top of node:sqlite, running the real migration file. */
 export function makeDb(): D1Like {
   const db = new DatabaseSync(":memory:");
-  const sql = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../migrations/0001_init.sql"), "utf8");
-  db.exec(sql);
+  const dir = join(dirname(fileURLToPath(import.meta.url)), "../migrations");
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".sql")).sort()) db.exec(readFileSync(join(dir, f), "utf8"));
+  const toSql = (v: unknown) => (v instanceof ArrayBuffer ? new Uint8Array(v) : v);
   const stmt = (query: string, args: unknown[] = []): D1PreparedStatement => ({
     bind: (...v: unknown[]) => stmt(query, v),
-    first: async <T>() => ((db.prepare(query).get(...(args as never[])) as T | undefined) ?? null),
-    all: async <T>() => ({ results: db.prepare(query).all(...(args as never[])) as T[] }),
+    first: async <T>() => ((db.prepare(query).get(...(args.map(toSql) as never[])) as T | undefined) ?? null),
+    all: async <T>() => ({ results: db.prepare(query).all(...(args.map(toSql) as never[])) as T[] }),
     run: async () => {
-      const r = db.prepare(query).run(...(args as never[]));
+      const r = db.prepare(query).run(...(args.map(toSql) as never[]));
       return { success: true, meta: { changes: Number(r.changes) } };
     },
   });

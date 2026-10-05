@@ -6,12 +6,15 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "madeforyou"
-database_id = "REPLACE_WITH_THE_ID_PRINTED_BY_wrangler_d1_create"
+database_id = "ce081e99-00ce-4972-a170-35210740392d"
 migrations_dir = "../../packages/api/migrations"
 
-[[r2_buckets]]
-binding = "FILES"
-bucket_name = "madeforyou-files"
+# Photos are stored in the database by default, so no payment card is needed.
+# If you later enable R2 (Cloudflare asks for a card, though the free tier is 10 GB), create a bucket and
+# uncomment these three lines; new photos then go to R2 instead.
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "madeforyou-files"
 
 [vars]
 ALLOW_DEV_AUTH = "0"

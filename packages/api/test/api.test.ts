@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { setField, starterSkeleton, stripPersonal, type Content } from "@madeforyou/schema";
+import { LIMITS, setField, starterSkeleton, stripPersonal, type Content } from "@madeforyou/schema";
 import { getTemplate } from "@madeforyou/templates";
+import { createApp } from "../src";
 import { makeClient, makeEnv, makeJwtSetup, SECRET } from "../src/testing";
+
+const makeApp = (e: ReturnType<typeof makeEnv>) => {
+  const app = createApp({ now: () => 1_790_000_000_000 });
+  return (path: string) => app.request(path, {}, e);
+};
 
 const webp = () => {
   const b = new Uint8Array(40);
@@ -214,14 +220,15 @@ describe("photos", () => {
     expect((await upload("abhi", "ast_photo3", jpeg(), "image/webp")).status).toBe(415);
     expect((await upload("abhi", "ast_photo4", webp(), "image/svg+xml")).status).toBe(415);
     expect((await upload("abhi", "bad id!")).status).toBe(400);
-    const big = new Uint8Array(5 * 1024 * 1024 + 10);
+    const big = new Uint8Array(LIMITS.assetBytes + 10);
     big.set(webp());
     expect((await upload("abhi", "ast_photo5", big)).status).toBe(413);
   });
   it("enforces each person's storage allowance", async () => {
-    const chunk = new Uint8Array(4 * 1024 * 1024);
+    const chunk = new Uint8Array(1.4 * 1024 * 1024);
     chunk.set(webp());
-    for (let i = 0; i < 12; i++) expect((await upload("abhi", `ast_fill${String(i).padStart(2, "0")}`, chunk)).status).toBe(200);
+    const fits = Math.floor(LIMITS.userBytes / chunk.byteLength);
+    for (let i = 0; i < fits; i++) expect((await upload("abhi", `ast_fill${String(i).padStart(2, "0")}`, chunk)).status).toBe(200);
     expect((await upload("abhi", "ast_fill_over", chunk)).status).toBe(413);
     expect((await upload("sam", "ast_samphoto", chunk)).status).toBe(200); // someone else is unaffected
   });
@@ -348,5 +355,45 @@ describe("hardening", () => {
     const mine = await call("GET", "/me/token", { user: "abhi" });
     expect((await other("GET", `/a/ast_photo1?t=${encodeURIComponent(mine.json.token)}`)).status).toBe(404);
     expect(SECRET.length).toBeGreaterThan(16);
+  });
+});
+
+describe("photos stored in the database (no R2 bucket, no card needed)", () => {
+  beforeEach(() => {
+    env = makeEnv({ FILES: undefined });
+    call = makeClient(env, { now: () => t });
+  });
+  const bytes = () => {
+    const b = new Uint8Array(2000);
+    b.set(webp());
+    for (let i = 40; i < b.length; i++) b[i] = i % 251;
+    return b;
+  };
+
+  it("stores and serves a photo byte for byte, under the same access rules", async () => {
+    await upload("abhi", "ast_photo1", bytes());
+    await savePage("abhi", "pg_abcdef1");
+    await publish("abhi", "pg_abcdef1", { password: "zq7-secret-pass" });
+    expect((await call("GET", "/a/ast_photo1")).status).toBe(404);
+    const open = await call("POST", "/p/priya/open", { json: { password: "zq7-secret-pass" } });
+    const res = await makeApp(env)(`/api/a/ast_photo1?t=${encodeURIComponent(open.json.assetToken)}`);
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes());
+  });
+  it("replacing a photo replaces its bytes, and another user cannot overwrite it", async () => {
+    await upload("abhi", "ast_photo1", bytes());
+    const smaller = bytes().slice(0, 100);
+    expect((await upload("abhi", "ast_photo1", smaller)).status).toBe(200);
+    expect((await upload("mallory", "ast_photo1", bytes())).status).toBe(409);
+    const mine = await call("GET", "/me/token", { user: "abhi" });
+    const res = await makeApp(env)(`/api/a/ast_photo1?t=${encodeURIComponent(mine.json.token)}`);
+    expect((await res.arrayBuffer()).byteLength).toBe(100);
+  });
+  it("reports how full the free database is", async () => {
+    await upload("abhi", "ast_photo1", bytes());
+    expect((await call("GET", "/admin/usage")).status).toBe(403);
+    const r = await call("GET", "/admin/usage", { headers: { "x-admin-token": "admin-token-123" } });
+    expect(r.json.photos).toBe(1);
+    expect(r.json.storage).toContain("database");
   });
 });

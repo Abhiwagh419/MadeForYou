@@ -65,22 +65,27 @@ It is plain TypeScript with no Cloudflare imports, so it is tested here against 
 - Link previews: `/p/<link>` is rendered by `functions/p/[slug].ts`, which fills in the WhatsApp card. Locked, private and password pages show a generic card so the surprise is not spoiled.
 - Without `VITE_REMOTE=1` the studio runs fully in the browser (local mode), as before.
 
-### Go live (all free tiers)
+### Go live (all free, no payment card)
 
-1. Cloudflare account (free). In `apps/studio`: `npx wrangler login`.
-2. `npx wrangler d1 create madeforyou`, then paste the printed `database_id` into `apps/studio/wrangler.toml`.
-3. `npx wrangler r2 bucket create madeforyou-files`
-4. `npx wrangler d1 migrations apply madeforyou --remote`
-5. Clerk account (free): create an application, copy the **Publishable key**, and the **JWKS URL** and **Issuer** (Clerk dashboard, API keys, Show JWT public key / Frontend API URL).
-6. Create the Pages project and set secrets:
-   - `npx wrangler pages project create madeforyou --production-branch main`
-   - `npx wrangler pages secret put SESSION_SECRET --project-name madeforyou` (any long random string)
-   - `npx wrangler pages secret put CLERK_JWKS_URL --project-name madeforyou`
-   - `npx wrangler pages secret put CLERK_ISSUER --project-name madeforyou`
-   - `npx wrangler pages secret put ADMIN_TOKEN --project-name madeforyou`
-7. Build and deploy with the Clerk key: set `VITE_REMOTE=1` and `VITE_CLERK_PUBLISHABLE_KEY=pk_...` (PowerShell: `$env:VITE_REMOTE="1"; $env:VITE_CLERK_PUBLISHABLE_KEY="pk_..."`), then `pnpm --filter @madeforyou/studio cf:deploy`.
-8. Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_CLERK_PUBLISHABLE_KEY`; `.github/workflows/ci.yml` then tests and deploys on every push to `main`.
+Run everything in PowerShell, in `apps\studio`, after `pnpm install` in the project root.
 
-Try it locally first with a fake login: copy `apps/studio/.dev.vars.example` to `.dev.vars`, run `pnpm --filter @madeforyou/studio cf:dev`, and build with `VITE_REMOTE=1` (no Clerk key = a "pick any name" dev login).
+1. `pnpm exec wrangler login` (a browser opens; click Allow).
+2. `pnpm exec wrangler d1 create madeforyou`. Copy the printed `database_id` into `wrangler.toml`. If it offers to edit your config for you, answer No.
+3. `pnpm exec wrangler d1 migrations apply madeforyou --remote`
+4. Clerk (dashboard.clerk.com): create an application. On its **API keys** page copy the **Publishable key** and the **Frontend API URL**. The JWKS URL is that URL plus `/.well-known/jwks.json`.
+5. `pnpm exec wrangler pages project create madeforyou --production-branch main`
+6. Set four secrets, pasting the value when asked: `pnpm exec wrangler pages secret put NAME --project-name madeforyou` for `SESSION_SECRET` (long random), `CLERK_JWKS_URL`, `CLERK_ISSUER` (the Frontend API URL), `ADMIN_TOKEN` (long random).
+7. Copy `.env.production.example` to `.env.production` and put your Clerk publishable key in it.
+8. `pnpm run cf:deploy`. It builds and prints your address (`https://madeforyou.pages.dev` or similar).
+9. Check `https://YOUR-ADDRESS/api/health` shows `{"ok":true}`, then try the whole journey on your phone.
+
+Photos are stored in the database by default (25 MB per person; the free database holds 500 MB in total). Check how full it is with the admin token:
+`Invoke-RestMethod https://YOUR-ADDRESS/api/admin/usage -Headers @{"x-admin-token"="YOUR_ADMIN_TOKEN"}`.
+Approve a new creator's public template with `POST /api/admin/templates/<id>/approve` and the same header.
+To use R2 instead (Cloudflare asks for a card), uncomment the bucket lines in `wrangler.toml`.
+
+Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `VITE_CLERK_PUBLISHABLE_KEY`; `.github/workflows/ci.yml` then tests and deploys on every push to `main`.
+
+Local test with a fake login: copy `.dev.vars.example` to `.dev.vars`, build with `VITE_REMOTE=1` and no Clerk key, then `pnpm run cf:dev`.
 
 The Content-Security-Policy in `public/_headers` is report-only. Open the live site, check the browser console for violations, then rename it to `Content-Security-Policy` to enforce it.
