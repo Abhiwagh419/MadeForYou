@@ -4,7 +4,7 @@ import {
   LIMITS, assetIds, checkPublishable, gateState, isAssetId, slugStatus, validateContent, validateTemplate,
   type Content,
 } from "@madeforyou/schema";
-import { authenticate, verifyClerk } from "./auth";
+import { authenticate, diagnose, verifyClerk } from "./auth";
 import { hashIp, hashPassword, randomHex, readToken, signToken, timingSafeEqual } from "./crypto";
 import { sniffImage } from "./sniff";
 import type { Deps, Env } from "./types";
@@ -117,6 +117,9 @@ export function createApp(overrides: Partial<Deps> = {}) {
   };
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  /** "Why was my sign-in not accepted?" Safe to expose: it only repeats public Clerk addresses. */
+  app.get("/diag", async (c) => c.json(await diagnose(c.req.header("authorization"), c.env, deps)));
 
   /* ------------------------------ owner: pages ------------------------------ */
 

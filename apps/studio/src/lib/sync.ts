@@ -1,5 +1,6 @@
 import { assetIds, type Content, type Template } from "@madeforyou/schema";
-import { api, ApiError } from "./api";
+import { useSyncExternalStore } from "react";
+import { api, apiRaw, ApiError } from "./api";
 import { getLocalBlob, setOwnerToken } from "./assets";
 import { getState, savePage, upsertPages, type Access, type PageRecord } from "../state/store";
 
@@ -106,16 +107,46 @@ export async function removeRemote(id: string) {
   }
 }
 
+/* ---------- "the server did not accept my sign-in" ---------- */
+let authProblem: string | null = null;
+const problemListeners = new Set<() => void>();
+export function setAuthProblem(msg: string | null) {
+  authProblem = msg;
+  problemListeners.forEach((l) => l());
+}
+export const useAuthProblem = () => useSyncExternalStore((cb) => (problemListeners.add(cb), () => problemListeners.delete(cb)), () => authProblem, () => authProblem);
+
+/** Asks the server why it refused our login, in plain words. */
+export async function explainSignIn(): Promise<string> {
+  try {
+    const r = await apiRaw<{ ok: boolean; problem: string | null }>("/diag");
+    return r.data?.problem ?? "The server did not accept your sign-in. Try signing out and in again.";
+  } catch {
+    return "We could not reach the server to check your sign-in.";
+  }
+}
+
+/** Call when a request failed. If it was a 401 while signed in, shows the reason in a banner. */
+export async function handleAuthError(e: unknown): Promise<boolean> {
+  if (e instanceof ApiError && e.status === 401) {
+    setAuthProblem(await explainSignIn());
+    return true;
+  }
+  return false;
+}
+
 let refresh: ReturnType<typeof setTimeout> | undefined;
-/** Photo links are signed for six hours; renew a little before they lapse. */
+/** Photo links are signed for six hours; renew a little before they lapse. Throws if the server refuses the login. */
 export async function refreshOwnerToken() {
   clearTimeout(refresh);
   try {
     const { token } = await api<{ token: string }>("/me/token");
     setOwnerToken(token);
-    refresh = setTimeout(refreshOwnerToken, 5 * 3600 * 1000);
-  } catch {
+    setAuthProblem(null);
+    refresh = setTimeout(() => refreshOwnerToken().catch(() => {}), 5 * 3600 * 1000);
+  } catch (e) {
     setOwnerToken(null);
+    throw e;
   }
 }
 

@@ -89,3 +89,8 @@ Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE
 Local test with a fake login: copy `.dev.vars.example` to `.dev.vars`, build with `VITE_REMOTE=1` and no Clerk key, then `pnpm run cf:dev`.
 
 The Content-Security-Policy in `public/_headers` is report-only. Open the live site, check the browser console for violations, then rename it to `Content-Security-Policy` to enforce it.
+
+## If sign-in works but saving says "please sign in"
+
+The website now shows a banner explaining why the server refused the login (it calls `/api/diag`). The usual causes:
+`CLERK_ISSUER` or `CLERK_JWKS_URL` belongs to a different Clerk application than the publishable key, or the secrets were set after the last deploy. Secrets only reach a **new** deployment, so run `pnpm run cf:deploy` again after changing any secret. Either value alone is enough: the server derives the other. Stray spaces, newlines and trailing slashes are ignored.

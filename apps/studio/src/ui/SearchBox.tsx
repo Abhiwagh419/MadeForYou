@@ -21,7 +21,7 @@ export function SearchBox({ initial = "", large, autoFocus }: { initial?: string
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 140)}
       />
-      <Button type="submit" size={large ? "lg" : "md"}>Search</Button>
+      <Button type="submit" size={large ? "lg" : "md"} iconRight="right" aria-label="Search">Search</Button>
       {open && found.length > 0 && (
         <ul className="suggest" role="listbox">
           {found.map((o) => (

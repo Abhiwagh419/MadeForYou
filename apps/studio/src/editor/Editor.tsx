@@ -4,7 +4,7 @@ import { registry, type Content } from "@madeforyou/schema";
 import { useAssets } from "../lib/assets";
 import { useSession } from "../lib/auth";
 import { isRemote } from "../lib/config";
-import { pushPage } from "../lib/sync";
+import { handleAuthError, pushPage } from "../lib/sync";
 import { go, useRoute } from "../lib/router";
 import { scrollToBlock } from "../lib/util";
 import {
@@ -92,7 +92,7 @@ function EditorInner({ page }: { page: PageRecord }) {
         setSync("ok");
       } catch (e) {
         setSync("error");
-        if (sync !== "error") toast((e as Error).message);
+        if (!(await handleAuthError(e)) && sync !== "error") toast((e as Error).message);
       }
     }, 2500);
     return () => clearTimeout(t);

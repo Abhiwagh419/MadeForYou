@@ -207,4 +207,20 @@ describe("browser and server together", () => {
     expect(raw.status).toBe(401);
     expect(guidedQuestions(rec.content).length).toBeGreaterThan(0);
   });
+
+  it("when the server refuses a sign-in, says why on screen instead of a bare 'please sign in'", async () => {
+    env.ALLOW_DEV_AUTH = "0"; // the server no longer accepts the browser's login
+    const rec = createPage({ title: "For Priya", content: filled() });
+    await visit("#/me", "abhi");
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(q(".auth-banner")?.textContent).toContain("did not accept your login");
+    expect(q(".auth-banner")?.textContent).toMatch(/no sign-in settings|did not send|token/);
+
+    await act(async () => root!.unmount());
+    host!.remove();
+    await visit(`#/publish/${rec.id}`, "abhi");
+    await act(async () => button("Publish").click());
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(text()).toContain("did not accept your sign-in");
+  });
 });

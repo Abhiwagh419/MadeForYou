@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useSession } from "./lib/auth";
 import { isRemote } from "./lib/config";
-import { pullPages, refreshOwnerToken } from "./lib/sync";
+import { handleAuthError, pullPages, refreshOwnerToken, setAuthProblem, useAuthProblem } from "./lib/sync";
+import { Button } from "./ui/Button";
 import { Editor } from "./editor/Editor";
 import { useRoute } from "./lib/router";
 import { Dashboard } from "./screens/Dashboard";
@@ -27,15 +28,32 @@ function SyncOnSignIn() {
         await refreshOwnerToken();
         const n = await pullPages();
         if (alive && n) toast(`Brought ${n} page${n === 1 ? "" : "s"} from your account`);
-      } catch {
-        /* offline: everything keeps working on this device */
+      } catch (e) {
+        // A refused login is explained on screen; being offline is not an error: everything keeps working here.
+        await handleAuthError(e);
       }
     })();
     return () => {
       alive = false;
     };
+    if (!userId) setAuthProblem(null);
   }, [userId]);
   return null;
+}
+
+function AuthProblemBanner() {
+  const problem = useAuthProblem();
+  const session = useSession();
+  if (!problem) return null;
+  return (
+    <div className="auth-banner" role="alert">
+      <div>
+        <strong>You are signed in, but the server did not accept your login.</strong>
+        <span>{problem}</span>
+      </div>
+      <Button size="sm" variant="secondary" onClick={session.signOut}>Sign out</Button>
+    </div>
+  );
 }
 
 export function App() {
@@ -62,6 +80,7 @@ export function App() {
   }
   return (
     <>
+      <AuthProblemBanner />
       {screen}
       <SyncOnSignIn />
       <Toaster />

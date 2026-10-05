@@ -6,7 +6,7 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "madeforyou"
-database_id = "ce081e99-00ce-4972-a170-35210740392d"
+database_id = "REPLACE_WITH_THE_ID_PRINTED_BY_wrangler_d1_create"
 migrations_dir = "../../packages/api/migrations"
 
 # Photos are stored in the database by default, so no payment card is needed.

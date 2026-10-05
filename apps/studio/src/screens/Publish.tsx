@@ -4,7 +4,7 @@ import { BRAND } from "@madeforyou/ui";
 import { api } from "../lib/api";
 import { useSession } from "../lib/auth";
 import { isRemote } from "../lib/config";
-import { publishRemote } from "../lib/sync";
+import { handleAuthError, publishRemote } from "../lib/sync";
 import { go, useRoute } from "../lib/router";
 import { SLUG_MESSAGES, formatWhen, sha256, slugStatus, slugSuggestions, slugify } from "../lib/util";
 import { savePage, slugTaken, useStore } from "../state/store";
@@ -87,7 +87,7 @@ function PublishInner({ id }: { id: string }) {
         });
         go(`/share/${id}`);
       } catch (e) {
-        setError((e as Error).message);
+        setError(((await handleAuthError(e)) ? "The server did not accept your sign-in. The reason is shown at the top of the page." : (e as Error).message));
         setBusy(false);
       }
       return;
