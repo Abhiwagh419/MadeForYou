@@ -1,4 +1,4 @@
-import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { setTokenGetter } from "./api";
 import { authMode } from "./config";
 import { Button } from "../ui/Button";
@@ -43,6 +43,7 @@ function DevAuth({ children }: { children: ReactNode }) {
     const n = draft.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40);
     if (n.length < 3) return;
     localStorage.setItem(DEV_KEY, n);
+    setTokenGetter(async () => `dev:${n}`); // ready before the app reacts to being signed in
     setName(n);
     setOpen(false);
   };
@@ -63,9 +64,12 @@ function ClerkAuth({ children }: { children: ReactNode }) {
   const [b, setB] = useState<{ ready: boolean; userId: string | null; label: string; getToken: () => Promise<string | null>; signOut: () => void }>({
     ready: false, userId: null, label: "", getToken: async () => null, signOut: () => {},
   });
-  useEffect(() => {
-    setTokenGetter(b.getToken);
-  }, [b.getToken]);
+  // Registered the moment the sign-in state arrives, not in an effect: effects of child components (which start
+  // syncing pages) run BEFORE a parent's effects, so they used to fire with no token and get a "please sign in".
+  const onState = useCallback((s: typeof b) => {
+    setTokenGetter(s.getToken);
+    setB(s);
+  }, []);
   const value = useMemo<Session>(
     () => ({ mode: "clerk", ready: b.ready, userId: b.userId, label: b.label, signIn: () => setOpen(true), signOut: b.signOut }),
     [b, setOpen],
@@ -73,7 +77,7 @@ function ClerkAuth({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       <Suspense fallback={null}>
-        <ClerkBridge onState={setB} open={open} onClose={() => setOpen(false)} />
+        <ClerkBridge onState={onState} open={open} onClose={() => setOpen(false)} />
       </Suspense>
       {children}
     </Ctx.Provider>

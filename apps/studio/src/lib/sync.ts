@@ -108,6 +108,9 @@ export async function removeRemote(id: string) {
 }
 
 /* ---------- "the server did not accept my sign-in" ---------- */
+/** How long to wait before the one quiet retry of a refused login. Tests shorten it. */
+export const authRetry = { delayMs: 1200 };
+
 let authProblem: string | null = null;
 const problemListeners = new Set<() => void>();
 export function setAuthProblem(msg: string | null) {
@@ -157,4 +160,44 @@ export async function pushTemplate(t: Template, fromPage?: string) {
 export async function fetchPublicTemplates(): Promise<Template[]> {
   const { templates } = await api<{ templates: Template[] }>("/templates", { auth: false });
   return templates;
+}
+
+export interface SyncReport {
+  pushed: number;
+  republished: number;
+  /** Published here with a password, but missing on the server: publishing again must ask for the password. */
+  needsRepublish: string[];
+  failed: { title: string; reason: string }[];
+  pulled: number;
+}
+
+/**
+ * Brings the server and this device into line: saves every page here to the account, restores any
+ * published page the server lost, and fetches pages made elsewhere. Never publishes a password-protected
+ * page without its password (that would silently remove the protection).
+ */
+export async function syncAll(): Promise<SyncReport> {
+  const report: SyncReport = { pushed: 0, republished: 0, needsRepublish: [], failed: [], pulled: 0 };
+  for (const rec of Object.values(getState().pages)) {
+    try {
+      const server = await pushPage(rec);
+      report.pushed++;
+      if (rec.status === "published" && server.status !== "published") {
+        if (rec.access.passwordHash) {
+          savePage(rec.id, { status: "draft" });
+          report.needsRepublish.push(rec.title);
+          continue;
+        }
+        await api(`/pages/${rec.id}/publish`, {
+          method: "POST",
+          json: { slug: rec.slug, visibility: rec.access.visibility, unlockAt: rec.access.unlockAt ?? null, expiresAt: rec.access.expiresAt ?? null },
+        });
+        report.republished++;
+      }
+    } catch (e) {
+      report.failed.push({ title: rec.title, reason: (e as Error).message });
+    }
+  }
+  report.pulled = await pullPages();
+  return report;
 }

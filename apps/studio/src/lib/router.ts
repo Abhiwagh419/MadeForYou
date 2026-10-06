@@ -16,6 +16,7 @@ const TABLE: [string, RegExp, string[]][] = [
   ["share", /^\/share\/([\w-]+)\/?$/, ["id"]],
   ["astemplate", /^\/template-from\/([\w-]+)\/?$/, ["id"]],
   ["me", /^\/me\/?$/, []],
+  ["status", /^\/status\/?$/, []],
   ["view", /^\/p\/([\w-]+)\/?$/, ["slug"]],
 ];
 

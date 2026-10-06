@@ -17,7 +17,7 @@ export function SearchBox({ initial = "", large, autoFocus }: { initial?: string
       <Icon name="search" size={large ? 22 : 18} />
       <input
         value={q} autoFocus={autoFocus} autoComplete="off" spellCheck={false}
-        placeholder="Try “maa”, “girlfriend”, “rakhi”, “farewell”…" aria-label="Search templates"
+        placeholder="Try “maa”, “rakhi”, “girlfriend”" aria-label="Search templates"
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 140)}
       />

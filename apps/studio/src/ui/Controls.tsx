@@ -3,15 +3,16 @@ import { Icon, type IconName } from "./Icon";
 
 /* ---------- Segmented control ---------- */
 export function Segmented<T extends string>({
-  value, onChange, options, label,
+  value, onChange, options, label, className = "",
 }: {
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string; icon?: IconName; hint?: string }[];
   label?: string;
+  className?: string;
 }) {
   return (
-    <div className="seg" role="radiogroup" aria-label={label}>
+    <div className={`seg ${className}`} role="radiogroup" aria-label={label}>
       {options.map((o) => (
         <button
           key={o.value} type="button" role="radio" aria-checked={value === o.value}

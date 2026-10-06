@@ -38,7 +38,7 @@ export function Footer() {
           <strong className="footer-brand">{BRAND.name}</strong>
           <p>{BRAND.tagline}</p>
         </div>
-        <p className="footer-note">Free for everyone. No ads, no watermarks you cannot remove, no card needed.</p>
+        <p className="footer-note">Free for everyone. No ads, no watermarks you cannot remove, no card needed. <a href="#/status">Connection status</a></p>
       </div>
     </footer>
   );

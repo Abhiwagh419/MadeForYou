@@ -7,7 +7,7 @@ import { guidedQuestions, setField, starterSkeleton, type Content } from "@madef
 import { App } from "../src/App";
 import { apiRaw, setTokenGetter } from "../src/lib/api";
 import { AuthProvider } from "../src/lib/auth";
-import { mergeServerPages, publishRemote, pullPages, pushPage, toLocalPage, type ServerPage } from "../src/lib/sync";
+import { authRetry, mergeServerPages, publishRemote, pullPages, pushPage, syncAll, toLocalPage, type ServerPage } from "../src/lib/sync";
 import { createPage, getState, resetStore, savePage } from "../src/state/store";
 import * as assets from "../src/lib/assets";
 
@@ -29,6 +29,7 @@ let root: Root | null = null;
 let host: HTMLElement | null = null;
 
 beforeEach(() => {
+  authRetry.delayMs = 10;
   vi.stubEnv("VITE_REMOTE", "1");
   vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "");
   env = makeEnv();
@@ -214,7 +215,7 @@ describe("browser and server together", () => {
     await visit("#/me", "abhi");
     await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
     expect(q(".auth-banner")?.textContent).toContain("did not accept your login");
-    expect(q(".auth-banner")?.textContent).toMatch(/no sign-in settings|did not send|token/);
+    expect(q(".auth-banner")?.textContent).toMatch(/switched off|no sign-in settings|did not send|token/);
 
     await act(async () => root!.unmount());
     host!.remove();
@@ -222,5 +223,53 @@ describe("browser and server together", () => {
     await act(async () => button("Publish").click());
     await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
     expect(text()).toContain("did not accept your sign-in");
+  });
+
+  it("sync-all restores pages the server does not have, without ever dropping a password", async () => {
+    const open = createPage({ title: "Open page", content: filled() });
+    savePage(open.id, { slug: "open-page", status: "published", access: { visibility: "unlisted" } });
+    const locked = createPage({ title: "Password page", content: filled() });
+    savePage(locked.id, { slug: "secret-page", status: "published", access: { visibility: "unlisted", passwordHash: "server" } });
+    const draft = createPage({ title: "Draft page", content: filled() });
+
+    const r = await syncAll();
+    expect(r.pushed).toBe(3);
+    expect(r.republished).toBe(1);
+    expect(r.needsRepublish).toEqual(["Password page"]);
+    expect(r.failed).toEqual([]);
+
+    setTokenGetter(async () => null);
+    expect((await apiRaw("/p/open-page")).data.state).toBe("open");
+    expect((await apiRaw("/p/secret-page")).status).toBe(404); // not exposed without its password
+    expect(getState().pages[locked.id]!.status).toBe("draft");
+    expect(getState().pages[draft.id]!.status).toBe("draft");
+    expect((await apiRaw("/p/open-page")).data.content.blocks.length).toBe(4);
+  });
+
+  it("status page: says when sign-in works, and why when it does not", async () => {
+    await visit("#/status", "abhi");
+    await act(async () => { await new Promise((r) => setTimeout(r, 200)); });
+    expect(text()).toContain("Online: uses the server");
+    expect(text()).toContain("Signed in as abhi");
+    expect(text()).toMatch(/Server accepts your login\s*Yes/);
+    await act(async () => root!.unmount());
+    host!.remove();
+    env.ALLOW_DEV_AUTH = "0";
+    await visit("#/status", "abhi");
+    await act(async () => { await new Promise((r) => setTimeout(r, 200)); });
+    expect(text()).toMatch(/Server accepts your login\s*No/);
+    expect(text()).toContain("Test logins are switched off");
+  });
+
+  it("signing in through the sheet works straight away, with no 'please sign in' banner", async () => {
+    await visit("#/status");
+    expect(text()).toContain("Not signed in");
+    await act(async () => button("Sign in").click());
+    await type(q('input[aria-label="Test name"]') as HTMLInputElement, "abhi");
+    await act(async () => button("Continue").click());
+    await act(async () => { await new Promise((r) => setTimeout(r, 200)); });
+    expect(q(".auth-banner")).toBeNull();
+    expect(text()).toContain("Signed in");
+    expect(text()).toMatch(/Server accepts your login\s*Yes/);
   });
 });

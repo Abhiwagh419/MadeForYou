@@ -168,7 +168,7 @@ function EditorInner({ page }: { page: PageRecord }) {
   const preview = (
     <div className="stage-col">
       <div className="stage-bar">
-        <Segmented value={device} onChange={setDevice} label="Device"
+        <Segmented value={device} onChange={setDevice} label="Device" className="seg-icons"
           options={[{ value: "phone", label: "Phone", icon: "phone" }, { value: "tablet", label: "Tablet", icon: "desktop" }]} />
         {langs.length > 1 && (
           <Segmented value={lang} onChange={setLang} label="Language" options={langs.map((l) => ({ value: l, label: l === "hi" ? "हिन्दी" : l.toUpperCase() }))} />

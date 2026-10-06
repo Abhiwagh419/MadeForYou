@@ -46,7 +46,8 @@ export function Dashboard() {
             <span>
               {session.userId
                 ? "Your pages are saved to your account, so you can open them on any device."
-                : "You are not signed in. Pages stay on this device only. Sign in and they are saved to your account."}
+                : "You are not signed in. Pages stay on this device only. Sign in and they are saved to your account."}{" "}
+              <a href="#/status">Check connection</a>
             </span>
             {!session.userId && <Button size="sm" onClick={session.signIn}>Sign in</Button>}
           </div>
