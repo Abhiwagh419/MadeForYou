@@ -94,3 +94,12 @@ The Content-Security-Policy in `public/_headers` is report-only. Open the live s
 
 The website now shows a banner explaining why the server refused the login (it calls `/api/diag`). The usual causes:
 `CLERK_ISSUER` or `CLERK_JWKS_URL` belongs to a different Clerk application than the publishable key, or the secrets were set after the last deploy. Secrets only reach a **new** deployment, so run `pnpm run cf:deploy` again after changing any secret. Either value alone is enough: the server derives the other. Stray spaces, newlines and trailing slashes are ignored.
+
+## Checking a live site (v6.3)
+
+- `https://YOUR-SITE/#/status` shows what the site is connected to: server reachable, sign-in accepted, how many pages are in your account, and a **Sync all my pages now** button that saves everything made on this device to your account.
+- `https://YOUR-SITE/api/diag` shows which Clerk address the server expects.
+- To look inside the database, always add `--remote`, otherwise wrangler reads an empty local copy:
+  `pnpm exec wrangler d1 execute madeforyou --remote --command "SELECT id, owner_id, status, slug FROM pages"`
+  (The `users` table only holds an id and a date; names and emails live in Clerk.)
+- Deploy as production: `pnpm exec wrangler pages deploy dist --project-name madeforyou --branch main`, then open `https://madeforyou-XXXX.pages.dev` (without the random prefix).

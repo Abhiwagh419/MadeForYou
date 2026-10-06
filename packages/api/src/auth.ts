@@ -69,6 +69,12 @@ export async function diagnose(header: string | undefined, env: Env, deps: Deps)
   const configuredIssuer = clerkIssuer(env) || null;
   const out: Diagnosis = { hasToken: !!token, serverConfigured: !!clerkJwksUrl(env), configuredIssuer, tokenIssuer: null, ok: false, problem: null };
 
+  // A test login (only used on a developer machine) is judged by its own switch, not by Clerk's settings.
+  if (token?.startsWith("dev:")) {
+    out.ok = env.ALLOW_DEV_AUTH === "1" && DEV_RE.test(token.slice(4));
+    if (!out.ok) out.problem = "Test logins are switched off on this server. Add your Clerk publishable key to the build (.env.production), deploy again, and sign in with Clerk.";
+    return out;
+  }
   if (!out.serverConfigured) {
     out.problem = "The server has no sign-in settings. Set CLERK_ISSUER (and CLERK_JWKS_URL), then deploy again: secrets only reach a new deployment.";
     return out;

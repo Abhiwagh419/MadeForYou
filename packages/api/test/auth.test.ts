@@ -65,3 +65,14 @@ describe("/api/diag explains a rejected login", () => {
     expect(d.problem).toMatch(/expired/);
   });
 });
+
+describe("/api/diag and test logins", () => {
+  it("accepts a test login only while the server allows them", async () => {
+    const on = makeClient(makeEnv({ ALLOW_DEV_AUTH: "1" }));
+    expect((await on("GET", "/diag", { headers: { authorization: "Bearer dev:abhi" } })).json.ok).toBe(true);
+    const off = makeClient(makeEnv({ ALLOW_DEV_AUTH: "0" }));
+    const d = (await off("GET", "/diag", { headers: { authorization: "Bearer dev:abhi" } })).json;
+    expect(d.ok).toBe(false);
+    expect(d.problem).toMatch(/switched off/);
+  });
+});
