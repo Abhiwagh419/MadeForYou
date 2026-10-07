@@ -8,8 +8,8 @@
     "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "cf:dev": "pnpm build && wrangler pages dev dist",
-    "cf:deploy": "pnpm build && wrangler pages deploy dist --project-name madeforyou"
+    "cf:dev": "node scripts/prepare-wrangler.mjs && pnpm build && wrangler pages dev dist",
+    "cf:deploy": "node scripts/prepare-wrangler.mjs && pnpm build && wrangler pages deploy dist --project-name madeforyou --branch main"
   },
   "dependencies": {
     "@madeforyou/renderer": "workspace:*",
