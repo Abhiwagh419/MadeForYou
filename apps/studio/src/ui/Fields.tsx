@@ -1,8 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
-import type { AssetRef } from "@madeforyou/schema";
-import type { FieldDef } from "@madeforyou/schema";
+import { defaultValue, isSafeLink, normalizeLink, parseVideoUrl, type AssetRef, type FieldDef, type VideoRef } from "@madeforyou/schema";
 import { saveImage, useAssetUrl } from "../lib/assets";
-import { humanize } from "../lib/util";
+import { fromIstInput, humanize, toIstInput } from "../lib/util";
 import { Icon } from "./Icon";
 import { Segmented, toast } from "./Controls";
 
@@ -71,6 +70,47 @@ export function ImageInput({ value, onChange, large, showAlt = true }: { value: 
   );
 }
 
+/* ---------- a link, tidied as you leave the box ---------- */
+function LinkInput({ value, onChange, small, large, label }: { value: string; onChange: (v: string) => void; small?: boolean; large?: boolean; label: string }) {
+  const [draft, setDraft] = useState(value);
+  const bad = draft !== "" && !isSafeLink(normalizeLink(draft));
+  return (
+    <>
+      <input className={`in ${small ? "in-sm" : ""} ${large ? "in-lg" : ""}`} inputMode="url" autoCapitalize="none" spellCheck={false} aria-label={label}
+        placeholder="https://… or a phone number or an email" value={draft}
+        onChange={(e) => { setDraft(e.target.value); const n = normalizeLink(e.target.value); if (isSafeLink(n)) onChange(n); }}
+        onBlur={() => { const n = normalizeLink(draft); if (isSafeLink(n)) { setDraft(n); onChange(n); } }} />
+      {bad && <p className="field-error">Use a web link, a phone number or an email address</p>}
+    </>
+  );
+}
+
+/* ---------- a YouTube or Vimeo link, stored as provider + id ---------- */
+function EmbedInput({ value, onChange, large }: { value: VideoRef | null | undefined; onChange: (v: VideoRef | null) => void; large?: boolean }) {
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState("");
+  if (value) {
+    return (
+      <div className="embed-chip">
+        <Icon name="video" size={16} />
+        <span>{value.provider === "youtube" ? "YouTube" : "Vimeo"} video added</span>
+        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => onChange(null)} aria-label="Remove video"><Icon name="x" size={16} /></button>
+      </div>
+    );
+  }
+  const add = (text: string) => {
+    const v = parseVideoUrl(text);
+    if (v) { setError(""); setDraft(""); onChange(v); } else if (text.trim()) setError("Paste a YouTube or Vimeo link");
+  };
+  return (
+    <>
+      <input className={`in ${large ? "in-lg" : "in-sm"}`} inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="Paste a YouTube or Vimeo link" value={draft} aria-label="Video link"
+        onChange={(e) => { setDraft(e.target.value); if (parseVideoUrl(e.target.value)) add(e.target.value); }} onBlur={() => add(draft)} />
+      {error && <p className="field-error">{error}</p>}
+    </>
+  );
+}
+
 /* ---------- list of items (gallery photos) ---------- */
 function Thumbnail({ id }: { id?: string }) {
   const url = useAssetUrl(id);
@@ -114,10 +154,18 @@ export function ListInput({ def, value, onChange, large }: { def: Extract<FieldD
         <div className="li" key={i}>
           {imageKey && <Thumbnail id={(it[imageKey] as AssetRef | null | undefined)?.asset} />}
           <div className="li-fields">
-            {Object.entries(def.item).filter(([, d]) => d.kind !== "image").map(([k, d]) => (
-              <input key={k} className="in in-sm" placeholder={d.prompt ?? humanize(k)} maxLength={d.kind === "text" ? d.max : undefined}
-                value={(it[k] as string) ?? ""} onChange={(e) => patch(i, k, e.target.value)} aria-label={humanize(k)} />
-            ))}
+            {Object.entries(def.item).filter(([, d]) => d.kind !== "image").map(([k, d]) => {
+              const v = it[k];
+              const ph = d.prompt ?? humanize(k);
+              if (d.kind === "longtext") return <textarea key={k} className="in in-sm in-area" rows={2} placeholder={ph} maxLength={d.max} value={(v as string) ?? ""} onChange={(e) => patch(i, k, e.target.value)} aria-label={humanize(k)} />;
+              if (d.kind === "enum") return (
+                <select key={k} className="in in-sm" value={String(v ?? d.default)} onChange={(e) => patch(i, k, e.target.value)} aria-label={humanize(k)}>
+                  {d.options.map((o) => <option key={o} value={o}>{k === "correct" ? `Right answer: ${o}` : humanize(o)}</option>)}
+                </select>
+              );
+              if (d.kind === "url") return <LinkInput key={k} small label={humanize(k)} value={(v as string) ?? ""} onChange={(n) => patch(i, k, n)} />;
+              return <input key={k} className="in in-sm" placeholder={ph} maxLength={d.kind === "text" ? d.max : undefined} value={(v as string) ?? ""} onChange={(e) => patch(i, k, e.target.value)} aria-label={humanize(k)} />;
+            })}
             {imageKey && (it[imageKey] as AssetRef | undefined) && (
               <input className="in in-sm" placeholder="Describe the photo (alt text)" maxLength={200}
                 value={(it[imageKey] as AssetRef).alt ?? ""} onChange={(e) => patch(i, imageKey, { ...(it[imageKey] as AssetRef), alt: e.target.value })} aria-label="Photo description" />
@@ -131,7 +179,7 @@ export function ListInput({ def, value, onChange, large }: { def: Extract<FieldD
         </div>
       ))}
       {room > 0 && (
-        <button type="button" className="li-add" onClick={() => (imageKey ? file.current?.click() : onChange([...items, {}]))}>
+        <button type="button" className="li-add" onClick={() => (imageKey && Object.keys(def.item).length === 1 ? file.current?.click() : imageKey ? file.current?.click() : onChange([...items, Object.fromEntries(Object.entries(def.item).filter(([, d]) => d.kind === "enum").map(([k, d]) => [k, defaultValue(d)]))]))}>
           <Icon name={imageKey ? "image" : "plus"} size={20} />
           <span>{busy ? "Preparing…" : imageKey ? (items.length ? "Add more photos" : "Add photos") : "Add item"}</span>
           <small>{items.length} of {def.max}</small>
@@ -174,10 +222,18 @@ export function FieldInput({
       return <Field label={large ? undefined : label}><ImageInput large={large} value={value as AssetRef | null} onChange={onChange} /></Field>;
     case "date":
       return (
-        <Field label={large ? undefined : label}>
-          <input className={`in ${large ? "in-lg" : ""}`} type="date" value={typeof value === "string" ? value.slice(0, 10) : ""} onChange={(e) => onChange(e.target.value || null)} aria-label={label} />
+        <Field label={large ? undefined : label} hint={def.withTime ? "India time (IST)" : undefined}>
+          {def.withTime ? (
+            <input className={`in ${large ? "in-lg" : ""}`} type="datetime-local" value={toIstInput(value)} onChange={(e) => onChange(fromIstInput(e.target.value))} aria-label={label} />
+          ) : (
+            <input className={`in ${large ? "in-lg" : ""}`} type="date" value={typeof value === "string" ? value.slice(0, 10) : ""} onChange={(e) => onChange(e.target.value || null)} aria-label={label} />
+          )}
         </Field>
       );
+    case "url":
+      return <Field label={large ? undefined : label}><LinkInput large={large} label={label} value={String(shown ?? "")} onChange={onChange} /></Field>;
+    case "embed":
+      return <Field label={large ? undefined : label}><EmbedInput large={large} value={value as VideoRef | null} onChange={onChange} /></Field>;
     case "enum":
       return (
         <Field label={label}>

@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactEl
 import type { Block } from "@madeforyou/schema";
 import { useFields, useRender } from "./context";
 import { label } from "./labels";
+import { MORE } from "./more";
+import { parseTarget } from "./util";
 
 type P = { block: Block };
 
@@ -101,13 +103,7 @@ export function Gallery({ block }: P) {
   );
 }
 
-/** A date-only target means midnight in India (IST), the default for this product. */
-export function parseTarget(v: string): number | null {
-  if (!v) return null;
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00+05:30` : v;
-  const t = Date.parse(iso);
-  return Number.isNaN(t) ? null : t;
-}
+export { parseTarget };
 
 export function splitRemaining(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -180,6 +176,7 @@ export const COMPONENTS: Record<string, (p: P) => ReactElement> = {
   gallery: Gallery,
   countdown: Countdown,
   signature: Signature,
+  ...MORE,
 };
 
 /**

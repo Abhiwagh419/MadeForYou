@@ -18,7 +18,7 @@ import { Mark } from "../ui/Logo";
 import { PhonePreview } from "../ui/PhonePreview";
 import { NotFound } from "../ui/Shell";
 import { BlockList } from "./BlockList";
-import { BLOCK_INFO } from "./blockInfo";
+import { BLOCK_INFO, CATEGORY_LABELS } from "./blockInfo";
 import { BlockInspector, DesignPanel, SettingsPanel } from "./Inspector";
 
 type Tab = "blocks" | "edit" | "design" | "settings";
@@ -243,16 +243,24 @@ function EditorInner({ page }: { page: PageRecord }) {
       )}
 
       <Sheet open={adding} onClose={() => setAdding(false)} title="Add a block" wide>
-        <div className="addgrid">
-          {Object.values(registry).map((d) => (
-            <button key={d.type} type="button" className="addcard" onClick={() => insert(d.type)}>
-              <span className="bl-icon"><Icon name={BLOCK_INFO[d.type]?.icon ?? "layers"} size={20} /></span>
-              <strong>{d.label}</strong>
-              <small>{BLOCK_INFO[d.type]?.desc}</small>
-            </button>
-          ))}
-        </div>
-        <p className="muted add-more">More blocks (quiz, timeline, voice note, RSVP and others) are on the way.</p>
+        {Object.keys(CATEGORY_LABELS).map((cat) => {
+          const defs = Object.values(registry).filter((d) => d.category === cat);
+          return defs.length === 0 ? null : (
+            <section key={cat} className="addgroup">
+              <h3>{CATEGORY_LABELS[cat]}</h3>
+              <div className="addgrid">
+                {defs.map((d) => (
+                  <button key={d.type} type="button" className="addcard" onClick={() => insert(d.type)}>
+                    <span className="bl-icon"><Icon name={BLOCK_INFO[d.type]?.icon ?? "layers"} size={20} /></span>
+                    <strong>{d.label}</strong>
+                    <small>{BLOCK_INFO[d.type]?.desc}</small>
+                  </button>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+        <p className="muted add-more">Voice notes, maps and guest messages (wishes wall, replies, RSVP) are coming next.</p>
       </Sheet>
 
       {full && <Fullscreen content={content} lang={lang} onClose={() => setFull(false)} />}

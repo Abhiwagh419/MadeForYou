@@ -6,12 +6,15 @@ export interface RenderContext {
   defaultLang: string;
   /** The host app turns an asset reference into a URL (public, or signed for private pages). */
   resolveAsset: (ref: AssetRef) => string | undefined;
+  /** Thumbnail mode: blocks must not load embeds or run games. */
+  isStatic: boolean;
 }
 
 export const RenderCtx = createContext<RenderContext>({
   lang: "en",
   defaultLang: "en",
   resolveAsset: () => undefined,
+  isStatic: false,
 });
 
 export const useRender = () => useContext(RenderCtx);
@@ -21,9 +24,10 @@ const isRef = (v: unknown): v is AssetRef =>
 
 /** Small accessor so block components stay free of casts and language logic. */
 export function useFields(block: Block) {
-  const { lang, defaultLang, resolveAsset } = useRender();
+  const { lang, defaultLang, resolveAsset, isStatic } = useRender();
   const raw = (field: string): unknown => block.fields[field];
   return {
+    isStatic,
     raw,
     /** Text for the current language, falling back to the page's default language. */
     t(field: string): string {

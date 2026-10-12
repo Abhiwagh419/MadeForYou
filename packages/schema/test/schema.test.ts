@@ -265,3 +265,65 @@ describe("shared access rules", () => {
     expect(slugStatus("taken-one", (s) => s === "taken-one")).toBe("taken");
   });
 });
+
+import { isSafeLink, normalizeLink, parseVideoUrl, defaultValue, placeholderValue } from "../src";
+
+describe("links and video are safe by construction", () => {
+  it("accepts web, email and phone links only", () => {
+    for (const ok of ["", "https://wa.me/919876543210", "http://example.com", "mailto:a@b.co", "tel:+919876543210"]) expect(isSafeLink(ok)).toBe(true);
+    for (const bad of ["javascript:alert(1)", "data:text/html,<b>", "vbscript:x", "file:///etc/passwd", "not a link", "//evil.com"]) expect(isSafeLink(bad)).toBe(false);
+  });
+  it("turns what people type into a real link", () => {
+    expect(normalizeLink("9876543210")).toBe("tel:+919876543210");
+    expect(normalizeLink("+91 98765-43210")).toBe("tel:+919876543210");
+    expect(normalizeLink("me@example.com")).toBe("mailto:me@example.com");
+    expect(normalizeLink("www.example.com/page")).toBe("https://www.example.com/page");
+    expect(normalizeLink("https://wa.me/91123")).toBe("https://wa.me/91123");
+    expect(normalizeLink("  ")).toBe("");
+    expect(isSafeLink(normalizeLink("javascript:alert(1)"))).toBe(false);
+  });
+  it("accepts YouTube and Vimeo links, as provider + id, and nothing else", () => {
+    expect(parseVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", id: "dQw4w9WgXcQ" });
+    expect(parseVideoUrl("https://youtu.be/dQw4w9WgXcQ?t=5")?.provider).toBe("youtube");
+    expect(parseVideoUrl("https://youtube.com/shorts/dQw4w9WgXcQ")?.id).toBe("dQw4w9WgXcQ");
+    expect(parseVideoUrl("https://vimeo.com/123456789")).toEqual({ provider: "vimeo", id: "123456789" });
+    expect(parseVideoUrl("https://player.vimeo.com/video/123456789")?.provider).toBe("vimeo");
+    expect(parseVideoUrl("https://evil.example/watch?v=dQw4w9WgXcQ")).toBeNull();
+    expect(parseVideoUrl("javascript:alert(1)")).toBeNull();
+  });
+  it("rejects an unsafe link or video stored in a page", () => {
+    const b = createBlock("buttons");
+    b.fields.items = [{ label: "Click", url: "javascript:alert(1)" }];
+    expect(validateContent({ ...starterSkeleton(), blocks: [b] }).ok).toBe(false);
+    b.fields.items = [{ label: "WhatsApp", url: "https://wa.me/919876543210" }];
+    expect(validateContent({ ...starterSkeleton(), blocks: [b] }).ok).toBe(true);
+    const v = createBlock("video");
+    v.fields.video = { provider: "youtube", id: "x" };
+    expect(validateContent({ ...starterSkeleton(), blocks: [v] }).ok).toBe(false);
+    v.fields.video = { provider: "vimeo", id: "123456789" };
+    expect(validateContent({ ...starterSkeleton(), blocks: [v] }).ok).toBe(true);
+  });
+  it("has defaults for the new kinds", () => {
+    expect(defaultValue({ kind: "url", max: 10 })).toBe("");
+    expect(placeholderValue({ kind: "embed" })).toBeNull();
+  });
+});
+
+describe("the full block set", () => {
+  it("has 21 blocks, each valid with its placeholders", () => {
+    expect(Object.keys(registry)).toHaveLength(21);
+    const blocks = Object.keys(registry).map((t) => createBlock(t));
+    expect(validateContent({ ...starterSkeleton(), blocks }).ok).toBe(true);
+  });
+  it("strips personal content from every block, including list items", () => {
+    const blocks = Object.keys(registry).map((t) => {
+      const b = createBlock(t);
+      for (const [name, def] of Object.entries(registry[t]!.fields)) {
+        if (def.kind === "text" && def.personal) b.fields[name] = "SECRET-VALUE";
+      }
+      return b;
+    });
+    const stripped = stripPersonal({ ...starterSkeleton(), blocks });
+    expect(JSON.stringify(stripped.content)).not.toContain("SECRET-VALUE");
+  });
+});

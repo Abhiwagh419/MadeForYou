@@ -531,3 +531,12 @@ body { overflow-x: hidden; }
 .status-list .bad .status-dot { background: var(--bad); }
 .status-list .bad { border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 .linkbox .btn { margin-left: auto; }
+
+.addgroup { margin-bottom: 1.25rem; }
+.addgroup h3 { font-family: var(--font-ui); font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.6rem; letter-spacing: 0; }
+@media (max-width: 700px) { .addgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .addcard { padding: 0.8rem; } }
+.item-fields { display: grid; gap: 0.35rem; min-width: 0; }
+.in-area { min-height: 3.4rem; resize: vertical; }
+select.in-sm { padding-right: 1.5rem; }
+.embed-chip { display: flex; align-items: center; gap: 0.5rem; background: var(--soft); padding: 0.4rem 0.4rem 0.4rem 0.8rem; border-radius: 999px; font-size: 0.85rem; }
+.embed-chip span { flex: 1; }

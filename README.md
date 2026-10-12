@@ -70,7 +70,7 @@ It is plain TypeScript with no Cloudflare imports, so it is tested here against 
 Run everything in PowerShell, in `apps\studio`, after `pnpm install` in the project root.
 
 1. `pnpm exec wrangler login` (a browser opens; click Allow).
-2. `pnpm exec wrangler d1 create madeforyou`. Copy the printed `database_id` into `wrangler.toml`. If it offers to edit your config for you, answer No.
+2. `pnpm exec wrangler d1 create madeforyou`. You do not need to copy the id anywhere: `pnpm run cf:deploy` finds it and writes it into `wrangler.toml` for you (the file is not part of the downloads, so a new version of the code can never erase it).
 3. `pnpm exec wrangler d1 migrations apply madeforyou --remote`
 4. Clerk (dashboard.clerk.com): create an application. On its **API keys** page copy the **Publishable key** and the **Frontend API URL**. The JWKS URL is that URL plus `/.well-known/jwks.json`.
 5. `pnpm exec wrangler pages project create madeforyou --production-branch main`
@@ -103,3 +103,17 @@ The website now shows a banner explaining why the server refused the login (it c
   `pnpm exec wrangler d1 execute madeforyou --remote --command "SELECT id, owner_id, status, slug FROM pages"`
   (The `users` table only holds an id and a date; names and emails live in Clerk.)
 - Deploy as production: `pnpm exec wrangler pages deploy dist --project-name madeforyou --branch main`, then open `https://madeforyou-XXXX.pages.dev` (without the random prefix).
+
+## "database_id" error when deploying
+
+`wrangler.toml` must contain the id of your database (a 36-character code like `1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d`, not a URL). `pnpm run cf:deploy` fills it in automatically. To do it by hand: `pnpm exec wrangler d1 list` prints the name and id; or Cloudflare dashboard, Storage & Databases, D1, madeforyou.
+
+## Blocks (21 of 26)
+
+Built: hero, featured photo, gallery, timeline, days together, video, text, letter, quote/shayari, reasons list, promises/bucket list, open-when letters, countdown, scratch card, the ask, quiz, memory match, event details (with add-to-calendar), buttons/links, divider, signature.
+Still to build: voice note, places map, wishes wall, reply box, RSVP (the last three need a submissions endpoint and an inbox).
+
+- Links are stored only as https, http, mailto or tel (`isSafeLink`); videos only as provider + id (`parseVideoUrl`). The renderer keeps its own tiny copy of the link rule so the page does not pull in the schema library; a test keeps the two in step.
+- YouTube loads only when the visitor taps the poster, which keeps pages light on slow phones. Thumbnails never load embeds.
+- Open-when letters are not time-locked per letter: a real lock must be enforced on the server, and per-letter locks would only be cosmetic.
+- Add a block: define it in `packages/schema/src/blocks.ts`, register it in `registry.ts`, add a component in `packages/renderer/src/more.tsx` (and `MORE`), then a description in `apps/studio/src/editor/blockInfo.ts`.

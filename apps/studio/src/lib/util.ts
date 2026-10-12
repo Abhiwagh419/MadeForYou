@@ -89,3 +89,13 @@ export function formatWhen(iso: string | null | undefined): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
+
+const IST_MS = 5.5 * 3600 * 1000;
+/** A stored date or date-time, shown in a datetime-local box as India time ("2027-02-14T18:30"). */
+export function toIstInput(v: unknown): string {
+  if (typeof v !== "string" || !v) return "";
+  const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00+05:30` : v);
+  return Number.isNaN(t) ? "" : new Date(t + IST_MS).toISOString().slice(0, 16);
+}
+/** What the datetime-local box holds, saved as an India-time value. */
+export const fromIstInput = (v: string): string | null => (v ? `${v}:00+05:30` : null);

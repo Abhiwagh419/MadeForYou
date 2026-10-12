@@ -39,6 +39,15 @@ const P: Record<string, string> = {
   type: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
   more: '<circle cx="5" cy="12" r="1.400"/><circle cx="12" cy="12" r="1.400"/><circle cx="19" cy="12" r="1.400"/>',
   alert: '<path d="M12 4 2.500 20h19z"/><path d="M12 10v4M12 17.200v.1"/>',
+  video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/>',
+  quote: '<path d="M10 7c-3 1-5 4-5 8h5v-5H7M19 7c-3 1-5 4-5 8h5v-5h-3"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.100L12 17l-5.4 2.900 1-6.100L3.200 9.500l6.100-.9z"/>',
+  question: '<circle cx="12" cy="12" r="9"/><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 1-1 1.700M12 17v.1"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.500"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2-4-6-3-5 0 1 2 5 0 5 0zM12 8c2-4 6-3 5 0-1 2-5 0-5 0z"/>',
+  minus: '<path d="M5 12h14"/>',
   home: '<path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-6h4v6"/>',
 };
 

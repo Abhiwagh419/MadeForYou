@@ -36,8 +36,8 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
   const tap = useTapEffect(isStatic ? "none" : settings.tap);
 
   const ctx = useMemo(
-    () => ({ lang: activeLang, defaultLang: settings.languages.default, resolveAsset }),
-    [activeLang, settings.languages.default, resolveAsset],
+    () => ({ lang: activeLang, defaultLang: settings.languages.default, resolveAsset, isStatic }),
+    [activeLang, settings.languages.default, resolveAsset, isStatic],
   );
 
   return (
