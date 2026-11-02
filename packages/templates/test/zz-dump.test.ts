@@ -17,6 +17,8 @@ it("dumps templates for visual checks", () => {
       if (b.type === "event") b.fields.when = "2027-02-14T18:30:00+05:30";
       if (b.type === "buttons") b.fields.items = [{ label: "RSVP on WhatsApp", url: "https://wa.me/919876543210" }, { label: "Call us", url: "tel:+919876543210" }];
       if (b.type === "video") b.fields.video = { provider: "youtube", id: "dQw4w9WgXcQ" };
+      if (b.type === "map") b.fields.location = { lat: 19.076, lng: 72.8777 };
+      if (b.type === "voiceNote") b.fields.audio = { asset: "ast_voice01", seconds: 42 };
     }
     return { id: t.meta.id, title: t.meta.title, content: c };
   });

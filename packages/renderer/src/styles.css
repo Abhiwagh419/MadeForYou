@@ -497,3 +497,42 @@ button.mfy-foil, .mfy-foil-static { display: grid; place-items: center; backgrou
   100% { opacity: 0; scale: 1.2; translate: calc(cos(var(--a)) * 120px) calc(sin(var(--a)) * 120px - 30px); }
 }
 .mfy-static .mfy-ask-btns, .mfy-static .mfy-quiz-opts { pointer-events: none; }
+
+/* =====================================================================
+   Guest messages, voice note, map
+   ===================================================================== */
+.mfy-hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+.mfy-form { display: grid; gap: 0.7rem; width: min(100%, 26rem); margin: 0.5rem auto 0; text-align: left; }
+.mfy-form-prompt { font-family: var(--mfy-font-hand); font-size: 1.2rem; text-align: center; color: var(--mfy-muted); }
+.mfy-form-note { font-size: 0.82rem; color: var(--mfy-muted); text-align: center; }
+.mfy-form-error { font-size: 0.88rem; color: #b91c1c; text-align: center; }
+.mfy-in { width: 100%; padding: 0.8rem 1rem; border: 2px solid color-mix(in srgb, var(--mfy-text) 16%, transparent); border-radius: calc(var(--mfy-radius) * 0.8); background: var(--mfy-surface); color: var(--mfy-text); font: inherit; font-size: 1rem; }
+.mfy-in:focus { outline: none; border-color: var(--mfy-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--mfy-primary) 18%, transparent); }
+.mfy-in:disabled { opacity: 0.6; }
+textarea.mfy-in { resize: vertical; line-height: 1.5; }
+.mfy-form .mfy-linkbtn { justify-self: center; }
+.mfy-form .mfy-linkbtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mfy-thanks { margin-top: 0.75rem; font-family: var(--mfy-font-hand); font-size: 1.4rem; line-height: 1.5; color: var(--mfy-primary); }
+.mfy-wishes { list-style: none; display: grid; gap: 0.75rem; text-align: left; margin: 0.5rem auto 1.25rem; width: min(100%, 28rem); }
+.mfy-wishes li { padding: 0.95rem 1.1rem; background: var(--mfy-surface); border-radius: var(--mfy-radius); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 10px 22px -16px color-mix(in srgb, var(--mfy-text) 55%, transparent); }
+.mfy-wishes p { font-family: var(--mfy-font-hand); font-size: 1.2rem; line-height: 1.5; }
+.mfy-wishes b { display: block; margin-top: 0.35rem; font-size: 0.85rem; color: var(--mfy-primary); font-weight: 500; }
+.mfy-rsvp-deadline { color: var(--mfy-muted); margin-bottom: 0.5rem; }
+.mfy-choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.mfy-choice button { padding: 0.75rem 0.5rem; border: 2px solid color-mix(in srgb, var(--mfy-text) 16%, transparent); border-radius: calc(var(--mfy-radius) * 0.8); background: transparent; color: inherit; font: inherit; font-weight: 500; cursor: pointer; }
+.mfy-choice button.on { background: var(--mfy-primary); border-color: var(--mfy-primary); color: var(--mfy-on-primary); }
+.mfy-guests { display: grid; gap: 0.3rem; font-size: 0.9rem; color: var(--mfy-muted); }
+
+.mfy-voice figcaption, .mfy-map figcaption { margin-top: 0.8rem; color: var(--mfy-muted); }
+.mfy-player { display: flex; align-items: center; gap: 0.9rem; width: min(100%, 26rem); margin: 0.25rem auto 0; padding: 0.8rem 1rem; background: var(--mfy-surface); border-radius: 999px; box-shadow: 0 14px 28px -20px rgba(0, 0, 0, 0.55); }
+.mfy-player .mfy-play { flex: none; width: 3rem; height: 3rem; border: 0; padding: 0; cursor: pointer; }
+.mfy-player .mfy-play:disabled { opacity: 0.6; cursor: default; }
+.mfy-wave { flex: 1; display: flex; align-items: center; gap: 3px; height: 2rem; }
+.mfy-wave i { flex: 1; border-radius: 2px; background: var(--mfy-primary); transition: opacity 0.3s; }
+.mfy-time { flex: none; font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--mfy-muted); min-width: 2.6rem; text-align: right; }
+
+.mfy-map-box { position: relative; aspect-ratio: 4 / 3; border-radius: var(--mfy-radius); overflow: hidden; background: linear-gradient(135deg, color-mix(in srgb, var(--mfy-accent) 28%, var(--mfy-soft)), color-mix(in srgb, var(--mfy-primary) 20%, var(--mfy-soft))); box-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.55); }
+.mfy-map-box iframe, .mfy-map-poster { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.mfy-map-poster { display: grid; place-content: center; justify-items: center; gap: 0.4rem; padding: 0; cursor: pointer; color: var(--mfy-primary); font: inherit; background-color: transparent; background-image: repeating-linear-gradient(0deg, transparent 0 28px, color-mix(in srgb, var(--mfy-text) 7%, transparent) 28px 29px), repeating-linear-gradient(90deg, transparent 0 28px, color-mix(in srgb, var(--mfy-text) 7%, transparent) 28px 29px); }
+.mfy-map-poster span { font-size: 0.9rem; color: var(--mfy-text); }
+.mfy-map .mfy-linkbtn { margin-top: 0.9rem; }

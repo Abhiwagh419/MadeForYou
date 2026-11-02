@@ -1,6 +1,17 @@
 import { createContext, useContext } from "react";
 import type { AssetRef, Block } from "@madeforyou/schema";
 
+/** What the host app (the website) lends the page: a way to send guests' messages, and the wishes already approved. */
+export interface Host {
+  submit?: (
+    blockId: string,
+    kind: "wish" | "reply" | "rsvp",
+    payload: Record<string, unknown>,
+    extra: { website: string; elapsedMs: number },
+  ) => Promise<{ ok: boolean; status?: string; error?: string }>;
+  wishes?: Record<string, { id: string; name: string; message: string }[]>;
+}
+
 export interface RenderContext {
   lang: string;
   defaultLang: string;
@@ -8,6 +19,7 @@ export interface RenderContext {
   resolveAsset: (ref: AssetRef) => string | undefined;
   /** Thumbnail mode: blocks must not load embeds or run games. */
   isStatic: boolean;
+  host?: Host;
 }
 
 export const RenderCtx = createContext<RenderContext>({
@@ -15,6 +27,7 @@ export const RenderCtx = createContext<RenderContext>({
   defaultLang: "en",
   resolveAsset: () => undefined,
   isStatic: false,
+  host: undefined,
 });
 
 export const useRender = () => useContext(RenderCtx);
@@ -24,10 +37,11 @@ const isRef = (v: unknown): v is AssetRef =>
 
 /** Small accessor so block components stay free of casts and language logic. */
 export function useFields(block: Block) {
-  const { lang, defaultLang, resolveAsset, isStatic } = useRender();
+  const { lang, defaultLang, resolveAsset, isStatic, host } = useRender();
   const raw = (field: string): unknown => block.fields[field];
   return {
     isStatic,
+    host,
     raw,
     /** Text for the current language, falling back to the page's default language. */
     t(field: string): string {

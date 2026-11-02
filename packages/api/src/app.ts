@@ -1,12 +1,12 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import {
-  LIMITS, assetIds, checkPublishable, gateState, isAssetId, slugStatus, validateContent, validateTemplate,
-  type Content,
+  LIMITS, SUBMISSION, assetIds, checkPublishable, cleanSubmission, gateState, isAssetId, slugStatus, validateContent, validateTemplate,
+  type Content, type SubmissionKind,
 } from "@madeforyou/schema";
 import { authenticate, diagnose, verifyClerk } from "./auth";
 import { hashIp, hashPassword, randomHex, readToken, signToken, timingSafeEqual } from "./crypto";
-import { sniffImage } from "./sniff";
+import { sniffMedia } from "./sniff";
 import type { Deps, Env } from "./types";
 
 type Vars = { userId: string | null };
@@ -15,12 +15,14 @@ type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 const PAGE_ID = /^pg_[a-z0-9]{6,24}$/;
 const TEMPLATE_ID = /^[a-z0-9-]{2,40}$/;
 const GATE_TTL = 6 * 3600;
+const CONTRIB_TTL = 90 * 86400;
 const MAX_JSON_BYTES = 400_000;
 
 interface PageRow {
   id: string; owner_id: string; title: string; template_id: string | null; content: string; slug: string | null;
   status: "draft" | "published"; visibility: "private" | "unlisted"; password_hash: string | null; password_salt: string | null;
   unlock_at: string | null; expires_at: string | null; created_at: string; updated_at: string; published_at: string | null;
+  contrib_epoch: number;
 }
 
 /** A page as the owner's browser sees it. The password hash never leaves the server. */
@@ -45,10 +47,13 @@ async function putFile(env: Env, id: string, buf: ArrayBuffer, type: string): Pr
   }
   await env.DB.prepare("INSERT INTO asset_blobs (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data").bind(id, buf).run();
 }
-async function getFile(env: Env, id: string): Promise<BodyInit | null> {
-  if (env.FILES) return (await env.FILES.get(`a/${id}`))?.body ?? null;
+async function getFile(env: Env, id: string): Promise<Uint8Array | null> {
+  if (env.FILES) {
+    const o = await env.FILES.get(`a/${id}`);
+    return o ? new Uint8Array(await o.arrayBuffer()) : null;
+  }
   const row = await env.DB.prepare("SELECT data FROM asset_blobs WHERE id = ?").bind(id).first<{ data: ArrayLike<number> }>();
-  return row ? (new Uint8Array(row.data) as unknown as BodyInit) : null;
+  return row ? new Uint8Array(row.data) : null;
 }
 
 class HttpError extends Error {
@@ -68,7 +73,7 @@ async function readJson<T>(c: Ctx): Promise<T> {
 }
 
 export function createApp(overrides: Partial<Deps> = {}) {
-  const deps: Deps = { verify: verifyClerk, now: () => Date.now(), ...overrides };
+  const deps: Deps = { verify: verifyClerk, now: () => Date.now(), fetch: (...a) => fetch(...a), ...overrides };
   const app = new Hono<{ Bindings: Env; Variables: Vars }>().basePath("/api");
 
   app.use("*", async (c, next) => {
@@ -239,14 +244,28 @@ export function createApp(overrides: Partial<Deps> = {}) {
   const presetOf = (r: PageRow) => (JSON.parse(r.content) as Content).settings.theme.preset;
 
   /** The only place page content leaves the server for a visitor. */
-  const openPayload = async (c: Ctx, r: PageRow, owner: boolean) => ({
-    state: "open" as const,
-    title: r.title,
-    content: JSON.parse(r.content) as Content,
-    visibility: r.visibility,
-    owner,
-    assetToken: await signToken(c.env.SESSION_SECRET, `pg:${r.id}`, GATE_TTL, deps.now()),
-  });
+  const openPayload = async (c: Ctx, r: PageRow, owner: boolean) => {
+    const content = JSON.parse(r.content) as Content;
+    // Only wishes the owner has approved are ever shown to visitors.
+    const wishes: Record<string, { id: string; name: string; message: string; at: string }[]> = {};
+    if (content.blocks.some((b) => b.type === "wishes")) {
+      const { results } = await c.env.DB.prepare("SELECT id, block_id, payload, created_at FROM submissions WHERE page_id = ? AND kind = 'wish' AND status = 'approved' ORDER BY created_at DESC LIMIT 100")
+        .bind(r.id).all<{ id: string; block_id: string; payload: string; created_at: string }>();
+      for (const w of results ?? []) {
+        const p = JSON.parse(w.payload) as { name: string; message: string };
+        (wishes[w.block_id] ??= []).push({ id: w.id, name: p.name, message: p.message, at: w.created_at });
+      }
+    }
+    return {
+      state: "open" as const,
+      title: r.title,
+      content,
+      visibility: r.visibility,
+      owner,
+      wishes,
+      assetToken: await signToken(c.env.SESSION_SECRET, `pg:${r.id}`, GATE_TTL, deps.now()),
+    };
+  };
 
   /** Decides what a visitor may receive. Locked, ended and password states carry NO content. */
   const gate = async (c: Ctx, r: PageRow | null, passwordOk: boolean) => {
@@ -279,20 +298,20 @@ export function createApp(overrides: Partial<Deps> = {}) {
 
   /* ------------------------------ photos ------------------------------ */
 
-  const ALLOWED = new Set(["image/webp", "image/jpeg", "image/png"]);
+  const ALLOWED = new Set(["image/webp", "image/jpeg", "image/png", "audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg"]);
 
   app.put("/assets/:id", async (c) => {
     const userId = await need(c);
     const id = c.req.param("id");
     if (!isAssetId(id)) throw new HttpError(400, "That photo id is not valid");
     const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim();
-    if (!ALLOWED.has(type)) throw new HttpError(415, "Photos must be WebP, JPEG or PNG");
+    if (!ALLOWED.has(type)) throw new HttpError(415, "Use a WebP, JPEG or PNG photo, or a WebM, MP4, OGG or MP3 voice note");
     if (Number(c.req.header("content-length") ?? 0) > LIMITS.assetBytes) throw new HttpError(413, "That photo is too large");
     await throttle(c, `up:${userId}`, 3600, 300);
 
     const buf = await c.req.arrayBuffer();
     if (buf.byteLength === 0 || buf.byteLength > LIMITS.assetBytes) throw new HttpError(413, "That photo is too large");
-    if (sniffImage(new Uint8Array(buf)) !== type) throw new HttpError(415, "That file is not the kind of image it says it is");
+    if (sniffMedia(new Uint8Array(buf)) !== type) throw new HttpError(415, "That file is not the kind of image it says it is");
 
     const existing = await c.env.DB.prepare("SELECT owner_id, bytes FROM assets WHERE id = ?").bind(id).first<{ owner_id: string; bytes: number }>();
     if (existing && existing.owner_id !== userId) throw new HttpError(409, "That photo id is taken");
@@ -324,9 +343,182 @@ export function createApp(overrides: Partial<Deps> = {}) {
     }
     if (!allowed) return notFound();
 
-    const body = await getFile(c.env, id);
-    if (!body) return notFound();
-    return new Response(body, { headers: { "Content-Type": asset.content_type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff" } });
+    const bytes = await getFile(c.env, id);
+    if (!bytes) return notFound();
+    const headers: Record<string, string> = { "Content-Type": asset.content_type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Accept-Ranges": "bytes" };
+    // Safari will not play audio unless the server understands byte ranges.
+    const range = c.req.header("range")?.match(/^bytes=(\d*)-(\d*)$/);
+    if (range && (range[1] || range[2])) {
+      const size = bytes.byteLength;
+      if (range[1] && +range[1] >= size) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+      const start = range[1] ? +range[1] : Math.max(0, size - +range[2]!);
+      const end = range[1] && range[2] ? Math.min(+range[2], size - 1) : size - 1;
+      if (start > end) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+      return new Response(bytes.slice(start, end + 1) as unknown as BodyInit, { status: 206, headers: { ...headers, "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Length": String(end - start + 1) } });
+    }
+    return new Response(bytes as unknown as BodyInit, { headers: { ...headers, "Content-Length": String(bytes.byteLength) } });
+  });
+
+
+  /* ------------------------------ guest messages ------------------------------ */
+
+  const verifyTurnstile = async (c: Ctx, token: unknown): Promise<boolean> => {
+    if (!c.env.TURNSTILE_SECRET) return true;
+    if (typeof token !== "string" || !token) return false;
+    try {
+      const res = await deps.fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ secret: c.env.TURNSTILE_SECRET, response: token, remoteip: c.req.header("cf-connecting-ip") ?? "" }),
+      });
+      return ((await res.json()) as { success?: boolean }).success === true;
+    } catch {
+      return false;
+    }
+  };
+
+  /** The one place a guest's message is accepted, whether it comes from the page or a contributor link. */
+  const accept = async (c: Ctx, r: PageRow, input: { blockId: unknown; kind: SubmissionKind; payload: unknown; source: "page" | "contributor"; website?: unknown; elapsedMs?: unknown; turnstile?: unknown }) => {
+    if (r.expires_at && Date.parse(r.expires_at) <= deps.now()) throw new HttpError(410, "This page has ended");
+    const content = JSON.parse(r.content) as Content;
+    const block = content.blocks.find((b) => b.id === input.blockId);
+    const expected = block ? (SUBMISSION.blockKind as Record<string, SubmissionKind>)[block.type] : undefined;
+    if (!block || expected !== input.kind) throw new HttpError(400, "That box is not on this page");
+
+    if (typeof input.website === "string" && input.website !== "") return { ok: true, status: "approved" as const }; // a bot filled the hidden field: pretend it worked
+    if (typeof input.elapsedMs === "number" && input.elapsedMs < SUBMISSION.minFillMs) throw new HttpError(429, "Please take a moment before sending");
+    if (!(await verifyTurnstile(c, input.turnstile))) throw new HttpError(403, "We could not confirm you are a person. Please try again.");
+
+    const ip = await ipOf(c);
+    await throttle(c, `sub:${r.id}:${ip}`, 600, SUBMISSION.perVisitorPer10Min);
+    await throttle(c, `subp:${r.id}`, 3600, SUBMISSION.perPagePerHour);
+    const total = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM submissions WHERE page_id = ?").bind(r.id).first<{ n: number }>();
+    if ((total?.n ?? 0) >= SUBMISSION.maxPerPage) throw new HttpError(403, "This page cannot take more messages");
+
+    const cleaned = cleanSubmission(input.kind, input.payload);
+    if (!cleaned.ok) throw new HttpError(400, cleaned.error);
+    const status = input.kind === "wish" && block.fields.moderation !== "auto" ? "pending" : "approved";
+    const stmts = [];
+    if (input.kind === "rsvp") {
+      // answering again replaces the earlier answer instead of counting twice
+      stmts.push(c.env.DB.prepare("DELETE FROM submissions WHERE page_id = ? AND block_id = ? AND kind = 'rsvp' AND lower(json_extract(payload, '$.name')) = ?").bind(r.id, block.id, String(cleaned.payload.name).toLowerCase()));
+    }
+    stmts.push(c.env.DB.prepare("INSERT INTO submissions (id, page_id, block_id, kind, payload, status, source, created_at, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(`sb_${randomHex(8)}`, r.id, block.id, input.kind, JSON.stringify(cleaned.payload), status, input.source, iso(), ip));
+    await c.env.DB.batch(stmts);
+    return { ok: true, status };
+  };
+
+  app.post("/p/:slug/submit", async (c) => {
+    const r = await publicRow(c, c.req.param("slug"));
+    if (!r) throw new HttpError(404, "Page not found");
+    const b = await readJson<{ blockId?: unknown; kind?: unknown; payload?: unknown; token?: unknown; website?: unknown; elapsedMs?: unknown; turnstile?: unknown }>(c);
+    const owner = !!c.get("userId") && c.get("userId") === r.owner_id;
+    if (r.visibility === "private" && !owner) throw new HttpError(404, "Page not found");
+    // The visitor must have been let in (past the lock and password) to leave a message.
+    const scope = await readToken(c.env.SESSION_SECRET, typeof b.token === "string" ? b.token : "", deps.now());
+    if (scope !== `pg:${r.id}`) throw new HttpError(403, "Open the page first, then send your message");
+    if (b.kind !== "wish" && b.kind !== "reply" && b.kind !== "rsvp") throw new HttpError(400, "Unknown kind of message");
+    const out = await accept(c, r, { blockId: b.blockId, kind: b.kind, payload: b.payload, source: "page", website: b.website, elapsedMs: b.elapsedMs, turnstile: b.turnstile });
+    return c.json(out);
+  });
+
+  /* contributor links: friends add a wish without ever seeing the page (so a surprise stays a surprise) */
+  const contribScope = (r: PageRow) => `c:${r.id}:${r.contrib_epoch}`;
+  const contributorRow = async (c: Ctx, slug: string): Promise<PageRow> => {
+    const r = await publicRow(c, slug);
+    const scope = await readToken(c.env.SESSION_SECRET, c.req.query("k"), deps.now());
+    if (!r || !scope || scope !== contribScope(r)) throw new HttpError(404, "This invitation link is not valid any more");
+    return r;
+  };
+
+  app.post("/pages/:id/contributor-link", async (c) => {
+    const userId = await need(c);
+    const row = await ownedPage(c, c.req.param("id"), userId);
+    if (row.status !== "published" || !row.slug) throw new HttpError(409, "Publish the page first");
+    if (!(JSON.parse(row.content) as Content).blocks.some((b) => b.type === "wishes")) throw new HttpError(409, "Add a Wishes wall block first");
+    const token = await signToken(c.env.SESSION_SECRET, contribScope(row), CONTRIB_TTL, deps.now());
+    return c.json({ path: `/c/${row.slug}?k=${encodeURIComponent(token)}` });
+  });
+
+  /** Switching off the old link: every link sent so far stops working. */
+  app.post("/pages/:id/contributor-link/reset", async (c) => {
+    const userId = await need(c);
+    const row = await ownedPage(c, c.req.param("id"), userId);
+    await c.env.DB.prepare("UPDATE pages SET contrib_epoch = contrib_epoch + 1 WHERE id = ?").bind(row.id).run();
+    return c.json({ ok: true });
+  });
+
+  app.get("/c/:slug", async (c) => {
+    const r = await contributorRow(c, c.req.param("slug"));
+    if (r.expires_at && Date.parse(r.expires_at) <= deps.now()) throw new HttpError(410, "This page has ended");
+    const content = JSON.parse(r.content) as Content;
+    const wall = content.blocks.find((b) => b.type === "wishes");
+    if (!wall) throw new HttpError(404, "This page has no wishes wall");
+    const hero = content.blocks.find((b) => b.type === "hero");
+    const recipient = hero && !hero.ph.includes("recipient") && typeof hero.fields.recipient === "string" ? hero.fields.recipient : "";
+    return c.json({ blockId: wall.id, heading: wall.fields.title ?? "", prompt: wall.fields.prompt ?? "", recipient, theme: content.settings.theme.preset });
+  });
+
+  app.post("/c/:slug/submit", async (c) => {
+    const r = await contributorRow(c, c.req.param("slug"));
+    const b = await readJson<{ payload?: unknown; website?: unknown; elapsedMs?: unknown; turnstile?: unknown }>(c);
+    const wall = (JSON.parse(r.content) as Content).blocks.find((x) => x.type === "wishes");
+    if (!wall) throw new HttpError(404, "This page has no wishes wall");
+    return c.json(await accept(c, r, { blockId: wall.id, kind: "wish", payload: b.payload, source: "contributor", website: b.website, elapsedMs: b.elapsedMs, turnstile: b.turnstile }));
+  });
+
+  /* ------------------------------ the owner's inbox ------------------------------ */
+
+  interface SubRow { id: string; page_id: string; block_id: string; kind: string; payload: string; status: string; source: string; read_at: string | null; created_at: string }
+  const toSub = (s: SubRow) => ({ id: s.id, pageId: s.page_id, blockId: s.block_id, kind: s.kind, payload: JSON.parse(s.payload), status: s.status, source: s.source, read: !!s.read_at, createdAt: s.created_at });
+
+  app.get("/me/inbox", async (c) => {
+    const userId = await need(c);
+    const row = await ownedPage(c, c.req.query("page") ?? "", userId);
+    const { results } = await c.env.DB.prepare("SELECT * FROM submissions WHERE page_id = ? ORDER BY created_at DESC LIMIT 500").bind(row.id).all<SubRow>();
+    return c.json({ submissions: (results ?? []).map(toSub) });
+  });
+
+  app.get("/me/inbox/summary", async (c) => {
+    const userId = await need(c);
+    const { results } = await c.env.DB.prepare(
+      `SELECT s.page_id AS page_id,
+              SUM(CASE WHEN s.kind = 'wish' AND s.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+              SUM(CASE WHEN s.kind = 'reply' AND s.read_at IS NULL THEN 1 ELSE 0 END) AS unread,
+              SUM(CASE WHEN s.kind = 'rsvp' AND json_extract(s.payload, '$.response') = 'yes' THEN 1 ELSE 0 END) AS yes,
+              SUM(CASE WHEN s.kind = 'rsvp' AND json_extract(s.payload, '$.response') = 'no' THEN 1 ELSE 0 END) AS no,
+              SUM(CASE WHEN s.kind = 'rsvp' AND json_extract(s.payload, '$.response') = 'maybe' THEN 1 ELSE 0 END) AS maybe,
+              COALESCE(SUM(CASE WHEN s.kind = 'rsvp' THEN json_extract(s.payload, '$.guests') ELSE 0 END), 0) AS guests
+       FROM submissions s JOIN pages p ON p.id = s.page_id
+       WHERE p.owner_id = ? AND p.deleted_at IS NULL GROUP BY s.page_id`,
+    ).bind(userId).all<{ page_id: string; pending: number; unread: number; yes: number; no: number; maybe: number; guests: number }>();
+    return c.json({ pages: Object.fromEntries((results ?? []).map((r) => [r.page_id, { pending: r.pending, unread: r.unread, yes: r.yes, no: r.no, maybe: r.maybe, guests: r.guests }])) });
+  });
+
+  const ownedSubmission = async (c: Ctx, id: string, userId: string) => {
+    const row = await c.env.DB.prepare("SELECT s.id FROM submissions s JOIN pages p ON p.id = s.page_id WHERE s.id = ? AND p.owner_id = ?").bind(id, userId).first<{ id: string }>();
+    if (!row) throw new HttpError(404, "Message not found");
+  };
+
+  app.patch("/submissions/:id", async (c) => {
+    const userId = await need(c);
+    const id = c.req.param("id");
+    await ownedSubmission(c, id, userId);
+    const b = await readJson<{ status?: unknown; read?: unknown }>(c);
+    if (b.status !== undefined) {
+      if (b.status !== "approved" && b.status !== "rejected" && b.status !== "pending") throw new HttpError(400, "Unknown status");
+      await c.env.DB.prepare("UPDATE submissions SET status = ? WHERE id = ?").bind(b.status, id).run();
+    }
+    if (b.read !== undefined) await c.env.DB.prepare("UPDATE submissions SET read_at = ? WHERE id = ?").bind(b.read ? iso() : null, id).run();
+    return c.json({ ok: true });
+  });
+
+  app.delete("/submissions/:id", async (c) => {
+    const userId = await need(c);
+    await ownedSubmission(c, c.req.param("id"), userId);
+    await c.env.DB.prepare("DELETE FROM submissions WHERE id = ?").bind(c.req.param("id")).run();
+    return c.json({ ok: true });
   });
 
   /* ------------------------------ templates ------------------------------ */

@@ -46,3 +46,39 @@ export function gateState(a: AccessInfo, now: number = Date.now()): GateState {
   if (a.unlockAt && Date.parse(a.unlockAt) > now) return "locked";
   return a.hasPassword ? "password" : "open";
 }
+
+/* ---------- guest messages ---------- */
+export const SUBMISSION = {
+  /** Which block type accepts which kind of message. */
+  blockKind: { wishes: "wish", replyBox: "reply", rsvp: "rsvp" } as const,
+  perPagePerHour: 40,
+  perVisitorPer10Min: 5,
+  maxPerPage: 400,
+  minFillMs: 1500,
+} as const;
+export type SubmissionKind = "wish" | "reply" | "rsvp";
+
+const clean = (v: unknown, max: number): string =>
+  typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/\s+\n/g, "\n").trim().slice(0, max) : "";
+
+/** Checks and tidies a guest's message. Returns the cleaned payload, or an error in plain words. */
+export function cleanSubmission(kind: SubmissionKind, raw: unknown): { ok: true; payload: Record<string, string | number> } | { ok: false; error: string } {
+  const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  if (kind === "wish") {
+    const name = clean(p.name, 60), message = clean(p.message, 500);
+    if (!name) return { ok: false, error: "Please add your name" };
+    if (!message) return { ok: false, error: "Please write your wish" };
+    return { ok: true, payload: { name, message } };
+  }
+  if (kind === "reply") {
+    const message = clean(p.message, 1000), name = clean(p.name, 60);
+    if (!message) return { ok: false, error: "Please write a message" };
+    return { ok: true, payload: name ? { name, message } : { message } };
+  }
+  const name = clean(p.name, 60), note = clean(p.note, 200);
+  const response = p.response === "yes" || p.response === "no" || p.response === "maybe" ? p.response : "";
+  if (!name) return { ok: false, error: "Please add your name" };
+  if (!response) return { ok: false, error: "Please choose Yes, No or Maybe" };
+  const guests = response === "no" ? 0 : Math.min(10, Math.max(1, Math.floor(Number(p.guests) || 1)));
+  return { ok: true, payload: note ? { name, response, guests, note } : { name, response, guests } };
+}

@@ -14,6 +14,7 @@ export interface R2ObjectLike {
   body: BodyInit | null;
   size: number;
   httpMetadata?: { contentType?: string };
+  arrayBuffer(): Promise<ArrayBuffer>;
 }
 export interface R2Like {
   put(key: string, value: ArrayBuffer, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
@@ -34,10 +35,14 @@ export interface Env {
   ADMIN_TOKEN?: string;
   /** Extra origin allowed to call the API (local dev with the Vite server on another port). */
   ALLOWED_ORIGIN?: string;
+  /** Optional. With a Cloudflare Turnstile secret, guest messages must carry a passed challenge. */
+  TURNSTILE_SECRET?: string;
 }
 
 export interface Deps {
   /** Verifies a login token and returns the user id. Replaced in tests. */
   verify: (token: string, env: Env) => Promise<{ sub: string }>;
   now: () => number;
+  /** For the Turnstile check; replaced in tests. */
+  fetch: typeof fetch;
 }

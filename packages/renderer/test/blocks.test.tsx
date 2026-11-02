@@ -253,3 +253,136 @@ describe("memory match", () => {
     expect(q(".mfy-mem-moves").textContent).toContain("5 moves");
   });
 });
+
+import type { Host } from "../src";
+
+describe("guest messages on the page", () => {
+  const cleanup: (() => Promise<void>)[] = [];
+  const mountWith = async (content: Content, host?: Host) => {
+    const el = document.createElement("div");
+    document.body.append(el);
+    const r = createRoot(el);
+    await act(async () => r.render(<PageRenderer content={content} skipOpening host={host} />));
+    cleanup.push(async () => { await act(async () => r.unmount()); el.remove(); });
+    return el;
+  };
+  afterEach(async () => { for (const c of cleanup.splice(0)) await c(); });
+  const type = async (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    await act(async () => { Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value); el.dispatchEvent(new Event("input", { bubbles: true })); });
+  };
+  const submitForm = (el: HTMLElement) => act(async () => { el.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+
+  it("a preview (no host) shows sample wishes and a disabled form, never a working one", async () => {
+    const el = await mountWith(page("wishes", { title: "Wishes", prompt: "Say hi" }));
+    expect(el.querySelectorAll(".mfy-wishes li")).toHaveLength(2);
+    expect((el.querySelector("button[type=submit]") as HTMLButtonElement).disabled).toBe(true);
+    expect(el.querySelector(".mfy-form-note")!.textContent).toContain("once the page is live");
+  });
+  it("sends a wish with the hidden field and the time taken, then thanks the guest", async () => {
+    const calls: unknown[][] = [];
+    const host: Host = { submit: async (...a) => { calls.push(a); return { ok: true, status: "pending" }; }, wishes: {} };
+    const content = page("wishes", { title: "Wishes", prompt: "Say hi" });
+    const el = await mountWith(content, host);
+    await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Meera");
+    await type(el.querySelector("textarea") as HTMLTextAreaElement, "Happy birthday");
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    await submitForm(el);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]![0]).toBe(content.blocks[0]!.id);
+    expect(calls[0]![1]).toBe("wish");
+    expect(calls[0]![2]).toEqual({ name: "Meera", message: "Happy birthday" });
+    expect(calls[0]![3]).toMatchObject({ website: "" });
+    expect((calls[0]![3] as { elapsedMs: number }).elapsedMs).toBeGreaterThanOrEqual(1500);
+    expect(el.querySelector(".mfy-thanks")!.textContent).toContain("approved");
+  });
+  it("shows approved wishes from the host, and the server's error message when sending fails", async () => {
+    const content = page("wishes", { title: "Wishes" });
+    const id = content.blocks[0]!.id;
+    const host: Host = { submit: async () => ({ ok: false, error: "Please take a moment before sending" }), wishes: { [id]: [{ id: "w1", name: "Raj", message: "Cheers!" }] } };
+    const el = await mountWith(content, host);
+    expect(el.querySelector(".mfy-wishes")!.textContent).toContain("Cheers!");
+    expect(el.querySelector(".mfy-wishes")!.classList.contains("mfy-ph")).toBe(false);
+    await type(el.querySelector("input.mfy-in") as HTMLInputElement, "A");
+    await type(el.querySelector("textarea") as HTMLTextAreaElement, "B");
+    await submitForm(el);
+    expect(el.querySelector(".mfy-form-error")!.textContent).toContain("take a moment");
+  });
+  it("RSVP: a 'yes' sends the guest count", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const host: Host = { submit: async (_b, _k, payload) => { calls.push(payload); return { ok: true }; } };
+    const el = await mountWith(page("rsvp", { title: "Coming?", thanksYes: "See you!", thanksNo: "We will miss you" }), host);
+    await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Raj");
+    expect(el.querySelector("select")).toBeNull(); // no answer yet
+    await click(el.querySelectorAll(".mfy-choice button")[0]!);
+    expect(el.querySelector("select")).toBeTruthy();
+    await act(async () => { const s = el.querySelector("select")!; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(s, "3"); s.dispatchEvent(new Event("change", { bubbles: true })); });
+    await submitForm(el);
+    expect(calls[0]).toMatchObject({ name: "Raj", response: "yes", guests: 3 });
+    expect(el.querySelector(".mfy-thanks")!.textContent).toBe("See you!");
+  });
+  it("RSVP 'no' says the 'no' thanks and brings no guests", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const host: Host = { submit: async (_b, _k, payload) => { calls.push(payload); return { ok: true }; } };
+    const el = await mountWith(page("rsvp", { title: "Coming?", thanksYes: "See you!", thanksNo: "We will miss you" }), host);
+    await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Sneha");
+    await click(el.querySelectorAll(".mfy-choice button")[1]!);
+    expect(el.querySelector("select")).toBeNull();
+    await submitForm(el);
+    expect(calls[0]).toMatchObject({ response: "no", guests: 0 });
+    expect(el.querySelector(".mfy-thanks")!.textContent).toBe("We will miss you");
+  });
+  it("a reply box sends the message and says the owner's thank-you", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const host: Host = { submit: async (_b, _k, payload) => { calls.push(payload); return { ok: true }; } };
+    const el = await mountWith(page("replyBox", { title: "Write back", prompt: "Say it", thanks: "I read every word" }), host);
+    await type(el.querySelector("textarea") as HTMLTextAreaElement, "I cried");
+    await submitForm(el);
+    expect(calls[0]).toMatchObject({ message: "I cried" });
+    expect(el.querySelector(".mfy-thanks")!.textContent).toBe("I read every word");
+  });
+  it("nothing is sent from a thumbnail", async () => {
+    const el = document.createElement("div");
+    document.body.append(el);
+    const r = createRoot(el);
+    await act(async () => r.render(<PageRenderer content={page("rsvp", { title: "Coming?" })} skipOpening static host={{ submit: async () => ({ ok: true }) }} />));
+    expect(el.querySelector("form")).toBeNull();
+    await act(async () => r.unmount());
+    el.remove();
+  });
+});
+
+describe("voice note and map", () => {
+  it("plays the voice note from the asset the host resolves, and shows its length", async () => {
+    const c = page("voiceNote", { title: "For you", audio: { asset: "ast_voice01", seconds: 42 } });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(<PageRenderer content={c} skipOpening resolveAsset={(r) => `https://cdn.example/${r.asset}.webm`} />));
+    expect((q("audio") as HTMLAudioElement).src).toBe("https://cdn.example/ast_voice01.webm");
+    expect(q(".mfy-time").textContent).toBe("0:42");
+    expect((q(".mfy-player .mfy-play") as HTMLButtonElement).disabled).toBe(false);
+  });
+  it("without a recording the player is a disabled sample", async () => {
+    await mount(page("voiceNote", {}, ["audio", "title"]));
+    expect((q(".mfy-player .mfy-play") as HTMLButtonElement).disabled).toBe(true);
+    expect(qa("audio")).toHaveLength(0);
+  });
+  it("the map loads only when tapped, centred on the place, with links that are safe", async () => {
+    await mount(page("map", { title: "Where", location: { lat: 19.076, lng: 72.8777 } }));
+    expect(qa("iframe")).toHaveLength(0);
+    await click(q(".mfy-map-poster"));
+    const f = q("iframe") as HTMLIFrameElement;
+    expect(f.src).toContain("https://www.openstreetmap.org/export/embed.html?bbox=72.8717,19.072,72.8837,19.08");
+    expect(f.src).toContain("marker=19.076,72.8777");
+    expect(q("a.mfy-linkbtn").getAttribute("href")).toBe("https://www.google.com/maps?q=19.076,72.8777");
+  });
+  it("never builds a map from bad coordinates, or in a thumbnail", async () => {
+    await mount(page("map", { title: "Where", location: { lat: 999, lng: 0 } }));
+    expect((q(".mfy-map-poster") as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => root!.unmount());
+    host!.remove();
+    await mount(page("map", { title: "Where", location: { lat: 19, lng: 72 } }), { static: true });
+    expect((q(".mfy-map-poster") as HTMLButtonElement).disabled).toBe(true);
+  });
+});

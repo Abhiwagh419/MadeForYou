@@ -1,9 +1,10 @@
 import { useRef, useState, type ReactNode } from "react";
-import { defaultValue, isSafeLink, normalizeLink, parseVideoUrl, type AssetRef, type FieldDef, type VideoRef } from "@madeforyou/schema";
+import { defaultValue, isSafeLink, normalizeLink, parseGeo, parseVideoUrl, type AssetRef, type AudioRef, type FieldDef, type Geo, type VideoRef } from "@madeforyou/schema";
 import { saveImage, useAssetUrl } from "../lib/assets";
 import { fromIstInput, humanize, toIstInput } from "../lib/util";
 import { Icon } from "./Icon";
 import { Segmented, toast } from "./Controls";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 export function Field({ label, hint, right, children }: { label?: string; hint?: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -106,6 +107,36 @@ function EmbedInput({ value, onChange, large }: { value: VideoRef | null | undef
     <>
       <input className={`in ${large ? "in-lg" : "in-sm"}`} inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="Paste a YouTube or Vimeo link" value={draft} aria-label="Video link"
         onChange={(e) => { setDraft(e.target.value); if (parseVideoUrl(e.target.value)) add(e.target.value); }} onBlur={() => add(draft)} />
+      {error && <p className="field-error">{error}</p>}
+    </>
+  );
+}
+
+/* ---------- a place: a pasted map link or "latitude, longitude" ---------- */
+function GeoInput({ value, onChange, large }: { value: Geo | null | undefined; onChange: (v: Geo | null) => void; large?: boolean }) {
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState("");
+  if (value) {
+    return (
+      <div className="embed-chip">
+        <Icon name="pin" size={16} />
+        <span>Place set ({value.lat}, {value.lng})</span>
+        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => onChange(null)} aria-label="Remove place"><Icon name="x" size={16} /></button>
+      </div>
+    );
+  }
+  const add = (text: string) => {
+    const g = parseGeo(text);
+    if (g) { setError(""); setDraft(""); onChange(g); return; }
+    if (!text.trim()) return;
+    setError(/goo\.gl|maps\.app/.test(text)
+      ? "Short links cannot be read. Open the link, copy the long address from your browser's address bar, or paste latitude and longitude."
+      : "Paste an OpenStreetMap or Google Maps link, or type latitude and longitude like 19.0760, 72.8777");
+  };
+  return (
+    <>
+      <input className={`in ${large ? "in-lg" : "in-sm"}`} inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="Paste a map link, or 19.0760, 72.8777" value={draft} aria-label="Place"
+        onChange={(e) => { setDraft(e.target.value); if (parseGeo(e.target.value)) add(e.target.value); }} onBlur={() => add(draft)} />
       {error && <p className="field-error">{error}</p>}
     </>
   );
@@ -234,6 +265,10 @@ export function FieldInput({
       return <Field label={large ? undefined : label}><LinkInput large={large} label={label} value={String(shown ?? "")} onChange={onChange} /></Field>;
     case "embed":
       return <Field label={large ? undefined : label}><EmbedInput large={large} value={value as VideoRef | null} onChange={onChange} /></Field>;
+    case "audio":
+      return <Field label={large ? undefined : label} hint="Up to a minute. Hold the phone close and speak slowly."><VoiceRecorder large={large} value={value as AudioRef | null} onChange={onChange} /></Field>;
+    case "geo":
+      return <Field label={large ? undefined : label}><GeoInput large={large} value={value as Geo | null} onChange={onChange} /></Field>;
     case "enum":
       return (
         <Field label={label}>

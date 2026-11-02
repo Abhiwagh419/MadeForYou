@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { deletePage, deleteTemplate, duplicatePage, useStore, type PageRecord } from "../state/store";
 import { useSession } from "../lib/auth";
 import { isRemote } from "../lib/config";
 import { removeRemote } from "../lib/sync";
+import { api } from "../lib/api";
 import { formatWhen } from "../lib/util";
 import { go } from "../lib/router";
 import { Button } from "../ui/Button";
@@ -28,6 +29,12 @@ export function Dashboard() {
   const [tab, setTab] = useState<"pages" | "templates">("pages");
   const [doomed, setDoomed] = useState<PageRecord | null>(null);
   const session = useSession();
+  const [counts, setCounts] = useState<Record<string, { pending: number; unread: number; yes: number; maybe: number; no: number; guests: number }>>({});
+  useEffect(() => {
+    if (!isRemote() || !session.userId) return;
+    api<{ pages: typeof counts }>("/me/inbox/summary").then((r) => setCounts(r.pages)).catch(() => {});
+  }, [session.userId]);
+  const hasGuests = (p: PageRecord) => p.content.blocks.some((b) => b.type === "wishes" || b.type === "replyBox" || b.type === "rsvp");
 
   return (
     <Shell active="me">
@@ -70,11 +77,19 @@ export function Dashboard() {
                     <div className="tcard-body">
                       <h3>{p.title}</h3>
                       <p><span className={`badge ${st.tone ? `badge-${st.tone}` : ""}`}>{st.label}</span> <span className="muted">edited {formatWhen(p.updatedAt)}</span></p>
+                      {counts[p.id] && (
+                        <div className="card-chips">
+                          {counts[p.id]!.pending > 0 && <a className="chip chip-sm" href={`#/inbox/${p.id}`}>{counts[p.id]!.pending} wish{counts[p.id]!.pending === 1 ? "" : "es"} to approve</a>}
+                          {counts[p.id]!.unread > 0 && <a className="chip chip-sm" href={`#/inbox/${p.id}`}>{counts[p.id]!.unread} new repl{counts[p.id]!.unread === 1 ? "y" : "ies"}</a>}
+                          {counts[p.id]!.yes > 0 && <a className="chip chip-sm" href={`#/inbox/${p.id}`}>{counts[p.id]!.yes} coming · {counts[p.id]!.guests} guests</a>}
+                        </div>
+                      )}
                       <div className="card-actions">
                         <Button size="sm" variant="secondary" icon="pencil" href={`#/edit/${p.id}`}>Edit</Button>
                         {p.status === "published"
                           ? <Button size="sm" variant="ghost" icon="share" href={`#/share/${p.id}`}>Share</Button>
                           : <Button size="sm" variant="ghost" iconRight="right" href={`#/publish/${p.id}`}>Publish</Button>}
+                        {p.status === "published" && hasGuests(p) && <Button size="sm" variant="ghost" icon="mail" href={`#/inbox/${p.id}`}>Messages</Button>}
                         <Button size="sm" variant="ghost" icon="copy" aria-label="Duplicate" onClick={() => { const c = duplicatePage(p.id); if (c) toast("Copied"); }} />
                         <Button size="sm" variant="ghost" icon="trash" aria-label="Delete" onClick={() => setDoomed(p)} />
                       </div>

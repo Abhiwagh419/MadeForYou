@@ -45,7 +45,7 @@ export function makeBucket(): R2Like & { keys: () => string[] } {
     put: async (k, v, o) => void m.set(k, { buf: v, type: o?.httpMetadata?.contentType }),
     get: async (k) => {
       const o = m.get(k);
-      return o ? { body: o.buf, size: o.buf.byteLength, httpMetadata: { contentType: o.type } } : null;
+      return o ? { body: o.buf, size: o.buf.byteLength, httpMetadata: { contentType: o.type }, arrayBuffer: async () => o.buf } : null;
     },
     delete: async (k) => void [k].flat().forEach((x) => m.delete(x)),
     keys: () => [...m.keys()],

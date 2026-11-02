@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useSyncExternalStore } from "react";
-import type { AssetRef, Content } from "@madeforyou/schema";
+import { LIMITS, type AssetRef, type Content } from "@madeforyou/schema";
 import { apiBase, isRemote } from "./config";
 import { uid } from "./util";
 
@@ -88,6 +88,16 @@ export async function saveImage(file: File): Promise<AssetRef> {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image");
   if (file.size > 25 * 1024 * 1024) throw new Error("That photo is too large (25 MB max)");
   const blob = await compressImage(file);
+  const id = uid("ast");
+  await putBlob(id, blob);
+  urlCache.set(id, URL.createObjectURL(blob));
+  return { asset: id };
+}
+
+/** A voice note is stored exactly as recorded (it is already small: about 30 KB per second). */
+export async function saveAudio(blob: Blob): Promise<AssetRef> {
+  if (!/^audio\//.test(blob.type)) throw new Error("Please choose an audio file");
+  if (blob.size > LIMITS.assetBytes) throw new Error("That recording is too large. Keep it under a minute, or under 1.5 MB.");
   const id = uid("ast");
   await putBlob(id, blob);
   urlCache.set(id, URL.createObjectURL(blob));

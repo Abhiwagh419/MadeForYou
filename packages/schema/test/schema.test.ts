@@ -310,8 +310,8 @@ describe("links and video are safe by construction", () => {
 });
 
 describe("the full block set", () => {
-  it("has 21 blocks, each valid with its placeholders", () => {
-    expect(Object.keys(registry)).toHaveLength(21);
+  it("has every block, each valid with its placeholders", () => {
+    expect(Object.keys(registry).length).toBeGreaterThanOrEqual(21);
     const blocks = Object.keys(registry).map((t) => createBlock(t));
     expect(validateContent({ ...starterSkeleton(), blocks }).ok).toBe(true);
   });
@@ -325,5 +325,59 @@ describe("the full block set", () => {
     });
     const stripped = stripPersonal({ ...starterSkeleton(), blocks });
     expect(JSON.stringify(stripped.content)).not.toContain("SECRET-VALUE");
+  });
+});
+
+import { cleanSubmission, parseGeo } from "../src";
+
+describe("places", () => {
+  it("reads coordinates and map links, and refuses what it cannot read", () => {
+    expect(parseGeo("19.0760, 72.8777")).toEqual({ lat: 19.076, lng: 72.8777 });
+    expect(parseGeo("19.076 72.8777")).toEqual({ lat: 19.076, lng: 72.8777 });
+    expect(parseGeo("https://www.openstreetmap.org/?mlat=19.0760&mlon=72.8777#map=16/19.0760/72.8777")).toEqual({ lat: 19.076, lng: 72.8777 });
+    expect(parseGeo("https://www.openstreetmap.org/#map=16/19.0176/72.8562")).toEqual({ lat: 19.0176, lng: 72.8562 });
+    expect(parseGeo("https://www.google.com/maps/place/Gateway+of+India/@18.9219841,72.8346543,17z/data=x")).toEqual({ lat: 18.92198, lng: 72.83465 });
+    expect(parseGeo("https://www.google.com/maps?q=19.076,72.8777")).toEqual({ lat: 19.076, lng: 72.8777 });
+    expect(parseGeo("https://maps.app.goo.gl/abc123")).toBeNull();
+    expect(parseGeo("95, 200")).toBeNull();
+    expect(parseGeo("hello")).toBeNull();
+    expect(parseGeo("")).toBeNull();
+  });
+});
+
+describe("guest messages", () => {
+  it("tidies and limits what guests send", () => {
+    expect(cleanSubmission("wish", { name: "  Meera ", message: "Happy birthday!\u0000" })).toEqual({ ok: true, payload: { name: "Meera", message: "Happy birthday!" } });
+    expect(cleanSubmission("wish", { name: "", message: "x" })).toMatchObject({ ok: false });
+    expect(cleanSubmission("wish", { name: "A", message: "x".repeat(900) })).toMatchObject({ ok: true, payload: { message: "x".repeat(500) } });
+    expect(cleanSubmission("reply", { message: "Thank you" })).toEqual({ ok: true, payload: { message: "Thank you" } });
+    expect(cleanSubmission("reply", { message: "  " })).toMatchObject({ ok: false });
+    expect(cleanSubmission("wish", null)).toMatchObject({ ok: false });
+  });
+  it("RSVPs need a name and an answer, and a 'no' brings no guests", () => {
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "yes", guests: 3 })).toEqual({ ok: true, payload: { name: "Raj", response: "yes", guests: 3 } });
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "no", guests: 5 })).toMatchObject({ payload: { guests: 0 } });
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "yes", guests: 99 })).toMatchObject({ payload: { guests: 10 } });
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "perhaps" })).toMatchObject({ ok: false });
+    expect(cleanSubmission("rsvp", { response: "yes" })).toMatchObject({ ok: false });
+  });
+});
+
+describe("26 blocks", () => {
+  it("the whole planned set exists and validates", () => {
+    expect(Object.keys(registry)).toHaveLength(26);
+    expect(validateContent({ ...starterSkeleton(), blocks: Object.keys(registry).map((t) => createBlock(t)) }).ok).toBe(true);
+  });
+  it("accepts a voice note and a place only in their exact shapes", () => {
+    const v = createBlock("voiceNote");
+    v.fields.audio = { asset: "ast_voice01", seconds: 42 };
+    expect(validateContent({ ...starterSkeleton(), blocks: [v] }).ok).toBe(true);
+    v.fields.audio = { asset: "ast_voice01", seconds: 600 };
+    expect(validateContent({ ...starterSkeleton(), blocks: [v] }).ok).toBe(false);
+    const m = createBlock("map");
+    m.fields.location = { lat: 19.07, lng: 72.87 };
+    expect(validateContent({ ...starterSkeleton(), blocks: [m] }).ok).toBe(true);
+    m.fields.location = { lat: 190, lng: 0 };
+    expect(validateContent({ ...starterSkeleton(), blocks: [m] }).ok).toBe(false);
   });
 });

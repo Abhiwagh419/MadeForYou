@@ -7,7 +7,9 @@ import { Editor } from "./editor/Editor";
 import { useRoute } from "./lib/router";
 import { Dashboard } from "./screens/Dashboard";
 import { Guided } from "./screens/Guided";
+import { Contribute } from "./screens/Contribute";
 import { Home } from "./screens/Home";
+import { Inbox } from "./screens/Inbox";
 import { Status } from "./screens/Status";
 import { Publish } from "./screens/Publish";
 import { Share } from "./screens/Share";
@@ -99,6 +101,8 @@ export function App() {
     case "astemplate": screen = <TemplateFrom />; break;
     case "me": screen = <Dashboard />; break;
     case "status": screen = <Status />; break;
+    case "inbox": screen = <Inbox />; break;
+    case "contribute": screen = <Contribute />; break;
     case "view": screen = <Viewer />; break;
     default: screen = <NotFound />;
   }

@@ -22,6 +22,11 @@ export const BLOCK_INFO: Record<string, { icon: IconName; desc: string }> = {
   buttons: { icon: "link", desc: "WhatsApp, call, email or any link, as buttons" },
   divider: { icon: "minus", desc: "A decorative break between sections" },
   signature: { icon: "heart", desc: "Sign off with your name" },
+  voiceNote: { icon: "music", desc: "Record a message in your own voice, up to a minute" },
+  map: { icon: "pin", desc: "A place on a map, such as where you met or the venue" },
+  wishes: { icon: "sparkle", desc: "A wall where friends and family leave wishes, which you approve" },
+  replyBox: { icon: "mail", desc: "A box where they can write back to you, privately" },
+  rsvp: { icon: "calendar", desc: "Ask guests to answer Yes, No or Maybe, and count them" },
 };
 
 export const CATEGORY_LABELS: Record<string, string> = {
@@ -29,5 +34,6 @@ export const CATEGORY_LABELS: Record<string, string> = {
   memories: "Photos and memories",
   words: "Words",
   interactive: "Games and surprises",
+  social: "Messages from guests",
   utility: "Details and links",
 };

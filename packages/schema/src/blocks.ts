@@ -333,3 +333,52 @@ export const divider: BlockDef = {
   type: "divider", version: 1, category: "utility", label: "Divider",
   fields: { style: f.enum(["rangoli", "floral", "stars", "line"], "rangoli") },
 };
+
+/* ===================== Messages from guests (stored by the server) ===================== */
+export const wishes: BlockDef = {
+  type: "wishes", version: 1, category: "social", label: "Wishes wall",
+  fields: {
+    title: f.text(80, { personal: true, guided: true, prompt: "Name the wall", placeholder: "Wishes from everyone who loves you" }),
+    prompt: f.text(120, { personal: true, prompt: "What should people be asked?", placeholder: "Leave a wish for them" }),
+    moderation: f.enum(["review", "auto"], "review"),
+  },
+};
+
+export const replyBox: BlockDef = {
+  type: "replyBox", version: 1, category: "social", label: "Reply box",
+  fields: {
+    title: f.text(80, { personal: true, guided: true, prompt: "What should the box say?", placeholder: "Write back to me" }),
+    prompt: f.text(120, { personal: true, prompt: "A hint inside the box", placeholder: "Tell me what you felt" }),
+    thanks: f.text(160, { personal: true, prompt: "What should it say after they send?", placeholder: "Thank you. I will read every word." }),
+  },
+};
+
+export const rsvp: BlockDef = {
+  type: "rsvp", version: 1, category: "social", label: "RSVP",
+  fields: {
+    title: f.text(80, { personal: true, guided: true, prompt: "What are you asking?", placeholder: "Will you join us?" }),
+    deadline: f.text(60, { personal: true, prompt: "Reply by when? (optional)", placeholder: "Please reply by 1 February" }),
+    guests: f.enum(["yes", "no"], "yes"),
+    thanksYes: f.text(160, { personal: true, prompt: "What should it say if they are coming?", placeholder: "We cannot wait to see you." }),
+    thanksNo: f.text(160, { personal: true, prompt: "What should it say if they cannot come?", placeholder: "You will be missed. Thank you for letting us know." }),
+  },
+};
+
+/* ===================== Media ===================== */
+export const voiceNote: BlockDef = {
+  type: "voiceNote", version: 1, category: "memories", label: "Voice note",
+  fields: {
+    title: f.text(80, { personal: true, guided: true, prompt: "Give it a title", placeholder: "A message in my voice" }),
+    audio: f.audio({ personal: true, guided: true, required: true, prompt: "Record a voice note (up to a minute)" }),
+    caption: f.text(160, { personal: true, prompt: "Add a line about it", placeholder: "Press play, and listen with headphones" }),
+  },
+};
+
+export const map: BlockDef = {
+  type: "map", version: 1, category: "utility", label: "Place on a map",
+  fields: {
+    title: f.text(80, { personal: true, guided: true, prompt: "Name the place", placeholder: "Where we first met" }),
+    location: f.geo({ personal: true, guided: true, required: true, prompt: "Paste a map link, or latitude and longitude" }),
+    note: f.text(160, { personal: true, prompt: "Add a line about it", placeholder: "The corner table, by the window" }),
+  },
+};

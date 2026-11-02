@@ -2,7 +2,7 @@ import { z } from "zod";
 import { shapeToZod } from "./fields";
 import {
   ask, buttons, checklist, countdown, daysTogether, divider, event, featured, gallery, hero, letter, memory, openWhen,
-  quiz, quote, reasons, reveal, signature, text, timeline, video, type BlockDef,
+  map, quiz, quote, reasons, replyBox, reveal, rsvp, signature, text, timeline, video, voiceNote, wishes, type BlockDef,
 } from "./blocks";
 
 export const registry: Record<string, BlockDef> = {
@@ -10,6 +10,7 @@ export const registry: Record<string, BlockDef> = {
   text, letter, quote, reasons, checklist, openWhen,
   countdown, reveal, ask, quiz, memory,
   event, buttons, divider, signature,
+  voiceNote, map, wishes, replyBox, rsvp,
 };
 
 export function getBlockDef(type: string): BlockDef | undefined {

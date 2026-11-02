@@ -3,7 +3,7 @@ import type { AssetRef, Content } from "@madeforyou/schema";
 import { BRAND, themeToCssVars } from "@madeforyou/ui";
 import { Ambience } from "./Ambience";
 import { BlockView } from "./blocks";
-import { RenderCtx } from "./context";
+import { RenderCtx, type Host } from "./context";
 import { Music } from "./Music";
 import { Opening } from "./Opening";
 import { useTapEffect } from "./Tap";
@@ -21,11 +21,13 @@ export interface PageRendererProps {
   skipOpening?: boolean;
   /** Thumbnail mode: no motion, music, particles or tap effects; everything visible. */
   static?: boolean;
+  /** Lets guests send messages (wishes, replies, RSVPs). Without it those blocks show a preview only. */
+  host?: Host;
 }
 
 const noAssets = () => undefined;
 
-export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpening = false, static: isStatic = false }: PageRendererProps) {
+export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpening = false, static: isStatic = false, host }: PageRendererProps) {
   const { settings } = content;
   const activeLang = lang ?? settings.languages.default;
   const gated = !isStatic && !skipOpening && settings.opening.kind !== "none";
@@ -36,8 +38,8 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
   const tap = useTapEffect(isStatic ? "none" : settings.tap);
 
   const ctx = useMemo(
-    () => ({ lang: activeLang, defaultLang: settings.languages.default, resolveAsset, isStatic }),
-    [activeLang, settings.languages.default, resolveAsset, isStatic],
+    () => ({ lang: activeLang, defaultLang: settings.languages.default, resolveAsset, isStatic, host }),
+    [activeLang, settings.languages.default, resolveAsset, isStatic, host],
   );
 
   return (

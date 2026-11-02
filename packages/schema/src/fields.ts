@@ -26,6 +26,8 @@ export type FieldDef =
   | (FieldTags & { kind: "date"; withTime?: boolean })
   | (FieldTags & { kind: "url"; max: number })
   | (FieldTags & { kind: "embed" })
+  | (FieldTags & { kind: "audio" })
+  | (FieldTags & { kind: "geo" })
   | (FieldTags & { kind: "enum"; options: readonly [string, ...string[]]; default: string })
   | (FieldTags & { kind: "list"; max: number; item: Record<string, FieldDef> });
 
@@ -36,6 +38,8 @@ export const f = {
   date: (tags: FieldTags = {}, withTime = false): FieldDef => ({ kind: "date", withTime, ...tags }),
   url: (max: number, tags: FieldTags = {}): FieldDef => ({ kind: "url", max, ...tags }),
   embed: (tags: FieldTags = {}): FieldDef => ({ kind: "embed", ...tags }),
+  audio: (tags: FieldTags = {}): FieldDef => ({ kind: "audio", ...tags }),
+  geo: (tags: FieldTags = {}): FieldDef => ({ kind: "geo", ...tags }),
   enum: (options: readonly [string, ...string[]], dflt: string, tags: FieldTags = {}): FieldDef => ({
     kind: "enum",
     options,
@@ -111,6 +115,55 @@ export function parseVideoUrl(input: string): VideoRef | null {
   return null;
 }
 
+/** A voice note: an asset id plus its length in seconds (at most a minute). */
+export const AudioRefSchema = z.object({
+  asset: z.string().regex(/^ast_[A-Za-z0-9_-]{4,64}$/, "Invalid asset reference"),
+  seconds: z.number().min(0).max(65).optional(),
+});
+export type AudioRef = z.infer<typeof AudioRefSchema>;
+
+export const GeoSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
+export type Geo = z.infer<typeof GeoSchema>;
+
+const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
+const valid = (lat: number, lng: number): Geo | null =>
+  Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat: round5(lat), lng: round5(lng) } : null;
+
+/**
+ * Reads a place from what people paste: "19.0760, 72.8777", an OpenStreetMap link, or a long Google Maps link.
+ * Short links (maps.app.goo.gl) cannot be read without visiting them, so they are refused with a hint in the editor.
+ */
+export function parseGeo(input: string): Geo | null {
+  const v = input.trim();
+  if (!v) return null;
+  const pair = v.match(/^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+  if (pair) return valid(+pair[1]!, +pair[2]!);
+  let url: URL;
+  try {
+    url = new URL(v);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^www\./, "");
+  const num = "(-?\\d{1,3}(?:\\.\\d+)?)";
+  if (host === "openstreetmap.org") {
+    const mlat = url.searchParams.get("mlat"), mlon = url.searchParams.get("mlon");
+    if (mlat && mlon) return valid(+mlat, +mlon);
+    const m = url.hash.match(new RegExp(`map=\\d+/${num}/${num}`));
+    return m ? valid(+m[1]!, +m[2]!) : null;
+  }
+  if (/(^|\.)google\.[a-z.]+$/.test(host) && url.pathname.startsWith("/maps") || host === "maps.google.com") {
+    const href = decodeURIComponent(url.href);
+    const at = href.match(new RegExp(`@${num},${num}`));
+    if (at) return valid(+at[1]!, +at[2]!);
+    const bang = href.match(new RegExp(`!3d${num}!4d${num}`));
+    if (bang) return valid(+bang[1]!, +bang[2]!);
+    const q = (url.searchParams.get("q") ?? url.searchParams.get("ll") ?? "").match(new RegExp(`^${num}\\s*,\\s*${num}$`));
+    return q ? valid(+q[1]!, +q[2]!) : null;
+  }
+  return null;
+}
+
 export function fieldToZod(def: FieldDef): z.ZodTypeAny {
   switch (def.kind) {
     case "text":
@@ -124,6 +177,10 @@ export function fieldToZod(def: FieldDef): z.ZodTypeAny {
       return z.string().max(def.max).refine(isSafeLink, "Use a web link, an email address or a phone number");
     case "embed":
       return VideoSchema.nullable();
+    case "audio":
+      return AudioRefSchema.nullable();
+    case "geo":
+      return GeoSchema.nullable();
     case "enum":
       return z.enum(def.options);
     case "list":
@@ -147,6 +204,8 @@ export function defaultValue(def: FieldDef): unknown {
     case "image":
     case "date":
     case "embed":
+    case "audio":
+    case "geo":
       return null;
     case "enum":
       return def.default;
@@ -168,6 +227,8 @@ export function isEmpty(def: FieldDef, value: unknown): boolean {
     case "image":
     case "date":
     case "embed":
+    case "audio":
+    case "geo":
       return value == null;
     case "enum":
       return false;

@@ -3,6 +3,7 @@ import type { Block } from "@madeforyou/schema";
 import { useFields, useRender } from "./context";
 import { label } from "./labels";
 import { MORE } from "./more";
+import { SOCIAL } from "./social";
 import { parseTarget } from "./util";
 
 type P = { block: Block };
@@ -177,6 +178,7 @@ export const COMPONENTS: Record<string, (p: P) => ReactElement> = {
   countdown: Countdown,
   signature: Signature,
   ...MORE,
+  ...SOCIAL,
 };
 
 /**

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { BRAND } from "@madeforyou/ui";
+import { useAssets } from "../lib/assets";
+import { makeStoryImage } from "../lib/story";
 import { isRemote } from "../lib/config";
 import { useRoute } from "../lib/router";
 import { formatWhen, pageUrl, waLink } from "../lib/util";
@@ -15,6 +17,9 @@ export function Share() {
   const { id = "" } = useRoute().params;
   const page = useStore((s) => s.pages[id]);
   const [qr, setQr] = useState("");
+  const [story, setStory] = useState<{ url: string; blob: Blob } | null>(null);
+  const [making, setMaking] = useState(false);
+  const resolve = useAssets(page?.content ?? ({ schemaVersion: 1, settings: {}, blocks: [] } as never));
   const url = page?.slug ? pageUrl(page.slug) : "";
 
   useEffect(() => {
@@ -35,6 +40,30 @@ export function Share() {
     }
   };
   const locked = page.access.unlockAt && new Date(page.access.unlockAt).getTime() > Date.now();
+  const hasGuests = page.content.blocks.some((b) => b.type === "wishes" || b.type === "replyBox" || b.type === "rsvp");
+  const makeStory = async () => {
+    setMaking(true);
+    try {
+      const cover = hero?.fields.cover as { asset: string } | null | undefined;
+      const blob = await makeStoryImage({
+        title: String(hero?.fields.title ?? page.title), recipient: hero?.ph.includes("recipient") ? "" : recipient,
+        url, theme: page.content.settings.theme.preset, coverUrl: cover && !hero?.ph.includes("cover") ? resolve(cover as never) : undefined,
+      });
+      setStory({ blob, url: URL.createObjectURL(blob) });
+    } catch (e) {
+      toast((e as Error).message);
+    }
+    setMaking(false);
+  };
+  const shareStory = async () => {
+    if (!story) return;
+    const file = new File([story.blob], `${page.slug}-story.png`, { type: "image/png" });
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], text: message }); return; } catch { /* cancelled: fall back to a download */ }
+    }
+    const a = document.createElement("a");
+    a.href = story.url; a.download = file.name; a.click();
+  };
 
   return (
     <Shell>
@@ -78,7 +107,24 @@ export function Share() {
             </div>
           </div>
 
+          <div className="pcard">
+            <h2>Share to your story</h2>
+            <p className="field-hint">A tall picture for Instagram or WhatsApp status, with your page's look and a QR code that opens it.</p>
+            {story ? (
+              <div className="story-box">
+                <img src={story.url} alt="Preview of your story picture" />
+                <div className="share-actions">
+                  <Button icon="share" onClick={shareStory}>Share the picture</Button>
+                  <Button variant="secondary" icon="download" href={story.url} download={`${page.slug}-story.png`}>Download</Button>
+                </div>
+              </div>
+            ) : (
+              <div><Button variant="secondary" icon="image" disabled={making} onClick={makeStory}>{making ? "Making it…" : "Make the picture"}</Button></div>
+            )}
+          </div>
+
           <div className="share-more">
+            {hasGuests && <Button variant="ghost" icon="mail" href={`#/inbox/${id}`}>Messages</Button>}
             <Button variant="ghost" icon="pencil" href={`#/edit/${id}`}>Keep editing</Button>
             <Button variant="ghost" icon="sparkle" href={`#/template-from/${id}`}>Share as a template</Button>
             <Button variant="ghost" icon="grid" href="#/me">My pages</Button>

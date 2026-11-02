@@ -117,3 +117,13 @@ Still to build: voice note, places map, wishes wall, reply box, RSVP (the last t
 - YouTube loads only when the visitor taps the poster, which keeps pages light on slow phones. Thumbnails never load embeds.
 - Open-when letters are not time-locked per letter: a real lock must be enforced on the server, and per-letter locks would only be cosmetic.
 - Add a block: define it in `packages/schema/src/blocks.ts`, register it in `registry.ts`, add a component in `packages/renderer/src/more.tsx` (and `MORE`), then a description in `apps/studio/src/editor/blockInfo.ts`.
+
+## All 26 blocks, guest messages, voice notes (v8)
+
+Added: voice note (record in the browser, up to a minute), place on a map (OpenStreetMap, loads when tapped), wishes wall, reply box and RSVP.
+- Guests' messages are stored by the server (`submissions`, migration 0003). A guest can only send one after getting past the page's lock and password; wishes wait for the owner's approval; the owner reads everything in `#/inbox/<page>` and can download RSVPs for Excel.
+- Contributor link: friends add a wish through `/c/<link>?k=...` without ever seeing the page, so a locked surprise stays secret. The owner can switch off all old links.
+- Spam protection without any extra service: the guest must have opened the page, a hidden field catches bots, forms filled in under 1.5 s are refused, 5 messages per visitor per 10 minutes, 40 per page per hour, 400 per page. Optional Cloudflare Turnstile: set the secret `TURNSTILE_SECRET`.
+- Voice notes are served with byte ranges so they play in Safari.
+- Share screen: "Share to your story" makes a 1080 x 1920 picture with the page's look, title and a QR code.
+- Run `wrangler d1 migrations apply madeforyou --remote` (or just `pnpm run cf:deploy`, which the CI also does) to add the new tables.
