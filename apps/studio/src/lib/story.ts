@@ -96,15 +96,25 @@ export async function makeStoryImage(i: StoryInput): Promise<Blob> {
     y += 90;
   }
 
-  const qr = await loadImage(await QRCode.toDataURL(i.url, { margin: 1, width: 360, color: { dark: t.text, light: "#FFFFFF" } }));
+  /* Always dark squares on a white card, whatever the theme is. Theme colours made light themes' QR codes unreadable. */
+  const qrData = QRCode.create(i.url, { errorCorrectionLevel: "M" }).modules;
+  const quiet = 4;
+  const cell = Math.floor(380 / (qrData.size + quiet * 2));
+  const side = cell * (qrData.size + quiet * 2);
+  const qx = Math.round(W / 2 - side / 2);
   const qy = Math.max(y + 40, 1260);
   ctx.fillStyle = "#FFFFFF";
-  ctx.beginPath(); ctx.roundRect(W / 2 - 210, qy - 20, 420, 420, 32); ctx.fill();
-  ctx.drawImage(qr, W / 2 - 180, qy + 10, 360, 360);
+  ctx.beginPath(); ctx.roundRect(qx - 20, qy - 20, side + 40, side + 40, 32); ctx.fill();
+  ctx.fillStyle = "#000000";
+  for (let r = 0; r < qrData.size; r++) {
+    for (let col = 0; col < qrData.size; col++) {
+      if (qrData.get(r, col)) ctx.fillRect(qx + (col + quiet) * cell, qy + (r + quiet) * cell, cell, cell);
+    }
+  }
   ctx.fillStyle = t.muted;
   ctx.font = `500 34px "${body}", system-ui, sans-serif`;
-  ctx.fillText("Scan, or tap the link", W / 2, qy + 455);
-  ctx.fillText(i.url.replace(/^https?:\/\//, "").slice(0, 46), W / 2, qy + 500);
+  ctx.fillText("Scan, or tap the link", W / 2, qy + side + 80);
+  ctx.fillText(i.url.replace(/^https?:\/\//, "").slice(0, 46), W / 2, qy + side + 125);
   ctx.globalAlpha = 0.7;
   ctx.fillText(BRAND.badgeText, W / 2, H - 60);
   ctx.globalAlpha = 1;
