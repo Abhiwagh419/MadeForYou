@@ -37,6 +37,17 @@ export interface Env {
   ALLOWED_ORIGIN?: string;
   /** Optional. With a Cloudflare Turnstile secret, guest messages must carry a passed challenge. */
   TURNSTILE_SECRET?: string;
+  /** Brevo (free, no card) sends the emails. All three must be set for email to work. */
+  BREVO_API_KEY?: string;
+  /** A sender address verified in Brevo. */
+  MAIL_FROM?: string;
+  MAIL_FROM_NAME?: string;
+  /** Shared with the small scheduler Worker that calls /api/cron/tick every 15 minutes. */
+  CRON_SECRET?: string;
+  /** Lets the server look up a page owner's email (for "your page ends soon"). Optional. */
+  CLERK_SECRET_KEY?: string;
+  /** Optional. The main website address, e.g. https://madeforyou-9pj.pages.dev, used in links inside emails. */
+  PUBLIC_URL?: string;
 }
 
 export interface Deps {

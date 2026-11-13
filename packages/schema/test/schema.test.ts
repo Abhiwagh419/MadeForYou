@@ -328,7 +328,7 @@ describe("the full block set", () => {
   });
 });
 
-import { cleanSubmission, parseGeo } from "../src";
+import { cleanEmail, cleanSubmission, parseGeo } from "../src";
 
 describe("places", () => {
   it("reads coordinates and map links, and refuses what it cannot read", () => {
@@ -360,6 +360,19 @@ describe("guest messages", () => {
     expect(cleanSubmission("rsvp", { name: "Raj", response: "yes", guests: 99 })).toMatchObject({ payload: { guests: 10 } });
     expect(cleanSubmission("rsvp", { name: "Raj", response: "perhaps" })).toMatchObject({ ok: false });
     expect(cleanSubmission("rsvp", { response: "yes" })).toMatchObject({ ok: false });
+  });
+  it("keeps an optional reminder email only for guests who are coming", () => {
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "yes", guests: 1, email: " Raj@Example.COM " })).toMatchObject({ ok: true, payload: { email: "raj@example.com" } });
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "maybe", email: "raj@example.com" })).toMatchObject({ payload: { email: "raj@example.com" } });
+    const no = cleanSubmission("rsvp", { name: "Raj", response: "no", email: "raj@example.com" });
+    expect(no).toMatchObject({ ok: true });
+    expect((no as { payload: Record<string, unknown> }).payload.email).toBeUndefined();
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "yes", email: "raj at home" })).toMatchObject({ ok: false });
+    expect(cleanSubmission("rsvp", { name: "Raj", response: "yes", email: "" })).toMatchObject({ ok: true });
+  });
+  it("accepts ordinary email addresses and nothing that could smuggle in more", () => {
+    for (const ok of ["a@b.co", "first.last+tag@mail.example.com", "o'neil@example.org"]) expect(cleanEmail(ok)).toBe(ok);
+    for (const bad of ["", "a@b", "a b@c.com", "a@b.com\r\nBcc: x@y.com", "a@b.com, c@d.com", "<a@b.com>", "a@@b.com", "@b.com", "x".repeat(300) + "@b.com", 42, null]) expect(cleanEmail(bad)).toBeNull();
   });
 });
 

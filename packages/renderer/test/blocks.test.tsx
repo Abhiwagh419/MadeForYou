@@ -321,6 +321,36 @@ describe("guest messages on the page", () => {
     expect(calls[0]).toMatchObject({ name: "Raj", response: "yes", guests: 3 });
     expect(el.querySelector(".mfy-thanks")!.textContent).toBe("See you!");
   });
+  it("RSVP asks for a reminder email only when the host allows it, and never from a 'no'", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const submit: Host["submit"] = async (_b, _k, payload) => { calls.push(payload); return { ok: true }; };
+    const off = await mountWith(page("rsvp", { title: "Coming?" }), { submit });
+    await click(off.querySelectorAll(".mfy-choice button")[0]!);
+    expect(off.querySelector("input[type=email]")).toBeNull();
+
+    const el = await mountWith(page("rsvp", { title: "Coming?" }), { submit, canRemind: true });
+    expect(el.querySelector("input[type=email]")).toBeNull(); // not before an answer
+    await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Raj");
+    await click(el.querySelectorAll(".mfy-choice button")[0]!);
+    const box = el.querySelector("input[type=email]") as HTMLInputElement;
+    expect(box).toBeTruthy();
+    expect(el.textContent).toContain("Only the person who made this page can see your address");
+    await type(box, "raj@example.com");
+    await click(el.querySelectorAll(".mfy-choice button")[1]!); // changes the answer to "no"
+    expect(el.querySelector("input[type=email]")).toBeNull();
+    await submitForm(el);
+    expect(calls[0]).toMatchObject({ response: "no" });
+    expect(calls[0]).not.toHaveProperty("email");
+  });
+  it("RSVP sends the reminder email with a 'yes'", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const el = await mountWith(page("rsvp", { title: "Coming?" }), { submit: async (_b, _k, payload) => { calls.push(payload); return { ok: true }; }, canRemind: true });
+    await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Raj");
+    await click(el.querySelectorAll(".mfy-choice button")[0]!);
+    await type(el.querySelector("input[type=email]") as HTMLInputElement, "raj@example.com");
+    await submitForm(el);
+    expect(calls[0]).toMatchObject({ response: "yes", email: "raj@example.com" });
+  });
   it("RSVP 'no' says the 'no' thanks and brings no guests", async () => {
     const calls: Record<string, unknown>[] = [];
     const host: Host = { submit: async (_b, _k, payload) => { calls.push(payload); return { ok: true }; } };

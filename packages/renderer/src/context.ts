@@ -10,6 +10,8 @@ export interface Host {
     extra: { website: string; elapsedMs: number },
   ) => Promise<{ ok: boolean; status?: string; error?: string }>;
   wishes?: Record<string, { id: string; name: string; message: string }[]>;
+  /** True when the page may offer guests one email reminder before the event (the server decides). */
+  canRemind?: boolean;
 }
 
 export interface RenderContext {

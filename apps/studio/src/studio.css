@@ -603,3 +603,14 @@ select.in-sm { padding-right: 1.5rem; }
 /* A list without photos (reasons, promises) has no picture column */
 .li-plain, .listin-lg .li-plain { grid-template-columns: minmax(0, 1fr) auto; }
 .li-plain .li-actions { grid-template-columns: repeat(3, 2rem); }
+
+/* ---------- email delivery card ---------- */
+.form-grid { display: grid; gap: 0.7rem; }
+.form-grid .field { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--ink-2); }
+.delivery-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.delivery { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.6rem 0.8rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; }
+.delivery > div { display: grid; gap: 0.15rem; min-width: 0; }
+.delivery b { font-size: 0.9rem; overflow-wrap: anywhere; }
+.delivery small { color: var(--ink-3, #8a6b73); }
+.delivery.failed small { color: var(--rose-deep); }
+.delivery.cancelled { opacity: 0.6; }

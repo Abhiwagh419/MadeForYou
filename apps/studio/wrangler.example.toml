@@ -19,3 +19,4 @@ migrations_dir = "../../packages/api/migrations"
 [vars]
 ALLOW_DEV_AUTH = "0"
 # Set these as secrets, not here:  SESSION_SECRET  CLERK_JWKS_URL  CLERK_ISSUER  ADMIN_TOKEN
+# Email (optional, see README):     BREVO_API_KEY  MAIL_FROM  MAIL_FROM_NAME  CRON_SECRET  CLERK_SECRET_KEY  PUBLIC_URL

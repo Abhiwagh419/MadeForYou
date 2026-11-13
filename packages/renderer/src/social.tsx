@@ -115,6 +115,7 @@ export function Rsvp({ block }: P) {
   const [response, setResponse] = useState<"yes" | "no" | "maybe" | "">("");
   const [guests, setGuests] = useState(1);
   const [note, setNote] = useState("");
+  const [email, setEmail] = useState("");
   const askGuests = x.str("guests", "yes") === "yes" && response !== "no" && response !== "";
   const ok = s.live && name.trim() && response;
   return (
@@ -124,7 +125,7 @@ export function Rsvp({ block }: P) {
       {!x.isStatic && (s.state === "done" ? (
         <p className="mfy-thanks" role="status">{response === "no" ? x.t("thanksNo") : x.t("thanksYes")}</p>
       ) : (
-        <form className="mfy-form" onSubmit={(e) => { e.preventDefault(); void s.send({ name, response, guests: askGuests ? guests : response === "no" ? 0 : 1, note }); }}>
+        <form className="mfy-form" onSubmit={(e) => { e.preventDefault(); void s.send({ name, response, guests: askGuests ? guests : response === "no" ? 0 : 1, note, ...(x.host?.canRemind && response !== "no" && email.trim() ? { email: email.trim() } : {}) }); }}>
           <input className="mfy-in" value={name} maxLength={60} placeholder={label(s.lang, "yourName")} aria-label={label(s.lang, "yourName")} onChange={(e) => setName(e.target.value)} disabled={!s.live} />
           <div className="mfy-choice" role="radiogroup" aria-label={x.t("title")}>
             {(["yes", "no", "maybe"] as const).map((r) => (
@@ -139,6 +140,12 @@ export function Rsvp({ block }: P) {
             </label>
           )}
           <input className="mfy-in" value={note} maxLength={200} placeholder={label(s.lang, "yourNote")} aria-label={label(s.lang, "yourNote")} onChange={(e) => setNote(e.target.value)} disabled={!s.live} />
+          {x.host?.canRemind && response !== "no" && response !== "" && (
+            <>
+              <input className="mfy-in" type="email" inputMode="email" autoComplete="email" value={email} maxLength={254} placeholder={label(s.lang, "remindMe")} aria-label={label(s.lang, "remindMe")} onChange={(e) => setEmail(e.target.value)} />
+              <p className="mfy-form-note">{label(s.lang, "remindHint")}</p>
+            </>
+          )}
           <Honeypot value={s.website} onChange={s.setWebsite} />
           {s.error && <p className="mfy-form-error" role="alert">{s.error}</p>}
           <button type="submit" className="mfy-linkbtn" disabled={!ok || s.state === "sending"}>{s.state === "sending" ? label(s.lang, "sending") : label(s.lang, "send")}</button>

@@ -61,6 +61,14 @@ export type SubmissionKind = "wish" | "reply" | "rsvp";
 const clean = (v: unknown, max: number): string =>
   typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/\s+\n/g, "\n").trim().slice(0, max) : "";
 
+/** A plain, sane email address in lower case, or null. Deliberately strict: no names, quotes, commas or line breaks. */
+export function cleanEmail(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const e = v.trim().toLowerCase();
+  if (e.length < 6 || e.length > 254) return null;
+  return /^[a-z0-9._%+'-]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,24}$/.test(e) ? e : null;
+}
+
 /** Checks and tidies a guest's message. Returns the cleaned payload, or an error in plain words. */
 export function cleanSubmission(kind: SubmissionKind, raw: unknown): { ok: true; payload: Record<string, string | number> } | { ok: false; error: string } {
   const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -80,5 +88,14 @@ export function cleanSubmission(kind: SubmissionKind, raw: unknown): { ok: true;
   if (!name) return { ok: false, error: "Please add your name" };
   if (!response) return { ok: false, error: "Please choose Yes, No or Maybe" };
   const guests = response === "no" ? 0 : Math.min(10, Math.max(1, Math.floor(Number(p.guests) || 1)));
-  return { ok: true, payload: note ? { name, response, guests, note } : { name, response, guests } };
+  const payload: Record<string, string | number> = { name, response, guests };
+  if (note) payload.note = note;
+  // An optional address for ONE reminder before the event. Never kept for someone who said no.
+  const rawEmail = typeof p.email === "string" ? p.email.trim() : "";
+  if (rawEmail && response !== "no") {
+    const email = cleanEmail(rawEmail);
+    if (!email) return { ok: false, error: "That email address does not look right" };
+    payload.email = email;
+  }
+  return { ok: true, payload };
 }

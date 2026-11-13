@@ -9,6 +9,7 @@ const LABELS: Record<string, Record<string, string>> = {
     wishPending: "Thank you! Your wish will appear once it has been approved.", wishDone: "Thank you! Your wish is on the wall.",
     replyDone: "Sent.", yes: "Yes", no: "No", maybe: "Maybe", guests: "How many of you?", livePreview: "Guests can leave messages once the page is live.",
     loadMap: "Tap to load the map", playNote: "Play voice note", pauseNote: "Pause",
+    remindMe: "Email me a reminder (optional)", remindHint: "One email, a day before. Only the person who made this page can see your address.",
   },
   hi: {
     days: "दिन", hours: "घंटे", minutes: "मिनट", seconds: "सेकंड", pickDate: "तारीख चुनें",
@@ -19,6 +20,7 @@ const LABELS: Record<string, Record<string, string>> = {
     wishPending: "धन्यवाद! मंज़ूरी मिलने पर आपकी शुभकामना दिखेगी।", wishDone: "धन्यवाद! आपकी शुभकामना दीवार पर है।",
     replyDone: "भेज दिया।", yes: "हाँ", no: "नहीं", maybe: "शायद", guests: "आप कितने लोग हैं?", livePreview: "पेज लाइव होने पर मेहमान संदेश छोड़ सकेंगे।",
     loadMap: "मैप खोलने के लिए छुएँ", playNote: "वॉइस नोट चलाएँ", pauseNote: "रोकें",
+    remindMe: "मुझे ईमेल से याद दिलाएँ (वैकल्पिक)", remindHint: "सिर्फ़ एक ईमेल, एक दिन पहले। आपका पता सिर्फ़ पेज बनाने वाले को दिखेगा।",
   },
 };
 export const label = (lang: string, key: string): string =>

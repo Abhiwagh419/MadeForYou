@@ -97,6 +97,8 @@ describe("small helpers", () => {
     expect(csvCell("=HYPERLINK(\"http://evil\")")).toBe("\"'=HYPERLINK(\"\"http://evil\"\")\"");
     expect(csvCell("+91 98765")).toBe("'+91 98765");
     expect(csvCell(3)).toBe("3");
+    expect(rsvpCsv([{ name: "A", response: "yes", guests: 1, createdAt: "2026-10-10" }])).not.toContain("Email");
+    expect(rsvpCsv([{ name: "A", response: "yes", guests: 1, email: "a@b.com", createdAt: "2026-10-10" }])).toContain("Name,Answer,Guests,Note,Email,Received");
     const csv = rsvpCsv([{ name: "माँ", response: "yes", guests: 2, note: "line1\nline2", createdAt: "2026-10-10" }]);
     expect(csv.startsWith("\ufeffName,Answer,Guests,Note,Received\r\n")).toBe(true);
     expect(csv).toContain('"line1\nline2"');

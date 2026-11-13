@@ -184,6 +184,7 @@ function PublishInner({ id }: { id: string }) {
                 <>
                   <input className="in" type="datetime-local" value={expiry} onChange={(e) => setExpiry(e.target.value)} aria-label="Expiry time" />
                   {expiryInvalid && <p className="field-error">Pick a time in the future</p>}
+                  {isRemote() && <p className="field-hint">A day before it ends we email you, and anyone you sent the page to by email, so nobody misses it.</p>}
                 </>
               )}
             </div>

@@ -111,18 +111,19 @@ type Remote =
   | { state: "error"; message: string }
   | { state: "locked"; unlockAt: string; theme: string }
   | { state: "password"; theme: string; error?: string }
-  | { state: "open"; title: string; content: Content; assetToken: string; owner: boolean; visibility: string; wishes?: Record<string, { id: string; name: string; message: string }[]> };
+  | { state: "open"; title: string; content: Content; assetToken: string; owner: boolean; visibility: string; canRemind?: boolean; wishes?: Record<string, { id: string; name: string; message: string }[]> };
 
 function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: string }) {
   const resolve = useAssets(v.content, v.assetToken);
   // Guests' messages go to the server with the token this visitor earned by getting past the lock and password.
   const host = useMemo<Host>(() => ({
     wishes: v.wishes ?? {},
+    canRemind: !!v.canRemind,
     submit: async (blockId, kind, payload, extra) => {
       const r = await apiRaw(`/p/${slug}/submit`, { json: { token: v.assetToken, blockId, kind, payload, ...extra } });
       return r.status === 200 ? { ok: true, status: r.data?.status } : { ok: false, error: r.data?.error ?? "Something went wrong. Please try again." };
     },
-  }), [v.wishes, v.assetToken, slug]);
+  }), [v.wishes, v.canRemind, v.assetToken, slug]);
   useEffect(() => {
     document.title = v.title;
   }, [v.title]);

@@ -1,11 +1,12 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import {
-  LIMITS, SUBMISSION, assetIds, checkPublishable, cleanSubmission, gateState, isAssetId, slugStatus, validateContent, validateTemplate,
+  LIMITS, SUBMISSION, assetIds, checkPublishable, cleanEmail, cleanSubmission, gateState, isAssetId, slugStatus, validateContent, validateTemplate,
   type Content, type SubmissionKind,
 } from "@madeforyou/schema";
 import { authenticate, diagnose, verifyClerk } from "./auth";
 import { hashIp, hashPassword, randomHex, readToken, signToken, timingSafeEqual } from "./crypto";
+import { DAILY_CAP, blockEmail, deliverOne, escHtml, isBlocked, mailConfig, nextEvent, readUnsub, remindersOn, runTick } from "./mail";
 import { sniffMedia } from "./sniff";
 import type { Deps, Env } from "./types";
 
@@ -263,6 +264,8 @@ export function createApp(overrides: Partial<Deps> = {}) {
       visibility: r.visibility,
       owner,
       wishes,
+      // true when a guest may leave an email on the RSVP to get one reminder before the event
+      canRemind: remindersOn(c.env) && !!nextEvent(content, deps.now()),
       assetToken: await signToken(c.env.SESSION_SECRET, `pg:${r.id}`, GATE_TTL, deps.now()),
     };
   };
@@ -398,13 +401,25 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const cleaned = cleanSubmission(input.kind, input.payload);
     if (!cleaned.ok) throw new HttpError(400, cleaned.error);
     const status = input.kind === "wish" && block.fields.moderation !== "auto" ? "pending" : "approved";
+    let remindAt: string | null = null;
+    let eventAt: string | null = null;
+    if (input.kind === "rsvp" && cleaned.payload.email) {
+      const email = String(cleaned.payload.email);
+      const ev = remindersOn(c.env) ? nextEvent(content, deps.now()) : null;
+      if (!ev || ev.at - deps.now() < 30 * 60_000 || (await isBlocked(c.env, email))) {
+        delete cleaned.payload.email; // nothing to remind about, so the address is not kept
+      } else {
+        eventAt = new Date(ev.at).toISOString();
+        remindAt = new Date(Math.max(deps.now(), ev.at - 86_400_000)).toISOString();
+      }
+    }
     const stmts = [];
     if (input.kind === "rsvp") {
       // answering again replaces the earlier answer instead of counting twice
       stmts.push(c.env.DB.prepare("DELETE FROM submissions WHERE page_id = ? AND block_id = ? AND kind = 'rsvp' AND lower(json_extract(payload, '$.name')) = ?").bind(r.id, block.id, String(cleaned.payload.name).toLowerCase()));
     }
-    stmts.push(c.env.DB.prepare("INSERT INTO submissions (id, page_id, block_id, kind, payload, status, source, created_at, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(`sb_${randomHex(8)}`, r.id, block.id, input.kind, JSON.stringify(cleaned.payload), status, input.source, iso(), ip));
+    stmts.push(c.env.DB.prepare("INSERT INTO submissions (id, page_id, block_id, kind, payload, status, source, created_at, ip_hash, remind_at, event_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(`sb_${randomHex(8)}`, r.id, block.id, input.kind, JSON.stringify(cleaned.payload), status, input.source, iso(), ip, remindAt, eventAt));
     await c.env.DB.batch(stmts);
     return { ok: true, status };
   };
@@ -466,6 +481,101 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const wall = (JSON.parse(r.content) as Content).blocks.find((x) => x.type === "wishes");
     if (!wall) throw new HttpError(404, "This page has no wishes wall");
     return c.json(await accept(c, r, { blockId: wall.id, kind: "wish", payload: b.payload, source: "contributor", website: b.website, elapsedMs: b.elapsedMs, turnstile: b.turnstile }));
+  });
+
+  /* ------------------------------ email ------------------------------ */
+
+  const originOf = (c: Ctx) => (c.env.PUBLIC_URL?.trim().replace(/\/+$/, "") || new URL(c.req.url).origin);
+
+  interface DeliveryRow { id: string; to_email: string; to_name: string | null; from_name: string; note: string | null; send_at: string; status: string; error: string | null; sent_at: string | null }
+  const toDelivery = (d: DeliveryRow) => ({ id: d.id, toEmail: d.to_email, toName: d.to_name ?? "", fromName: d.from_name, note: d.note ?? "", sendAt: d.send_at, status: d.status, error: d.error ?? undefined, sentAt: d.sent_at ?? undefined });
+
+  /** Is email switched on? Lets the website say so instead of failing. */
+  app.get("/mail/status", (c) => c.json({ email: !!mailConfig(c.env), reminders: remindersOn(c.env), dailyLimit: DAILY_CAP }));
+
+  app.get("/pages/:id/deliveries", async (c) => {
+    const userId = await need(c);
+    const row = await ownedPage(c, c.req.param("id"), userId);
+    const { results } = await c.env.DB.prepare("SELECT id, to_email, to_name, from_name, note, send_at, status, error, sent_at FROM deliveries WHERE page_id = ? ORDER BY send_at DESC LIMIT 20").bind(row.id).all<DeliveryRow>();
+    return c.json({ deliveries: (results ?? []).map(toDelivery) });
+  });
+
+  app.post("/pages/:id/deliveries", async (c) => {
+    const userId = await need(c);
+    if (!mailConfig(c.env)) throw new HttpError(503, "Email is not switched on yet");
+    const row = await ownedPage(c, c.req.param("id"), userId);
+    if (row.status !== "published" || !row.slug) throw new HttpError(409, "Publish the page first, then you can email it");
+    const b = await readJson<{ toEmail?: unknown; toName?: unknown; fromName?: unknown; note?: unknown; sendAt?: unknown }>(c);
+
+    const toEmail = cleanEmail(b.toEmail);
+    if (!toEmail) throw new HttpError(400, "That email address does not look right");
+    const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max) : "");
+    const fromName = text(b.fromName, 60);
+    if (!fromName) throw new HttpError(400, "Add your name, so they know who it is from");
+    const toName = text(b.toName, 60);
+    const note = text(b.note, 300);
+
+    const now = deps.now();
+    let sendAt = now;
+    if (b.sendAt !== undefined && b.sendAt !== null && b.sendAt !== "") {
+      if (typeof b.sendAt !== "string" || Number.isNaN(Date.parse(b.sendAt))) throw new HttpError(400, "That date is not valid");
+      sendAt = Math.max(now, Date.parse(b.sendAt));
+    }
+    if (sendAt > now + 366 * 86_400_000) throw new HttpError(400, "Pick a date within the next year");
+    if (row.expires_at && sendAt >= Date.parse(row.expires_at)) throw new HttpError(400, "The page ends before that time, so they could not open it");
+    if (await isBlocked(c.env, toEmail)) throw new HttpError(400, "This person has asked not to get emails from MadeForYou");
+
+    const day = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM deliveries WHERE owner_id = ? AND created_at > ?").bind(userId, new Date(now - 86_400_000).toISOString()).first<{ n: number }>();
+    if ((day?.n ?? 0) >= 10) throw new HttpError(429, "You can schedule up to 10 emails a day. Try again tomorrow.");
+    const active = await c.env.DB.prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN to_email = ? AND status IN ('scheduled', 'sending') THEN 1 ELSE 0 END) AS same FROM deliveries WHERE page_id = ? AND status IN ('scheduled', 'sending', 'sent')").bind(toEmail, row.id).first<{ n: number; same: number | null }>();
+    if ((active?.n ?? 0) >= 5) throw new HttpError(409, "One page can be emailed to up to 5 people");
+    if ((active?.same ?? 0) > 0) throw new HttpError(409, "That person is already waiting for this page");
+
+    const id = `dl_${randomHex(8)}`;
+    await c.env.DB.prepare("INSERT INTO deliveries (id, page_id, owner_id, to_email, to_name, from_name, note, send_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, row.id, userId, toEmail, toName || null, fromName, note || null, new Date(sendAt).toISOString(), iso()).run();
+    if (sendAt <= now + 60_000) await deliverOne(c.env, deps, originOf(c), id);
+    const saved = await c.env.DB.prepare("SELECT id, to_email, to_name, from_name, note, send_at, status, error, sent_at FROM deliveries WHERE id = ?").bind(id).first<DeliveryRow>();
+    return c.json({ delivery: toDelivery(saved!) });
+  });
+
+  /** Cancels one that is still waiting; removes the record of one that is done. */
+  app.delete("/deliveries/:id", async (c) => {
+    const userId = await need(c);
+    const id = c.req.param("id");
+    const d = await c.env.DB.prepare("SELECT id, status FROM deliveries WHERE id = ? AND owner_id = ?").bind(id, userId).first<{ id: string; status: string }>();
+    if (!d) throw new HttpError(404, "Not found");
+    if (d.status === "scheduled") await c.env.DB.prepare("UPDATE deliveries SET status = 'cancelled' WHERE id = ? AND status = 'scheduled'").bind(id).run();
+    else if (d.status === "sending") throw new HttpError(409, "It is being sent right now");
+    else await c.env.DB.prepare("DELETE FROM deliveries WHERE id = ?").bind(id).run();
+    return c.json({ ok: true });
+  });
+
+  /** The page that "Stop emails like this" opens. Asks first, so a mail scanner that opens links cannot unsubscribe anyone. */
+  const unsubHtml = (title: string, body: string) =>
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml(title)}</title></head><body style="margin:0;background:#FFF8F0;font-family:Helvetica,Arial,sans-serif;color:#4A0E1F"><main style="max-width:420px;margin:12vh auto;padding:28px;background:#fff;border:1px solid #F3DCCB;border-radius:20px"><h1 style="font-family:Georgia,serif;font-size:24px;margin:0 0 14px">${escHtml(title)}</h1>${body}</main></body></html>`;
+
+  app.get("/mail/unsub", async (c) => {
+    const t = c.req.query("t") ?? "";
+    const email = await readUnsub(c.env, t, deps.now());
+    if (!email) return c.html(unsubHtml("This link is not valid", "<p>It may have expired. If you keep getting emails you do not want, reply to one of them.</p>"), 400);
+    return c.html(unsubHtml("Stop emails from MadeForYou?", `<p>${escHtml(email)} will not get any more emails sent through MadeForYou.</p><form method="post" action="/api/mail/unsub?t=${encodeURIComponent(t)}"><button type="submit" style="background:#E11D48;color:#fff;border:0;border-radius:999px;padding:12px 24px;font-size:16px;font-weight:600">Yes, stop them</button></form>`));
+  });
+  // Also the target of the one-click unsubscribe button some mail apps show.
+  app.post("/mail/unsub", async (c) => {
+    const email = await readUnsub(c.env, c.req.query("t"), deps.now());
+    if (!email) return c.html(unsubHtml("This link is not valid", "<p>It may have expired.</p>"), 400);
+    await blockEmail(c.env, email, deps.now());
+    return c.html(unsubHtml("Done", `<p>${escHtml(email)} will not get any more emails sent through MadeForYou.</p>`));
+  });
+
+  /** Called every 15 minutes by the scheduler Worker (apps/mailer). Not for browsers. */
+  app.post("/cron/tick", async (c) => {
+    const secret = c.env.CRON_SECRET?.trim();
+    if (!secret) throw new HttpError(503, "The scheduler is not set up");
+    const m = c.req.header("authorization")?.match(/^Bearer\s+(.+)$/i);
+    if (!m || !timingSafeEqual(m[1]!.trim(), secret)) throw new HttpError(401, "Not allowed");
+    return c.json(await runTick(c.env, deps, originOf(c)));
   });
 
   /* ------------------------------ the owner's inbox ------------------------------ */

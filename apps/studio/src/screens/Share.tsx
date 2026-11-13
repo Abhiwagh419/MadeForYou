@@ -9,6 +9,7 @@ import { formatWhen, pageUrl, waLink } from "../lib/util";
 import { useStore } from "../state/store";
 import { Button } from "../ui/Button";
 import { toast } from "../ui/Controls";
+import { EmailDelivery } from "../ui/EmailDelivery";
 import { Icon } from "../ui/Icon";
 import { NotFound, Shell } from "../ui/Shell";
 import { Thumb } from "../ui/Thumb";
@@ -30,6 +31,7 @@ export function Share() {
   if (!page || page.status !== "published") return <NotFound />;
   const hero = page.content.blocks.find((b) => b.type === "hero");
   const recipient = String(hero?.fields.recipient ?? "");
+  const sig = page.content.blocks.find((b) => b.type === "signature");
   const message = `I made something for ${recipient && !hero?.ph.includes("recipient") ? recipient : "you"}. Open it when you are ready: ${url}`;
   const copy = async () => {
     try {
@@ -124,6 +126,8 @@ export function Share() {
               <div><Button variant="secondary" icon="image" disabled={making} onClick={makeStory}>{making ? "Making it…" : "Make the picture"}</Button></div>
             )}
           </div>
+
+          <EmailDelivery pageId={id} defaultTo={hero?.ph.includes("recipient") ? "" : recipient} defaultFrom={String(sig && !sig.ph.includes("name") ? sig.fields.name ?? "" : "")} />
 
           <div className="share-more">
             {hasGuests && <Button variant="ghost" icon="mail" href={`#/inbox/${id}`}>Messages</Button>}

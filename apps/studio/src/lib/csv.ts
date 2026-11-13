@@ -5,11 +5,12 @@ export function csvCell(v: unknown): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export interface RsvpRow { name: string; response: string; guests: number; note?: string; createdAt: string }
+export interface RsvpRow { name: string; response: string; guests: number; note?: string; email?: string; createdAt: string }
 
 export function rsvpCsv(rows: RsvpRow[]): string {
-  const head = ["Name", "Answer", "Guests", "Note", "Received"];
-  const lines = rows.map((r) => [r.name, r.response, r.guests, r.note ?? "", r.createdAt].map(csvCell).join(","));
+  const withEmail = rows.some((r) => r.email); // the column appears only when someone left an address
+  const head = ["Name", "Answer", "Guests", "Note", ...(withEmail ? ["Email"] : []), "Received"];
+  const lines = rows.map((r) => [r.name, r.response, r.guests, r.note ?? "", ...(withEmail ? [r.email ?? ""] : []), r.createdAt].map(csvCell).join(","));
   return `\ufeff${[head.join(","), ...lines].join("\r\n")}\r\n`; // the BOM makes Excel read Hindi names correctly
 }
 

@@ -9,7 +9,9 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "cf:dev": "node scripts/prepare-wrangler.mjs && pnpm build && wrangler pages dev dist",
-    "cf:deploy": "node scripts/prepare-wrangler.mjs && wrangler d1 migrations apply madeforyou --remote && pnpm build && wrangler pages deploy dist --project-name madeforyou --branch main"
+    "cf:deploy": "node scripts/prepare-wrangler.mjs && wrangler d1 migrations apply madeforyou --remote && pnpm build && wrangler pages deploy dist --project-name madeforyou --branch main",
+    "mailer:deploy": "wrangler deploy --config ../../workers/mailer/wrangler.toml",
+    "mailer:secret": "wrangler secret put CRON_SECRET --config ../../workers/mailer/wrangler.toml"
   },
   "dependencies": {
     "@madeforyou/renderer": "workspace:*",

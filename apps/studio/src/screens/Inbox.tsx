@@ -155,13 +155,14 @@ export function Inbox() {
                 </div>
                 <div className="head-row">
                   <span className="muted">{rsvps.length} answer{rsvps.length === 1 ? "" : "s"}</span>
-                  <Button size="sm" variant="secondary" icon="download" onClick={() => download("rsvps.csv", rsvpCsv(rsvps.map((s): RsvpRow => ({ name: s.payload.name, response: s.payload.response, guests: s.payload.guests, note: s.payload.note, createdAt: s.createdAt }))))}>Download for Excel</Button>
+                  <Button size="sm" variant="secondary" icon="download" onClick={() => download("rsvps.csv", rsvpCsv(rsvps.map((s): RsvpRow => ({ name: s.payload.name, response: s.payload.response, guests: s.payload.guests, note: s.payload.note, email: s.payload.email, createdAt: s.createdAt }))))}>Download for Excel</Button>
                 </div>
                 <ul className="msg-list">
                   {rsvps.map((s) => (
                     <li key={s.id} className="msg">
                       <p><b>{s.payload.name}</b> · {s.payload.response === "yes" ? `coming, ${s.payload.guests} ${s.payload.guests === 1 ? "person" : "people"}` : s.payload.response === "maybe" ? `maybe, ${s.payload.guests}` : "cannot come"}</p>
                       {s.payload.note && <p className="muted">“{s.payload.note}”</p>}
+                      {s.payload.email && <p className="muted">Reminder to {s.payload.email}</p>}
                       <small>{formatWhen(s.createdAt)}</small>
                       <div className="msg-actions"><Button size="sm" variant="ghost" icon="trash" aria-label="Delete" onClick={() => remove(s)} /></div>
                     </li>

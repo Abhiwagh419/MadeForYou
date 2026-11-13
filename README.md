@@ -90,6 +90,29 @@ Local test with a fake login: copy `.dev.vars.example` to `.dev.vars`, build wit
 
 The Content-Security-Policy in `public/_headers` is report-only. Open the live site, check the browser console for violations, then rename it to `Content-Security-Policy` to enforce it.
 
+## Email (optional)
+
+Three kinds of email, all sent through Brevo's free plan (300 a day, no card):
+
+1. **A page sent to someone on a date** (Share screen, "Send it by email").
+2. **One reminder for guests** who leave an email on the RSVP, a day before the event.
+3. **"This page ends soon"**, a day before a page's end date, to the owner and to people it was emailed to.
+
+Email stays switched off until these are set (each with `pnpm exec wrangler pages secret put NAME` from `apps\studio`, then `pnpm run cf:deploy`):
+
+| Secret | What it is |
+| --- | --- |
+| `BREVO_API_KEY` | Brevo, Settings, SMTP & API, API keys |
+| `MAIL_FROM` | A sender address verified in Brevo (Settings, Senders) |
+| `MAIL_FROM_NAME` | Optional. The name people see, default MadeForYou |
+| `CRON_SECRET` | Any long random text. The same value goes to the scheduler (below) |
+| `CLERK_SECRET_KEY` | Optional. Lets the server find the owner's email for "ends soon" |
+| `PUBLIC_URL` | Optional. Your main address, e.g. `https://madeforyou-9pj.pages.dev`, used in email links |
+
+Cloudflare Pages cannot run on a timer, so `workers/mailer` is a tiny Worker that calls `/api/cron/tick` every 15 minutes. Deploy it once: `pnpm run mailer:secret` (paste the same `CRON_SECRET`), then `pnpm run mailer:deploy`. Check `TICK_URL` in `workers/mailer/wrangler.toml` first.
+
+Safeguards: only the page owner can send; 5 people per page and 10 a day per owner; a stop link in every email (it opens a confirmation page, so mail scanners cannot trigger it); stopped addresses are never emailed again; the daily total is held under 280.
+
 ## If sign-in works but saving says "please sign in"
 
 The website now shows a banner explaining why the server refused the login (it calls `/api/diag`). The usual causes:
