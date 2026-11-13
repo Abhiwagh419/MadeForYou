@@ -1,5 +1,11 @@
 /** Small pure helpers for the blocks. Kept free of the schema package so the page stays light. */
 
+/** The shape the author cropped a photo to. Without it the photo fills its frame and is centre-cropped. */
+export function shape(ref?: { ratio?: number } | null): { aspectRatio: string } | undefined {
+  const r = ref?.ratio;
+  return typeof r === "number" && r >= 0.2 && r <= 5 ? { aspectRatio: String(r) } : undefined;
+}
+
 const SAFE = new Set(["https:", "http:", "mailto:", "tel:"]);
 
 /** A link that is safe to put in href, or "" if it is not. (Same rule as the schema's isSafeLink; a test keeps them in step.) */

@@ -4,7 +4,7 @@ import { useFields, useRender } from "./context";
 import { label } from "./labels";
 import { MORE } from "./more";
 import { SOCIAL } from "./social";
-import { parseTarget } from "./util";
+import { parseTarget, shape } from "./util";
 
 type P = { block: Block };
 
@@ -94,7 +94,7 @@ export function Gallery({ block }: P) {
         return (
           <li key={i} className="mfy-tile" data-tone={i % 4} style={idx(i)} aria-hidden={sample || undefined}>
             <figure>
-              {url ? <img src={url} alt={alt} loading="lazy" decoding="async" /> : <span className="mfy-tile-fill" />}
+              {url ? <img src={url} alt={alt} loading="lazy" decoding="async" style={shape(x.ref(it.image))} /> : <span className="mfy-tile-fill" />}
               {it.caption && <figcaption>{it.caption}</figcaption>}
             </figure>
           </li>

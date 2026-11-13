@@ -5,7 +5,7 @@ import { parseMusic } from "../lib/util";
 import { setSettings, setStyle, type EditorAction } from "../state/editor";
 import { Button } from "../ui/Button";
 import { Segmented, Switch } from "../ui/Controls";
-import { Field, FieldInput } from "../ui/Fields";
+import { Field, FieldInput, frameLock } from "../ui/Fields";
 import { Icon } from "../ui/Icon";
 import { BLOCK_INFO } from "./blockInfo";
 
@@ -13,9 +13,9 @@ type Dispatch = (a: EditorAction) => void;
 
 /* ---------------- selected block ---------------- */
 export function BlockInspector({
-  block, lang, defaultLang, dispatch, onDuplicate, onDelete,
+  block, theme, lang, defaultLang, dispatch, onDuplicate, onDelete,
 }: {
-  block: Block; lang: string; defaultLang: string; dispatch: Dispatch; onDuplicate: () => void; onDelete: () => void;
+  block: Block; theme: string; lang: string; defaultLang: string; dispatch: Dispatch; onDuplicate: () => void; onDelete: () => void;
 }) {
   const def = registry[block.type];
   if (!def) return null;
@@ -44,7 +44,7 @@ export function BlockInspector({
         const value = translating ? block.i18n?.[lang]?.[name] ?? "" : block.fields[name];
         const shown = translating ? { ...f, placeholder: String(block.fields[name] ?? "") } : f;
         return (
-          <FieldInput key={`${block.id}-${name}-${lang}`} name={name} def={shown} value={value}
+          <FieldInput key={`${block.id}-${name}-${lang}`} name={name} def={shown} value={value} lock={frameLock(block, name, theme)}
             isPh={translating ? false : block.ph.includes(name)}
             onChange={(v) => apply((c) => setField(c, block.id, name, v, translating ? lang : undefined), `f:${block.id}:${name}:${lang}`)} />
         );

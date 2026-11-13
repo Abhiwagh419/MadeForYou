@@ -91,7 +91,9 @@ export function Share() {
             <span>
               {isRemote()
                 ? "Anyone with this link can open it on any phone. If you edit the page, the changes go live within a few seconds."
-                : `This link works on this device while ${BRAND.name} is being built. When it goes live, the same page and link will open for everyone.`}
+                : /^(localhost|127\.|192\.168\.|10\.)/.test(window.location.hostname)
+                  ? `You are on a test copy running on your own computer, so this link only opens here and nowhere else. For a link that opens on any phone, make and publish the page on your live ${BRAND.name} website.`
+                  : `This link works on this device while ${BRAND.name} is being built. When it goes live, the same page and link will open for everyone.`}
             </span>
           </div>
 

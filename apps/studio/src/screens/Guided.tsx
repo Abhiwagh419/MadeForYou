@@ -5,7 +5,7 @@ import { go, useRoute } from "../lib/router";
 import { scrollToBlock } from "../lib/util";
 import { Button } from "../ui/Button";
 import { Sheet, useMedia } from "../ui/Controls";
-import { FieldInput } from "../ui/Fields";
+import { FieldInput, frameLock } from "../ui/Fields";
 import { PhonePreview } from "../ui/PhonePreview";
 import { Mark } from "../ui/Logo";
 import { NotFound } from "../ui/Shell";
@@ -82,7 +82,7 @@ export function Guided() {
       <>
         <p className="eyebrow-soft">{registry[block.type]?.label}</p>
         <h1>{q.prompt}</h1>
-        <FieldInput large name={q.field} def={def} value={value} isPh={isPh} onChange={answer} />
+        <FieldInput large name={q.field} def={def} value={value} isPh={isPh} onChange={answer} lock={frameLock(block, q.field, page.content.settings.theme.preset)} />
         <div className="guided-nav">
           {i > 0 && <Button variant="ghost" icon="left" onClick={() => setI(i - 1)}>Back</Button>}
           <span className="grow" />

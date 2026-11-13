@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useSyncExternalStore } from "react";
 import { LIMITS, type AssetRef, type Content } from "@madeforyou/schema";
 import { apiBase, isRemote } from "./config";
+import { roundRatio } from "./crop";
 import { uid } from "./util";
 
 /**
@@ -71,7 +72,12 @@ export const MAX_EDGE = 1280;
 
 /** Resize to at most 1280px on the long edge and re-encode as WebP, in the browser, before storing. */
 export async function compressImage(file: Blob): Promise<Blob> {
-  if (typeof createImageBitmap !== "function") return file;
+  return (await compressWithShape(file)).blob;
+}
+
+/** Same, and also reports width divided by height so the page can show the whole photo. */
+async function compressWithShape(file: Blob): Promise<{ blob: Blob; ratio?: number }> {
+  if (typeof createImageBitmap !== "function") return { blob: file };
   const bmp = await createImageBitmap(file);
   const k = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * k);
@@ -81,17 +87,32 @@ export async function compressImage(file: Blob): Promise<Blob> {
   canvas.height = h;
   canvas.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
   bmp.close?.();
-  return new Promise((res) => canvas.toBlob((b) => res(b ?? file), "image/webp", 0.82));
+  const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? file), "image/webp", 0.82));
+  return { blob, ratio: roundRatio(w / h) };
 }
 
-export async function saveImage(file: File): Promise<AssetRef> {
+/** Throws a friendly message if the file cannot be used as a photo. */
+export function checkImageFile(file: File) {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image");
   if (file.size > 25 * 1024 * 1024) throw new Error("That photo is too large (25 MB max)");
-  const blob = await compressImage(file);
+}
+
+/** The whole photo, uncropped. Its own shape is remembered so the page never centre-crops it. */
+export async function saveImage(file: File): Promise<AssetRef> {
+  checkImageFile(file);
+  const { blob, ratio } = await compressWithShape(file);
   const id = uid("ast");
   await putBlob(id, blob);
   urlCache.set(id, URL.createObjectURL(blob));
-  return { asset: id };
+  return ratio ? { asset: id, ratio } : { asset: id };
+}
+
+/** A photo the author has already cropped (see CropDialog). */
+export async function saveCropped(blob: Blob, ratio: number): Promise<AssetRef> {
+  const id = uid("ast");
+  await putBlob(id, blob);
+  urlCache.set(id, URL.createObjectURL(blob));
+  return { asset: id, ratio };
 }
 
 /** A voice note is stored exactly as recorded (it is already small: about 30 KB per second). */

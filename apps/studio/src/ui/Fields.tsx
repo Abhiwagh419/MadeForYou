@@ -1,10 +1,12 @@
 import { useRef, useState, type ReactNode } from "react";
 import { defaultValue, isSafeLink, normalizeLink, parseGeo, parseVideoUrl, type AssetRef, type AudioRef, type FieldDef, type Geo, type VideoRef } from "@madeforyou/schema";
-import { saveImage, useAssetUrl } from "../lib/assets";
+import { checkImageFile, saveCropped, saveImage, useAssetUrl } from "../lib/assets";
 import { fromIstInput, humanize, toIstInput } from "../lib/util";
 import { Icon } from "./Icon";
 import { Segmented, toast } from "./Controls";
 import { VoiceRecorder } from "./VoiceRecorder";
+import { frameRatio } from "@madeforyou/ui";
+import { CropDialog } from "./CropDialog";
 
 export function Field({ label, hint, right, children }: { label?: string; hint?: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -22,23 +24,46 @@ export function Field({ label, hint, right, children }: { label?: string; hint?:
 }
 
 /* ---------- one image, with a description for screen readers ---------- */
-export function ImageInput({ value, onChange, large, showAlt = true }: { value: AssetRef | null | undefined; onChange: (v: AssetRef | null) => void; large?: boolean; showAlt?: boolean }) {
+export function ImageInput({ value, onChange, large, showAlt = true, lock }: { value: AssetRef | null | undefined; onChange: (v: AssetRef | null) => void; large?: boolean; showAlt?: boolean; lock?: number }) {
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const url = useAssetUrl(value?.asset);
+  /* A photo that was just chosen waits here while the author picks the part to show. */
+  const [pending, setPending] = useState<{ file: File; src: string } | null>(null);
+  const [recrop, setRecrop] = useState(false);
 
-  const take = async (f?: File) => {
+  const take = (f?: File) => {
     if (!f) return;
+    try {
+      checkImageFile(f);
+      setPending({ file: f, src: URL.createObjectURL(f) });
+    } catch (e) {
+      toast((e as Error).message);
+    }
+  };
+  const closePending = () => {
+    if (pending) URL.revokeObjectURL(pending.src);
+    setPending(null);
+  };
+  const useWhole = async () => {
+    if (!pending) return;
     setBusy(true);
     try {
-      const ref = await saveImage(f);
-      onChange({ asset: ref.asset, alt: value?.alt });
+      const ref = await saveImage(pending.file);
+      onChange({ ...ref, alt: value?.alt });
     } catch (e) {
       toast((e as Error).message);
     } finally {
       setBusy(false);
+      closePending();
     }
+  };
+  const useCrop = async (r: { blob: Blob; ratio: number }) => {
+    const ref = await saveCropped(r.blob, r.ratio);
+    onChange({ ...ref, alt: value?.alt });
+    if (pending) closePending();
+    setRecrop(false);
   };
 
   return (
@@ -57,12 +82,15 @@ export function ImageInput({ value, onChange, large, showAlt = true }: { value: 
         )}
         {value && (
           <div className="drop-actions">
+            <button type="button" onClick={() => setRecrop(true)}><Icon name="crop" size={15} />Crop</button>
             <button type="button" onClick={() => file.current?.click()}><Icon name="pencil" size={15} />Replace</button>
             <button type="button" onClick={() => onChange(null)}><Icon name="trash" size={15} />Remove</button>
           </div>
         )}
         <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { take(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
+      {pending && <CropDialog src={pending.src} onCancel={closePending} onDone={useCrop} onWhole={useWhole} lock={lock} />}
+      {recrop && url && <CropDialog src={url} onCancel={() => setRecrop(false)} onDone={useCrop} lock={lock} />}
       {value && showAlt && (
         <input className="in in-sm" placeholder="Describe the photo, for people using screen readers" maxLength={200}
           value={value.alt ?? ""} onChange={(e) => onChange({ ...value, alt: e.target.value })} aria-label="Photo description" />
@@ -148,12 +176,15 @@ function Thumbnail({ id }: { id?: string }) {
   return <div className="li-thumb">{url ? <img src={url} alt="" /> : <Icon name="image" size={18} />}</div>;
 }
 
-export function ListInput({ def, value, onChange, large }: { def: Extract<FieldDef, { kind: "list" }>; value: unknown; onChange: (v: unknown[]) => void; large?: boolean }) {
+export function ListInput({ def, value, onChange, large, lock }: { def: Extract<FieldDef, { kind: "list" }>; value: unknown; onChange: (v: unknown[]) => void; large?: boolean; lock?: number }) {
   const items = (Array.isArray(value) ? value : []) as Record<string, unknown>[];
   const imageKey = Object.entries(def.item).find(([, d]) => d.kind === "image")?.[0];
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const room = def.max - items.length;
+  const [cropIdx, setCropIdx] = useState<number | null>(null);
+  const cropRef = cropIdx !== null ? ((items[cropIdx] as Record<string, unknown> | undefined)?.[imageKey ?? ""] as AssetRef | undefined) : undefined;
+  const cropUrl = useAssetUrl(cropRef?.asset);
 
   const addFiles = async (files: FileList | null) => {
     if (!files?.length || !imageKey) return;
@@ -182,7 +213,7 @@ export function ListInput({ def, value, onChange, large }: { def: Extract<FieldD
   return (
     <div className={`listin ${large ? "listin-lg" : ""}`}>
       {items.map((it, i) => (
-        <div className="li" key={i}>
+        <div className={`li ${imageKey ? "" : "li-plain"}`} key={i}>
           {imageKey && <Thumbnail id={(it[imageKey] as AssetRef | null | undefined)?.asset} />}
           <div className="li-fields">
             {Object.entries(def.item).filter(([, d]) => d.kind !== "image").map(([k, d]) => {
@@ -201,6 +232,9 @@ export function ListInput({ def, value, onChange, large }: { def: Extract<FieldD
               <input className="in in-sm" placeholder="Describe the photo (alt text)" maxLength={200}
                 value={(it[imageKey] as AssetRef).alt ?? ""} onChange={(e) => patch(i, imageKey, { ...(it[imageKey] as AssetRef), alt: e.target.value })} aria-label="Photo description" />
             )}
+            {imageKey && (it[imageKey] as AssetRef | undefined) && (
+              <button type="button" className="li-crop" onClick={() => setCropIdx(i)}><Icon name="crop" size={15} />Crop this photo</button>
+            )}
           </div>
           <div className="li-actions">
             <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up"><Icon name="up" size={16} /></button>
@@ -217,15 +251,26 @@ export function ListInput({ def, value, onChange, large }: { def: Extract<FieldD
         </button>
       )}
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+      {cropIdx !== null && imageKey && cropUrl && (
+        <CropDialog src={cropUrl} lock={lock} onCancel={() => setCropIdx(null)}
+          onDone={async (r) => { const ref = await saveCropped(r.blob, r.ratio); patch(cropIdx, imageKey, { ...ref, alt: cropRef?.alt }); setCropIdx(null); }} />
+      )}
     </div>
   );
 }
 
+/** The fixed frame shape a photo field is shown in, if there is one (the theme's cover frame, the memory cards). */
+export function frameLock(block: { type: string; fields: Record<string, unknown> }, field: string, preset: string): number | undefined {
+  if (block.type === "hero" && field === "cover") return block.fields.layout === "fullbleed" ? 4 / 5 : frameRatio(preset);
+  if (block.type === "memory" && field === "photos") return 1;
+  return undefined;
+}
+
 /* ---------- any field, by kind ---------- */
 export function FieldInput({
-  name, def, value, isPh, onChange, large, disabledNote,
+  name, def, value, isPh, onChange, large, disabledNote, lock,
 }: {
-  name: string; def: FieldDef; value: unknown; isPh: boolean; onChange: (v: unknown) => void; large?: boolean; disabledNote?: string;
+  name: string; def: FieldDef; value: unknown; isPh: boolean; onChange: (v: unknown) => void; large?: boolean; disabledNote?: string; lock?: number;
 }) {
   const label = humanize(name);
   if (disabledNote) {
@@ -250,7 +295,7 @@ export function FieldInput({
         </Field>
       );
     case "image":
-      return <Field label={large ? undefined : label}><ImageInput large={large} value={value as AssetRef | null} onChange={onChange} /></Field>;
+      return <Field label={large ? undefined : label}><ImageInput large={large} lock={lock} value={value as AssetRef | null} onChange={onChange} /></Field>;
     case "date":
       return (
         <Field label={large ? undefined : label} hint={def.withTime ? "India time (IST)" : undefined}>
@@ -277,6 +322,6 @@ export function FieldInput({
         </Field>
       );
     case "list":
-      return <Field label={large ? undefined : label}><ListInput def={def} value={value} onChange={onChange} large={large} /></Field>;
+      return <Field label={large ? undefined : label}><ListInput def={def} value={value} onChange={onChange} large={large} lock={lock} /></Field>;
   }
 }

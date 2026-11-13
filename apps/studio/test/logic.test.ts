@@ -144,3 +144,49 @@ describe("routes", () => {
     expect(parseHash("#/nope/nope").name).toBe("notfound");
   });
 });
+
+import { fitRect, moveRect, resizeCorner, roundRatio } from "../src/lib/crop";
+import { AssetRefSchema } from "@madeforyou/schema";
+import { shape } from "../../../packages/renderer/src/util";
+
+describe("crop geometry", () => {
+  it("fits the biggest shape inside the photo, centred", () => {
+    expect(fitRect(400, 300, 1)).toEqual({ x: 50, y: 0, w: 300, h: 300 });
+    expect(fitRect(200, 400, 1)).toEqual({ x: 0, y: 100, w: 200, h: 200 });
+    expect(fitRect(400, 300, null)).toEqual({ x: 0, y: 0, w: 400, h: 300 });
+  });
+  it("never moves outside the photo", () => {
+    const r = moveRect({ x: 10, y: 10, w: 100, h: 100 }, 999, -999, 400, 300);
+    expect(r).toEqual({ x: 300, y: 0, w: 100, h: 100 });
+  });
+  it("keeps the opposite corner fixed and the shape when resizing", () => {
+    const r = resizeCorner({ x: 100, y: 100, w: 100, h: 100 }, "se", 260, 250, 1, 400, 300);
+    expect(r.x).toBe(100);
+    expect(r.y).toBe(100);
+    expect(r.w).toBeCloseTo(r.h);
+    expect(r.x + r.w).toBeLessThanOrEqual(400);
+    expect(r.y + r.h).toBeLessThanOrEqual(300);
+  });
+  it("resizes from the top-left without leaving the photo", () => {
+    const r = resizeCorner({ x: 100, y: 100, w: 100, h: 100 }, "nw", -50, -50, null, 400, 300);
+    expect(r).toEqual({ x: 0, y: 0, w: 200, h: 200 });
+  });
+  it("keeps a minimum size", () => {
+    const r = resizeCorner({ x: 100, y: 100, w: 100, h: 100 }, "se", 101, 101, null, 400, 300);
+    expect(r.w).toBeGreaterThanOrEqual(48);
+  });
+  it("stores the crop shape and the page uses it", () => {
+    expect(AssetRefSchema.parse({ asset: "ast_abcd1234", ratio: roundRatio(0.8) }).ratio).toBe(0.8);
+    expect(AssetRefSchema.safeParse({ asset: "ast_abcd1234", ratio: 99 }).success).toBe(false);
+    expect(shape({ ratio: 0.8 })).toEqual({ aspectRatio: "0.8" });
+    expect(shape({})).toBeUndefined();
+  });
+});
+
+import { frameRatio } from "@madeforyou/ui";
+describe("cover frame shape", () => {
+  it("matches the theme's frame", () => {
+    expect(frameRatio("rose-garden")).toBeGreaterThan(0.5);
+    for (const p of ["rose-garden", "marigold-sun", "does-not-exist"]) expect([0.75, 0.8, 1]).toContain(frameRatio(p));
+  });
+});

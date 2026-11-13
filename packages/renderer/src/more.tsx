@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import type { AssetRef, Block } from "@madeforyou/schema";
 import { useFields, useRender } from "./context";
 import { label } from "./labels";
-import { buildIcs, formatEvent, parseTarget, safeHref, togetherSince } from "./util";
+import { buildIcs, formatEvent, parseTarget, safeHref, shape, togetherSince } from "./util";
 
 type P = { block: Block };
 const idx = (i: number) => ({ "--i": i }) as CSSProperties;
@@ -26,7 +26,7 @@ export function Featured({ block }: P) {
   const caption = x.t("caption");
   return (
     <figure className={`mfy-featured mfy-fr-${x.str("frame", "polaroid")}`}>
-      <div className="mfy-feat-img">{url ? <img src={url} alt={ref?.alt ?? caption} loading="lazy" decoding="async" /> : <span className={`mfy-tile-fill ${x.ph("image")}`} />}</div>
+      <div className="mfy-feat-img">{url ? <img src={url} alt={ref?.alt ?? caption} loading="lazy" decoding="async" style={shape(ref)} /> : <span className={`mfy-tile-fill ${x.ph("image")}`} />}</div>
       {caption && <figcaption className={x.ph("caption")}>{caption}</figcaption>}
     </figure>
   );
@@ -47,7 +47,7 @@ export function Timeline({ block }: P) {
               <span className="mfy-tl-dot" aria-hidden="true" />
               {str(it.date) && <p className="mfy-tl-date">{str(it.date)}</p>}
               {str(it.title) && <h3>{str(it.title)}</h3>}
-              {url && <img src={url} alt={(it.image as AssetRef).alt ?? str(it.title)} loading="lazy" decoding="async" />}
+              {url && <img src={url} alt={(it.image as AssetRef).alt ?? str(it.title)} loading="lazy" decoding="async" style={shape(it.image as AssetRef)} />}
               {str(it.text) && <p className="mfy-tl-text">{str(it.text)}</p>}
             </li>
           );

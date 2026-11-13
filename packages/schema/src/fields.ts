@@ -58,6 +58,8 @@ export const f = {
 export const AssetRefSchema = z.object({
   asset: z.string().regex(/^ast_[A-Za-z0-9_-]{4,64}$/, "Invalid asset reference"),
   alt: z.string().max(200).optional(),
+  /** Width divided by height of the photo as the author cropped it. Lets the page show the whole crop instead of centre-cropping it into a fixed frame. */
+  ratio: z.number().min(0.2).max(5).optional(),
 });
 export type AssetRef = z.infer<typeof AssetRefSchema>;
 

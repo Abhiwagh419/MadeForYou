@@ -155,7 +155,7 @@ function EditorInner({ page }: { page: PageRecord }) {
       onMove={(bid, d) => apply((c) => moveBlock(c, bid, d))} onToggle={(bid) => apply((c) => toggleVisible(c, bid))} onAdd={() => setAdding(true)} />
   );
   const panelEdit = block ? (
-    <BlockInspector block={block} lang={lang} defaultLang={defaultLang} dispatch={dispatch} onDuplicate={duplicate} onDelete={remove} />
+    <BlockInspector block={block} theme={content.settings.theme.preset} lang={lang} defaultLang={defaultLang} dispatch={dispatch} onDuplicate={duplicate} onDelete={remove} />
   ) : (
     <div className="inspector"><p className="field-note">Tap a block in the preview, or choose one from the list, to edit it.</p></div>
   );

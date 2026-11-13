@@ -73,6 +73,12 @@ const FRAMES: Record<ThemeTokens["frame"], { radius: string; ratio: string; widt
   soft: { radius: "var(--mfy-radius)", ratio: "4 / 5", width: "min(72%, 16rem)" },
 };
 
+/** Width divided by height of the cover frame this theme uses (arch 3:4, circle 1:1, soft 4:5). */
+export function frameRatio(preset: string): number {
+  const t = THEMES[preset] ?? THEMES[DEFAULT_THEME]!;
+  return { arch: 3 / 4, circle: 1, soft: 4 / 5 }[t.frame];
+}
+
 export function themeToCssVars(preset: string): Record<string, string> {
   const t = THEMES[preset] ?? THEMES[DEFAULT_THEME]!;
   const fr = FRAMES[t.frame];
