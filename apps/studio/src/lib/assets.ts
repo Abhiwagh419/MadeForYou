@@ -25,6 +25,18 @@ const remoteUrl = (id: string, token?: string | null) => {
 };
 const memory = new Map<string, Blob>();
 
+/** Forgets every photo kept on this device. */
+export async function clearLocalAssets() {
+  memory.clear();
+  for (const u of urlCache.values()) URL.revokeObjectURL(u);
+  urlCache.clear();
+  if (typeof indexedDB === "undefined") return;
+  await new Promise<void>((res) => {
+    const req = indexedDB.deleteDatabase("mfy-assets");
+    req.onsuccess = req.onerror = req.onblocked = () => res();
+  });
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open("mfy-assets", 1);

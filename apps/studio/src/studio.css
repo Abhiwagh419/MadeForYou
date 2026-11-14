@@ -614,3 +614,35 @@ select.in-sm { padding-right: 1.5rem; }
 .delivery small { color: var(--ink-3, #8a6b73); }
 .delivery.failed small { color: var(--rose-deep); }
 .delivery.cancelled { opacity: 0.6; }
+
+/* ---------- footer links, Terms and Privacy ---------- */
+.footer-right { display: grid; gap: 0.5rem; justify-items: end; text-align: right; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; justify-content: flex-end; }
+.footer-links a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+.footer-links a:hover { color: var(--rose-deep); }
+@media (max-width: 640px) { .footer-right { justify-items: start; text-align: left; } .footer-links { justify-content: flex-start; } }
+.legal { max-width: 46rem; padding-block: 2.5rem 4rem; }
+.legal h1 { margin-bottom: 0.3rem; }
+.legal h2 { font-size: 1.25rem; margin: 2rem 0 0.6rem; }
+.legal p, .legal li { line-height: 1.65; color: var(--ink-2); }
+.legal ul { padding-left: 1.2rem; display: grid; gap: 0.45rem; margin: 0.4rem 0; }
+.legal-updated { color: var(--ink-3, #8a6b73); font-size: 0.9rem; margin-bottom: 1rem; }
+.legal-summary { margin: 1rem 0 0; }
+.legal-end { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+
+/* ---------- report, account, review ---------- */
+.viewer-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1.2rem; padding: 1.4rem 1rem 2rem; font-size: 0.82rem; background: var(--cream, #FFF8F0); }
+.viewer-foot a, .viewer-foot button { color: #7a5a62; background: none; border: 0; padding: 0; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.viewer-foot a:hover, .viewer-foot button:hover { color: var(--rose-deep); }
+.report { display: grid; gap: 0.8rem; }
+.report .mfy-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.report-reasons { display: grid; gap: 0.4rem; }
+.report-reasons label { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.8rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; cursor: pointer; }
+.report-reasons label.on { border-color: var(--rose); background: var(--soft); }
+.report-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; align-items: center; }
+.account { max-width: 44rem; padding-block: 2.5rem 4rem; display: grid; gap: 1.2rem; }
+.danger-zone { border-color: #f0b8c4; }
+.danger-zone h2 { color: var(--rose-deep); }
+.admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8rem; }
+.report-item.dismissed, .report-item.removed { opacity: 0.7; }
+.check { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }

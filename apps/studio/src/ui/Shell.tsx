@@ -38,7 +38,16 @@ export function Footer() {
           <strong className="footer-brand">{BRAND.name}</strong>
           <p>{BRAND.tagline}</p>
         </div>
-        <p className="footer-note">Free for everyone. No ads, no watermarks you cannot remove, no card needed. <a href="#/status">Connection status</a></p>
+        <div className="footer-right">
+          <p className="footer-note">Free for everyone. No ads, no watermarks you cannot remove, no card needed.</p>
+          <nav className="footer-links" aria-label="About and legal">
+            <a href="#/terms">Terms</a>
+            <a href="#/privacy">Privacy</a>
+            <a href={`mailto:${BRAND.contactEmail}`}>Contact</a>
+            <a href="#/account">Account</a>
+            <a href="#/status">Connection status</a>
+          </nav>
+        </div>
       </div>
     </footer>
   );

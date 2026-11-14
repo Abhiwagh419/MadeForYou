@@ -19,6 +19,8 @@ export interface PageRecord {
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
+  /** Set when the site owner took the page down after a report. */
+  takenDown?: { at: string; reason: string };
 }
 export interface TemplateRecord {
   template: Template;
@@ -71,6 +73,18 @@ function set(next: State) {
   state = next;
   listeners.forEach((l) => l());
   persist();
+}
+
+/** Empties the pages and templates kept on this device (used when someone clears their data). */
+export function resetState() {
+  clearTimeout(timer);
+  state = { pages: {}, templates: {} };
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* storage blocked */
+  }
+  listeners.forEach((l) => l());
 }
 
 export const getState = () => state;

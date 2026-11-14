@@ -37,7 +37,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 /* ---------- sending ---------- */
 
-interface Outgoing { to: string; toName?: string; subject: string; html: string; text: string; unsubscribeUrl: string }
+interface Outgoing { to: string; toName?: string; subject: string; html: string; text: string; unsubscribeUrl?: string }
 
 export async function sendMail(env: Env, deps: Deps, m: Outgoing): Promise<void> {
   const cfg = mailConfig(env);
@@ -53,7 +53,7 @@ export async function sendMail(env: Env, deps: Deps, m: Outgoing): Promise<void>
         subject: m.subject,
         htmlContent: m.html,
         textContent: m.text,
-        headers: { "List-Unsubscribe": `<${m.unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        ...(m.unsubscribeUrl ? { headers: { "List-Unsubscribe": `<${m.unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } } : {}),
       }),
     });
   } catch {
@@ -387,4 +387,19 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
 
   out.left = budget.n;
   return out;
+}
+
+/* ---------- a note to the site owner when a page is reported ---------- */
+
+export async function notifyReport(env: Env, deps: Deps, o: { origin: string; slug: string; title: string; reason: string; details: string; contact: string; count: number }): Promise<void> {
+  const to = cleanEmail(env.REPORT_EMAIL ?? "") ?? mailConfig(env)?.from;
+  if (!to || !mailConfig(env)) return;
+  const link = `${o.origin}/#/admin`;
+  const lines = [`Page: ${o.title} (${o.origin}/p/${o.slug})`, `Reason: ${o.reason}`, o.details ? `Details: ${o.details}` : "", o.contact ? `Reporter: ${o.contact}` : "", `Reports on this page so far: ${o.count}`].filter(Boolean);
+  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#4A0E1F;line-height:1.5"><h2 style="font-family:Georgia,serif">A page was reported</h2>${lines.map((l) => `<p style="margin:0 0 8px">${escHtml(l)}</p>`).join("")}<p><a href="${escHtml(link)}">Open the review page</a></p></div>`;
+  try {
+    await sendMail(env, deps, { to, subject: `Page reported: ${o.title}`.slice(0, 120), html, text: `${lines.join("\n")}\n\nReview: ${link}` });
+  } catch {
+    /* the report is saved either way; it will be waiting in the review page */
+  }
 }

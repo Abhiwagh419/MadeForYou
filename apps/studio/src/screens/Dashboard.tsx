@@ -13,6 +13,7 @@ import { TemplateCard } from "../ui/TemplateCard";
 import { Thumb } from "../ui/Thumb";
 
 function status(p: PageRecord): { label: string; tone: string } {
+  if (p.takenDown) return { label: "Taken down", tone: "amber" };
   if (p.status === "draft") return { label: "Draft", tone: "" };
   if (p.access.expiresAt && new Date(p.access.expiresAt).getTime() < Date.now()) return { label: "Ended", tone: "" };
   if (p.access.unlockAt && new Date(p.access.unlockAt).getTime() > Date.now()) return { label: `Locked until ${formatWhen(p.access.unlockAt)}`, tone: "amber" };

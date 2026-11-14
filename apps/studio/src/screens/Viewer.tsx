@@ -10,6 +10,7 @@ import { sha256 } from "../lib/util";
 import { useStore, type PageRecord } from "../state/store";
 import { Button } from "../ui/Button";
 import { Mark } from "../ui/Logo";
+import { ReportDialog } from "../ui/ReportDialog";
 
 function Centered({ page, preset, children }: { page?: PageRecord; preset?: string; children: React.ReactNode }) {
   const style = themeToCssVars(preset ?? page?.content.settings.theme.preset ?? "rose-garden") as CSSProperties;
@@ -115,6 +116,7 @@ type Remote =
 
 function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: string }) {
   const resolve = useAssets(v.content, v.assetToken);
+  const [reporting, setReporting] = useState(false);
   // Guests' messages go to the server with the token this visitor earned by getting past the lock and password.
   const host = useMemo<Host>(() => ({
     wishes: v.wishes ?? {},
@@ -131,6 +133,14 @@ function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: 
     <>
       {v.owner && v.visibility === "private" && <div className="ribbon">Only you can see this page</div>}
       <PageRenderer content={v.content} resolveAsset={resolve} host={host} />
+      {!v.owner && (
+        <footer className="viewer-foot">
+          <button type="button" onClick={() => setReporting(true)}>Report this page</button>
+          <a href="#/privacy">Privacy</a>
+          <a href="#/terms">Terms</a>
+        </footer>
+      )}
+      {reporting && <ReportDialog slug={slug} onClose={() => setReporting(false)} />}
     </>
   );
 }

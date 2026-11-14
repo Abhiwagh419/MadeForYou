@@ -48,6 +48,8 @@ export interface Env {
   CLERK_SECRET_KEY?: string;
   /** Optional. The main website address, e.g. https://madeforyou-9pj.pages.dev, used in links inside emails. */
   PUBLIC_URL?: string;
+  /** Optional. Where a note goes when a page is reported. Defaults to MAIL_FROM. */
+  REPORT_EMAIL?: string;
 }
 
 export interface Deps {

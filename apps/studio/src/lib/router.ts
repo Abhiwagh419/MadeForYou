@@ -19,6 +19,10 @@ const TABLE: [string, RegExp, string[]][] = [
   ["status", /^\/status\/?$/, []],
   ["inbox", /^\/inbox\/([\w-]+)\/?$/, ["id"]],
   ["view", /^\/p\/([\w-]+)\/?$/, ["slug"]],
+  ["terms", /^\/terms\/?$/, []],
+  ["privacy", /^\/privacy\/?$/, []],
+  ["account", /^\/account\/?$/, []],
+  ["admin", /^\/admin\/?$/, []],
 ];
 
 export function parseHash(hash: string): Route {

@@ -6,7 +6,8 @@ import {
 } from "@madeforyou/schema";
 import { authenticate, diagnose, verifyClerk } from "./auth";
 import { hashIp, hashPassword, randomHex, readToken, signToken, timingSafeEqual } from "./crypto";
-import { DAILY_CAP, blockEmail, deliverOne, escHtml, isBlocked, mailConfig, nextEvent, readUnsub, remindersOn, runTick } from "./mail";
+import { DAILY_CAP, blockEmail, deliverOne, escHtml, isBlocked, mailConfig, nextEvent, notifyReport, readUnsub, remindersOn, runTick } from "./mail";
+import { eraseUser, purgeOld } from "./safety";
 import { sniffMedia } from "./sniff";
 import type { Deps, Env } from "./types";
 
@@ -23,7 +24,7 @@ interface PageRow {
   id: string; owner_id: string; title: string; template_id: string | null; content: string; slug: string | null;
   status: "draft" | "published"; visibility: "private" | "unlisted"; password_hash: string | null; password_salt: string | null;
   unlock_at: string | null; expires_at: string | null; created_at: string; updated_at: string; published_at: string | null;
-  contrib_epoch: number;
+  contrib_epoch: number; taken_down_at: string | null; takedown_reason: string | null;
 }
 
 /** A page as the owner's browser sees it. The password hash never leaves the server. */
@@ -31,6 +32,7 @@ const toPage = (r: PageRow) => ({
   id: r.id, title: r.title, templateId: r.template_id ?? undefined, content: JSON.parse(r.content) as Content, slug: r.slug ?? "",
   status: r.status, createdAt: r.created_at, updatedAt: r.updated_at, publishedAt: r.published_at ?? undefined,
   access: { visibility: r.visibility, hasPassword: !!r.password_hash, unlockAt: r.unlock_at, expiresAt: r.expires_at },
+  takenDown: r.taken_down_at ? { at: r.taken_down_at, reason: r.takedown_reason ?? "" } : undefined,
 });
 
 const isoOrNull = (v: unknown): string | null | undefined => {
@@ -195,6 +197,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
   app.post("/pages/:id/publish", async (c) => {
     const userId = await need(c);
     const row = await ownedPage(c, c.req.param("id"), userId);
+    if (row.taken_down_at) throw new HttpError(403, "This page was taken down and cannot be published. Email wabhi2009@gmail.com if you think that was a mistake.");
     const body = await readJson<{ slug?: unknown; visibility?: unknown; password?: unknown; unlockAt?: unknown; expiresAt?: unknown }>(c);
 
     const check = checkPublishable(JSON.parse(row.content) as Content);
@@ -483,6 +486,53 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json(await accept(c, r, { blockId: wall.id, kind: "wish", payload: b.payload, source: "contributor", website: b.website, elapsedMs: b.elapsedMs, turnstile: b.turnstile }));
   });
 
+  /* ------------------------------ reports, takedowns, deleting an account ------------------------------ */
+
+  const REASONS = ["abuse", "private", "copyright", "spam", "other"] as const;
+
+  /** Anyone may report a published page. It goes to the site owner, who decides. */
+  app.post("/p/:slug/report", async (c) => {
+    const r = await publicRow(c, c.req.param("slug"));
+    if (!r || r.visibility === "private") throw new HttpError(404, "Page not found");
+    const b = await readJson<{ reason?: unknown; details?: unknown; contact?: unknown; website?: unknown }>(c);
+    if (typeof b.website === "string" && b.website !== "") return c.json({ ok: true }); // a bot filled the hidden field
+    const reason = (REASONS as readonly string[]).includes(String(b.reason)) ? (b.reason as (typeof REASONS)[number]) : null;
+    if (!reason) throw new HttpError(400, "Choose what is wrong with the page");
+    const tidy = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max) : "");
+    const details = tidy(b.details, 600);
+    const contact = tidy(b.contact, 120);
+    if (reason === "other" && !details) throw new HttpError(400, "Please say a little about what is wrong");
+
+    const ip = await ipOf(c);
+    await throttle(c, `rep:${ip}`, 3600, 5);
+    await throttle(c, `repp:${r.id}`, 86_400, 20);
+    await c.env.DB.prepare("INSERT INTO reports (id, page_id, slug, reason, details, contact, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(`rp_${randomHex(8)}`, r.id, r.slug, reason, details || null, contact || null, ip, iso()).run();
+    const count = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE page_id = ? AND status = 'open'").bind(r.id).first<{ n: number }>())?.n ?? 1;
+    await notifyReport(c.env, deps, { origin: originOf(c), slug: r.slug!, title: r.title, reason, details, contact, count });
+    return c.json({ ok: true });
+  });
+
+  /** Delete the account and everything in it. The person must type DELETE, so a stray tap does nothing. */
+  app.delete("/me", async (c) => {
+    const userId = await need(c);
+    const b = await readJson<{ confirm?: unknown }>(c);
+    if (typeof b.confirm !== "string" || b.confirm.trim().toUpperCase() !== "DELETE") throw new HttpError(400, "Type DELETE to confirm");
+    const gone = await eraseUser(c.env, userId);
+    // Also remove the login itself when the server may (Clerk). If not, the person can do it from their profile.
+    let loginRemoved = false;
+    const secret = c.env.CLERK_SECRET_KEY?.trim();
+    if (secret && !userId.startsWith("dev_")) {
+      try {
+        const res = await deps.fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(userId)}`, { method: "DELETE", headers: { authorization: `Bearer ${secret}` } });
+        loginRemoved = res.ok;
+      } catch {
+        loginRemoved = false;
+      }
+    }
+    return c.json({ ok: true, ...gone, loginRemoved });
+  });
+
   /* ------------------------------ email ------------------------------ */
 
   const originOf = (c: Ctx) => (c.env.PUBLIC_URL?.trim().replace(/\/+$/, "") || new URL(c.req.url).origin);
@@ -575,7 +625,8 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (!secret) throw new HttpError(503, "The scheduler is not set up");
     const m = c.req.header("authorization")?.match(/^Bearer\s+(.+)$/i);
     if (!m || !timingSafeEqual(m[1]!.trim(), secret)) throw new HttpError(401, "Not allowed");
-    return c.json(await runTick(c.env, deps, originOf(c)));
+    const cleaned = await purgeOld(c.env, deps.now());
+    return c.json({ ...(await runTick(c.env, deps, originOf(c))), cleaned });
   });
 
   /* ------------------------------ the owner's inbox ------------------------------ */
@@ -707,6 +758,45 @@ export function createApp(overrides: Partial<Deps> = {}) {
       storage: c.env.FILES ? "r2" : "database (free limit 500 MB in total)",
     });
   });
+  /** Reports waiting for a decision, grouped by page. */
+  app.get("/admin/reports", async (c) => {
+    admin(c);
+    const status = c.req.query("status") === "all" ? "all" : "open";
+    const { results } = await c.env.DB.prepare(
+      `SELECT r.id, r.page_id, r.slug, r.reason, r.details, r.contact, r.status, r.created_at, p.title, p.owner_id, p.status AS page_status, p.taken_down_at,
+              (SELECT COUNT(*) FROM reports x WHERE x.page_id = r.page_id AND x.status = 'open') AS open_for_page
+         FROM reports r JOIN pages p ON p.id = r.page_id
+        ${status === "open" ? "WHERE r.status = 'open'" : ""}
+        ORDER BY r.created_at DESC LIMIT 100`,
+    ).all();
+    return c.json({ reports: results ?? [] });
+  });
+
+  /** remove: take the page down (its owner cannot publish it again) and close every open report on it. dismiss: nothing wrong. */
+  app.post("/admin/reports/:id/:action", async (c) => {
+    admin(c);
+    const action = c.req.param("action");
+    if (action !== "remove" && action !== "dismiss") throw new HttpError(400, "Unknown action");
+    const rep = await c.env.DB.prepare("SELECT id, page_id, reason FROM reports WHERE id = ?").bind(c.req.param("id")).first<{ id: string; page_id: string; reason: string }>();
+    if (!rep) throw new HttpError(404, "Report not found");
+    if (action === "dismiss") {
+      await c.env.DB.prepare("UPDATE reports SET status = 'dismissed', handled_at = ? WHERE id = ?").bind(iso(), rep.id).run();
+    } else {
+      await c.env.DB.batch([
+        c.env.DB.prepare("UPDATE pages SET status = 'draft', taken_down_at = ?, takedown_reason = ?, updated_at = ? WHERE id = ?").bind(iso(), `Reported: ${rep.reason}`, iso(), rep.page_id),
+        c.env.DB.prepare("UPDATE reports SET status = 'removed', handled_at = ? WHERE page_id = ? AND status = 'open'").bind(iso(), rep.page_id),
+      ]);
+    }
+    return c.json({ ok: true });
+  });
+
+  /** Let a page owner publish again after a mistake. */
+  app.post("/admin/pages/:id/restore", async (c) => {
+    admin(c);
+    const r = await c.env.DB.prepare("UPDATE pages SET taken_down_at = NULL, takedown_reason = NULL WHERE id = ?").bind(c.req.param("id")).run();
+    return c.json({ ok: true, changed: r.meta?.changes ?? 0 });
+  });
+
   app.get("/admin/templates/pending", async (c) => {
     admin(c);
     const { results } = await c.env.DB.prepare("SELECT id, owner_id, meta, created_at FROM templates WHERE status = 'pending' ORDER BY created_at").all();

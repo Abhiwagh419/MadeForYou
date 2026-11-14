@@ -107,11 +107,20 @@ Email stays switched off until these are set (each with `pnpm exec wrangler page
 | `MAIL_FROM_NAME` | Optional. The name people see, default MadeForYou |
 | `CRON_SECRET` | Any long random text. The same value goes to the scheduler (below) |
 | `CLERK_SECRET_KEY` | Optional. Lets the server find the owner's email for "ends soon" |
+| `REPORT_EMAIL` | Optional. Where "page reported" notes go. Defaults to `MAIL_FROM` |
 | `PUBLIC_URL` | Optional. Your main address, e.g. `https://madeforyou-9pj.pages.dev`, used in email links |
 
 Cloudflare Pages cannot run on a timer, so `workers/mailer` is a tiny Worker that calls `/api/cron/tick` every 15 minutes. Deploy it once: `pnpm run mailer:secret` (paste the same `CRON_SECRET`), then `pnpm run mailer:deploy`. Check `TICK_URL` in `workers/mailer/wrangler.toml` first.
 
 Safeguards: only the page owner can send; 5 people per page and 10 a day per owner; a stop link in every email (it opens a confirmation page, so mail scanners cannot trigger it); stopped addresses are never emailed again; the daily total is held under 280.
+
+## Safety: reports, takedowns, deleting data
+
+- **Terms and Privacy** are the pages `#/terms` and `#/privacy`. Their words are in `apps/studio/src/lib/legal.ts`; the operator name and contact email are in `packages/ui/src/brand.ts`. If you change what the app stores, change the Privacy page too.
+- **Report this page** appears at the bottom of every public page (not to its owner). Reports are saved and, if email is on, sent to `REPORT_EMAIL` (default: `MAIL_FROM`).
+- **Your review page** is `#/admin`. It asks for the `ADMIN_TOKEN` secret (kept in that browser tab only). From there you can open a reported page, dismiss the report, take the page down (its owner cannot publish it again) or restore it.
+- **Delete my account** is on `#/account` (linked in the footer). It removes the person's pages, photos, visitor messages, scheduled emails and templates at once, and their Clerk login too if `CLERK_SECRET_KEY` is set.
+- **Clean-up**: every time the scheduler Worker runs, pages deleted more than 30 days ago, photos no page uses, and handled reports older than a year are removed for good.
 
 ## If sign-in works but saving says "please sign in"
 

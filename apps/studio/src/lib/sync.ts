@@ -9,6 +9,7 @@ export interface ServerPage {
   id: string; title: string; templateId?: string; content: Content; slug: string; status: "draft" | "published";
   createdAt: string; updatedAt: string; publishedAt?: string;
   access: { visibility: "private" | "unlisted"; hasPassword: boolean; unlockAt: string | null; expiresAt: string | null };
+  takenDown?: { at: string; reason: string };
 }
 
 export const toLocalAccess = (a: ServerPage["access"]): Access => ({
@@ -20,7 +21,7 @@ export const toLocalAccess = (a: ServerPage["access"]): Access => ({
 
 export const toLocalPage = (s: ServerPage): PageRecord => ({
   id: s.id, title: s.title, templateId: s.templateId, content: s.content, slug: s.slug, status: s.status,
-  access: toLocalAccess(s.access), createdAt: s.createdAt, updatedAt: s.updatedAt, publishedAt: s.publishedAt,
+  access: toLocalAccess(s.access), createdAt: s.createdAt, updatedAt: s.updatedAt, publishedAt: s.publishedAt, takenDown: s.takenDown,
 });
 
 /** Last write wins: a server page replaces the local copy only if it is newer. Pure, so it is easy to test. */

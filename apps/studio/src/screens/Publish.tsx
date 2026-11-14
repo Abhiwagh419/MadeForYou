@@ -196,7 +196,9 @@ function PublishInner({ id }: { id: string }) {
           </section>
 
           <div className="publish-cta">
-            <Button size="lg" iconRight="right" disabled={!ready || busy} onClick={publish}>{page.status === "published" ? "Update and share" : "Publish"}</Button>
+            {page.takenDown && <p className="note-box">This page was taken down after a report, so it cannot be published. If you think that was a mistake, write to <a href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.</p>}
+            <p className="field-hint">By publishing you agree to the <a href="#/terms" target="_blank" rel="noreferrer">Terms</a> and the <a href="#/privacy" target="_blank" rel="noreferrer">Privacy</a> page. Only share what you have the right to share, and only with people who would be glad to get it.</p>
+            <Button size="lg" iconRight="right" disabled={!ready || busy || !!page.takenDown} onClick={publish}>{page.status === "published" ? "Update and share" : "Publish"}</Button>
             {error && <p className="field-error">{error}</p>}
             {!ready && <p className="field-hint">{needSignIn ? "Sign in to publish." : errors.length ? "Fix the red items above first." : status !== "ok" ? "Choose an available link." : "Check the options above."}</p>}
           </div>
