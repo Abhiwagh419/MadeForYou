@@ -9,6 +9,7 @@ import { formatWhen, pageUrl, waLink } from "../lib/util";
 import { useStore } from "../state/store";
 import { Button } from "../ui/Button";
 import { toast } from "../ui/Controls";
+import { supportUpi } from "../lib/config";
 import { EmailDelivery } from "../ui/EmailDelivery";
 import { Icon } from "../ui/Icon";
 import { NotFound, Shell } from "../ui/Shell";
@@ -128,6 +129,16 @@ export function Share() {
           </div>
 
           <EmailDelivery pageId={id} defaultTo={hero?.ph.includes("recipient") ? "" : recipient} defaultFrom={String(sig && !sig.ph.includes("name") ? sig.fields.name ?? "" : "")} />
+
+          {supportUpi() && (
+            <div className="pcard support-nudge">
+              <div>
+                <h2>Did {BRAND.name} help you today?</h2>
+                <p className="field-hint">It is free, with no ads. If you like, you can chip in any amount to keep it running. If not, that is completely fine.</p>
+              </div>
+              <Button variant="secondary" icon="heart" href="#/support">Support us</Button>
+            </div>
+          )}
 
           <div className="share-more">
             {hasGuests && <Button variant="ghost" icon="mail" href={`#/inbox/${id}`}>Messages</Button>}

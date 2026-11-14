@@ -646,3 +646,24 @@ select.in-sm { padding-right: 1.5rem; }
 .admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8rem; }
 .report-item.dismissed, .report-item.removed { opacity: 0.7; }
 .check { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+
+/* ---------- support us ---------- */
+.footer-links .footer-support { color: var(--rose-deep); font-weight: 600; }
+.support { max-width: 44rem; padding-block: 2.5rem 4rem; display: grid; gap: 1rem; }
+.support-lead { line-height: 1.65; color: var(--ink-2); margin: 0; }
+.support-card { display: grid; gap: 1.2rem; }
+.support-amounts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.support-amounts button { border: 1px solid var(--line); background: #fff; color: var(--ink-2); border-radius: 999px; padding: 0.5rem 1.1rem; font-size: 0.95rem; cursor: pointer; }
+.support-amounts button.on { background: var(--rose); border-color: var(--rose); color: #fff; }
+.support-pay { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; }
+.support-qr { display: grid; justify-items: center; gap: 0.4rem; }
+.support-qr img { border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.support-qr small { color: var(--ink-3, #8a6b73); }
+.support-actions { display: grid; gap: 0.8rem; flex: 1 1 14rem; }
+.support-id { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.support-id span { color: var(--ink-3, #8a6b73); font-size: 0.85rem; }
+.support-id code { background: var(--soft); padding: 0.25rem 0.5rem; border-radius: 6px; overflow-wrap: anywhere; }
+.support-small { margin: 0; }
+.support-nudge { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.support-nudge h2 { margin: 0 0 0.2rem; font-size: 1.05rem; }
+.support-nudge p { margin: 0; }

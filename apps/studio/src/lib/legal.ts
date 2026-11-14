@@ -6,7 +6,7 @@ export interface Legal { title: string; updated: string; summary: string; sectio
 
 const who = `${BRAND.name}, run by ${BRAND.operator} in Mumbai, India`;
 const mail = BRAND.contactEmail;
-export const LEGAL_UPDATED = "14 November 2026";
+export const LEGAL_UPDATED = "15 November 2026";
 
 export const TERMS: Legal = {
   title: "Terms of use",
@@ -31,7 +31,7 @@ export const TERMS: Legal = {
     ] },
     { h: "5. Emails you send through MadeForYou", p: ["You can email a page to a person on a date you choose. Only email people who would be glad to hear from you. Every email includes a link to stop them, and we will never email an address that has stopped. We limit how many emails one page and one person can send."] },
     { h: "6. Reports and removing pages", p: ["Anyone can report a page using the “Report this page” link. We read every report. We may take down a page, or close an account, if it breaks these terms or the law, and we may do this without warning when something serious is involved.", `If you think we made a mistake, write to ${mail} and we will look again.`] },
-    { h: "7. The free service", ul: ["There are limits, such as the number of pages and the photo space each person gets.", "Keep your own copies of photos and words you care about. We try to look after your pages, but we cannot promise they will always be available.", "We may add, change or remove features."] },
+    { h: "7. The free service", ul: ["There are limits, such as the number of pages and the photo space each person gets.", "If you would like to support MadeForYou with a payment, it is a voluntary gift. It buys nothing, unlocks nothing and is not refundable.", "Keep your own copies of photos and words you care about. We try to look after your pages, but we cannot promise they will always be available.", "We may add, change or remove features."] },
     { h: "8. Our responsibility", p: ["MadeForYou is provided without promises that it will always work or be free of errors. As far as the law allows, we are not responsible for losses that come from using a free service. Nothing here limits any right you have by law that cannot be limited."] },
     { h: "9. Ending your account", p: ["You can delete your account and everything in it at any time from the Account page. We may suspend or close an account that breaks these terms."] },
     { h: "10. Law", p: ["These terms follow the laws of India. Any dispute goes to the courts in Mumbai, Maharashtra."] },
@@ -51,6 +51,7 @@ export const PRIVACY: Legal = {
       "Messages from visitors. If you add a wishes wall, reply box or RSVP, visitors can send a name, a message, an answer, the number of guests and a note. If a guest asks for an event reminder, they can also add an email address. You, the page owner, can see these.",
       "Emails you send. The address you send to, their name, your name, your note and the send time, so that we can send it and honour a request to stop.",
       "Reports. If someone reports a page, we keep the reason, what they wrote and the contact they chose to give.",
+      "Support payments. If you choose to support MadeForYou, you pay through your own UPI app. We never see your bank details. We only see what appears on a bank statement, such as your name or UPI ID and the amount, and we use it only to say thank you.",
       "Visitor addresses. To stop spam and guessing of passwords we use a visitor's internet address, but we keep it only in a scrambled form that cannot be turned back into the address.",
     ] },
     { h: "3. Who can see your pages", p: ["A page can be opened by anyone who has its link, unless you made it private or added a password or a lock. We do not publish a list of pages. Remember that people you share a link with can pass it on, so do not put on a page what you would not want a person with the link to see."] },

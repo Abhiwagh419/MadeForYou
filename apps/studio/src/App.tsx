@@ -14,6 +14,7 @@ import { Status } from "./screens/Status";
 import { Account } from "./screens/Account";
 import { Admin } from "./screens/Admin";
 import { Privacy, Terms } from "./screens/Legal";
+import { Support } from "./screens/Support";
 import { Publish } from "./screens/Publish";
 import { Share } from "./screens/Share";
 import { TemplateFrom } from "./screens/TemplateFrom";
@@ -108,6 +109,7 @@ export function App() {
     case "privacy": screen = <Privacy />; break;
     case "account": screen = <Account />; break;
     case "admin": screen = <Admin />; break;
+    case "support": screen = <Support />; break;
     case "inbox": screen = <Inbox />; break;
     case "contribute": screen = <Contribute />; break;
     case "view": screen = <Viewer />; break;

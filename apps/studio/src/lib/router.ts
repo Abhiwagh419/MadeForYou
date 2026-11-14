@@ -23,6 +23,7 @@ const TABLE: [string, RegExp, string[]][] = [
   ["privacy", /^\/privacy\/?$/, []],
   ["account", /^\/account\/?$/, []],
   ["admin", /^\/admin\/?$/, []],
+  ["support", /^\/support\/?$/, []],
 ];
 
 export function parseHash(hash: string): Route {

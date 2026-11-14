@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BRAND } from "@madeforyou/ui";
 import { useSession } from "../lib/auth";
+import { supportUpi } from "../lib/config";
 import { useStore } from "../state/store";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
@@ -41,6 +42,7 @@ export function Footer() {
         <div className="footer-right">
           <p className="footer-note">Free for everyone. No ads, no watermarks you cannot remove, no card needed.</p>
           <nav className="footer-links" aria-label="About and legal">
+            {supportUpi() && <a href="#/support" className="footer-support">Support us</a>}
             <a href="#/terms">Terms</a>
             <a href="#/privacy">Privacy</a>
             <a href={`mailto:${BRAND.contactEmail}`}>Contact</a>

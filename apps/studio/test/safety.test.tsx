@@ -8,6 +8,8 @@ import { App } from "../src/App";
 import { apiRaw, setTokenGetter } from "../src/lib/api";
 import { AuthProvider } from "../src/lib/auth";
 import { LEGAL_UPDATED, PRIVACY, TERMS } from "../src/lib/legal";
+import { upiUri } from "../src/lib/support";
+import { supportUpi } from "../src/lib/config";
 import { authRetry, publishRemote } from "../src/lib/sync";
 import { createPage, getState, resetStore } from "../src/state/store";
 
@@ -208,5 +210,67 @@ describe("the site owner's review page", () => {
     expect((await row("SELECT status, taken_down_at FROM pages")).status).toBe("draft");
     expect((await apiRaw("/p/priya", { auth: false })).status).toBe(404);
     expect(text()).toContain("Nothing waiting");
+  });
+});
+
+describe("Support us", () => {
+  it("builds a UPI link that apps understand", () => {
+    expect(upiUri("abhi@okbank")).toBe("upi://pay?pa=abhi@okbank&pn=Abhishek%20Wagh&cu=INR&tn=MadeForYou%20support");
+    expect(upiUri("abhi@okbank", 50)).toContain("&am=50.00");
+    expect(upiUri("abhi@okbank", 0)).not.toContain("am=");
+  });
+
+  it("is hidden until a valid UPI ID is set", async () => {
+    for (const bad of ["", "   ", "not a upi id", "a@b", "x@y z", "<script>@evil"]) {
+      vi.stubEnv("VITE_SUPPORT_UPI", bad);
+      expect(supportUpi()).toBe("");
+    }
+    vi.stubEnv("VITE_SUPPORT_UPI", " abhi.wagh-1@okhdfcbank ");
+    expect(supportUpi()).toBe("abhi.wagh-1@okhdfcbank");
+
+    vi.stubEnv("VITE_SUPPORT_UPI", "");
+    await visit("#/templates");
+    expect(qa(".footer-links a").map((a) => a.textContent)).not.toContain("Support us");
+    await act(async () => { window.location.hash = "#/support"; });
+    await settle(60);
+    expect(text()).toContain("not switched on yet");
+  });
+
+  it("shows the footer link and a page with a QR code, the ID and one-tap amounts", async () => {
+    vi.stubEnv("VITE_SUPPORT_UPI", "abhi@okbank");
+    await visit("#/templates");
+    const link = qa(".footer-links a").find((a) => a.textContent === "Support us");
+    expect(link?.getAttribute("href")).toBe("#/support");
+
+    await act(async () => { window.location.hash = "#/support"; });
+    await settle(150);
+    expect(q("h1")?.textContent).toContain("helped you, you can say thanks");
+    expect(text()).toContain("completely fine"); // it never pressures anyone
+    expect(text()).toContain("abhi@okbank");
+    expect(q(".support-qr img")?.getAttribute("src")).toMatch(/^data:image\/svg\+xml/);
+    const pay = () => button("Pay with a UPI app") as HTMLAnchorElement;
+    expect(pay().getAttribute("href")).toBe("upi://pay?pa=abhi@okbank&pn=Abhishek%20Wagh&cu=INR&tn=MadeForYou%20support");
+
+    await act(async () => button("\u20b950").click());
+    await settle(100);
+    expect(pay().getAttribute("href")).toContain("am=50.00");
+    expect(button("\u20b950").getAttribute("aria-pressed")).toBe("true");
+    await act(async () => button("Any amount").click());
+    expect(pay().getAttribute("href")).not.toContain("am=");
+  });
+
+  it("is mentioned, quietly, once a page has been shared", async () => {
+    vi.stubEnv("VITE_SUPPORT_UPI", "abhi@okbank");
+    const rec = await publishParty();
+    await visit(`#/share/${rec.id}`, "abhi");
+    await settle(200);
+    expect(text()).toContain("Did MadeForYou help you today?");
+    expect(q(".support-nudge a")?.getAttribute("href")).toBe("#/support");
+  });
+
+  it("is explained in the Terms and the Privacy page", () => {
+    expect(JSON.stringify(TERMS)).toContain("voluntary gift");
+    expect(JSON.stringify(PRIVACY)).toContain("Support payments");
+    expect(JSON.stringify(PRIVACY)).toContain("never see your bank details");
   });
 });
