@@ -36,7 +36,12 @@ beforeEach(() => {
   vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "");
   env = makeEnv();
   const app = createApp();
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => app.request(typeof input === "string" ? input : (input as Request).url, init, env)) as typeof fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : (input as Request).url;
+    // Cloudflare's own check: accept the token "good" and nothing else
+    if (url.includes("challenges.cloudflare.com/turnstile/v0/siteverify")) return new Response(JSON.stringify({ success: new URLSearchParams(String(init?.body)).get("response") === "good" }));
+    return app.request(url, init, env);
+  }) as typeof fetch;
   URL.createObjectURL = () => "blob:test";
   localStorage.clear();
   sessionStorage.clear();
@@ -301,5 +306,76 @@ describe("Signing in stays on our site", () => {
   it("shows a clear message where sign-in is not set up", async () => {
     await visit("/sign-in");
     expect(text()).toContain("Signing in is not switched on here");
+  });
+});
+
+describe("The spam check on guest forms", () => {
+  const KEY = "1x00000000000000000000AA"; // Cloudflare's test key
+  let rendered: Record<string, any>[] = [];
+  const fakeTurnstile = (answer: "pass" | "fail") => {
+    rendered = [];
+    window.turnstile = {
+      render: (_el, opts) => { rendered.push(opts); return `w${rendered.length}`; },
+      execute: () => { setTimeout(() => (answer === "pass" ? rendered.at(-1)!.callback("good") : rendered.at(-1)!["error-callback"]()), 5); },
+      remove: () => {},
+    };
+  };
+  afterEach(() => { delete window.turnstile; document.getElementById("mfy-turnstile")?.remove(); });
+
+  const sendReport = async () => {
+    await publishParty();
+    setTokenGetter(async () => null);
+    await visit("/p/priya");
+    await act(async () => button("Report this page").click());
+    await act(async () => (document.body.querySelector('input[name="reason"][value="spam"]') as HTMLInputElement).click());
+    await act(async () => (button("Send report") as HTMLButtonElement).click());
+  };
+
+  it("is off, and invisible, until a site key is set", async () => {
+    expect((await import("../src/lib/config")).turnstileSiteKey()).toBe("");
+    const { humanToken } = await import("../src/lib/turnstile");
+    expect(await humanToken()).toBeUndefined();
+  });
+
+  it("rejects a malformed site key", async () => {
+    const { turnstileSiteKey } = await import("../src/lib/config");
+    for (const bad of ["short", "has spaces in it!!", "<script>alert(1)</script>"]) { vi.stubEnv("VITE_TURNSTILE_SITE_KEY", bad); expect(turnstileSiteKey()).toBe(""); }
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", ` ${KEY} `);
+    expect(turnstileSiteKey()).toBe(KEY);
+  });
+
+  it("lets a real person through: the token goes to the server, which checks it", async () => {
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", KEY);
+    env = makeEnv({ TURNSTILE_SECRET: "ts-secret" });
+    fakeTurnstile("pass");
+    await sendReport();
+    await until(() => document.body.textContent!.includes("Thank you. We have your report"));
+    expect(document.body.textContent).toContain("Thank you. We have your report");
+    expect(rendered[0]).toMatchObject({ sitekey: KEY, execution: "execute", appearance: "interaction-only" });
+    expect((await row("SELECT COUNT(*) AS n FROM reports")).n).toBe(1);
+  });
+
+  it("stops a visitor who cannot be confirmed, and says so in plain words", async () => {
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", KEY);
+    env = makeEnv({ TURNSTILE_SECRET: "ts-secret" });
+    fakeTurnstile("fail");
+    await sendReport();
+    await until(() => document.body.textContent!.includes("could not confirm you are a person"));
+    expect(document.body.textContent).toContain("We could not confirm you are a person");
+    expect((await row("SELECT COUNT(*) AS n FROM reports")).n).toBe(0);
+  });
+
+  it("shows the box only if Cloudflare needs the person to tick something", async () => {
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", KEY);
+    fakeTurnstile("pass");
+    const { humanToken } = await import("../src/lib/turnstile");
+    const pending = humanToken();
+    await act(async () => { await new Promise((r) => setTimeout(r, 1)); });
+    const holder = document.getElementById("mfy-turnstile")!;
+    expect(holder.style.display).toBe("none");
+    rendered[0]!["before-interactive-callback"]();
+    expect(holder.style.display).toBe("block");
+    expect(await pending).toBe("good");
+    expect(holder.style.display).toBe("none");
   });
 });

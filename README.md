@@ -21,7 +21,7 @@ Needs Node 20+ and pnpm 9 (`npm i -g pnpm@9`).
 
 ```
 pnpm install
-pnpm test          # all tests (437)
+pnpm test          # all tests (446)
 pnpm typecheck
 pnpm studio        # the website, in local mode (see below)
 ```
@@ -73,7 +73,7 @@ Everything is run in PowerShell, in `apps\studio`, after `pnpm install` in the p
 | `CLERK_SECRET_KEY` | optional | Lets the server find an owner's email for "ends soon", and remove the Clerk login when an account is deleted |
 | `REPORT_EMAIL` | optional | Where "page reported" notes go. Default: `MAIL_FROM` |
 | `PUBLIC_URL` | recommended | Your main address, e.g. `https://madeforyou-9pj.pages.dev`. Used in email links so they never show a one-off deploy address |
-| `TURNSTILE_SECRET` | optional | Cloudflare Turnstile (free) as an extra spam check on guest forms |
+| `TURNSTILE_SECRET` | optional | Cloudflare Turnstile secret key. With `VITE_TURNSTILE_SITE_KEY` it switches on the spam check (see below). Set both together |
 
 Never commit secrets, and never paste them into chats. Paste them only into the prompt.
 
@@ -84,9 +84,10 @@ This file is not committed (it is ignored by git). Vite reads it when building.
 ```
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 VITE_SUPPORT_UPI=yourname@yourbank
+VITE_TURNSTILE_SITE_KEY=0x4AAAA...
 ```
 
-`VITE_SUPPORT_UPI` is optional. Leave it out and every "Support us" button stays hidden. Use a name-based UPI ID, not one made of your mobile number: it is shown to everyone, and an ID that is a phone number is refused on purpose. If the page shows an old value after a redeploy, see "The Support button shows an old UPI ID" under Troubleshooting. With GitHub Actions, put the same two values in the repository's secrets/variables (`VITE_CLERK_PUBLISHABLE_KEY` as a secret, `VITE_SUPPORT_UPI` as a variable).
+`VITE_SUPPORT_UPI` is optional. Leave it out and every "Support us" button stays hidden. `VITE_TURNSTILE_SITE_KEY` is optional too; leave it out and the spam check is off. Use a name-based UPI ID, not one made of your mobile number: it is shown to everyone, and an ID that is a phone number is refused on purpose. If the page shows an old value after a redeploy, see "The Support button shows an old UPI ID" under Troubleshooting. With GitHub Actions, put the same two values in the repository's secrets/variables (`VITE_CLERK_PUBLISHABLE_KEY` as a secret, `VITE_SUPPORT_UPI` and `VITE_TURNSTILE_SITE_KEY` as variables).
 
 ### The scheduler (needed for email and clean-up)
 
@@ -104,6 +105,18 @@ Each run: sends due emails, then removes pages deleted more than 30 days ago, ph
 ### Photos
 
 Photos live in the database by default (25 MB per person; the free database holds 500 MB in total). To use R2 instead (Cloudflare asks for a card), uncomment the bucket lines in `wrangler.toml`.
+
+## Spam check on guest forms (Turnstile, free)
+
+Wishes, replies, RSVPs, contributor wishes and "Report this page" can be protected by Cloudflare Turnstile. It is almost always invisible; it shows a tick box only when Cloudflare is unsure, and says "We could not confirm you are a person" if the check fails.
+
+1. Cloudflare dashboard, **Turnstile**, **Add widget**. Name it MadeForYou, add the hostname of your site (for example `madeforyou-9pj.pages.dev`; its subdomains are covered), choose the **Managed** mode.
+2. Copy the **Site key** (public) and the **Secret key** (private).
+3. Put the site key in `apps/studio/.env.production` as `VITE_TURNSTILE_SITE_KEY=...`.
+4. Set the secret: `pnpm exec wrangler pages secret put TURNSTILE_SECRET --project-name madeforyou`.
+5. `pnpm run cf:deploy`, then post a test wish from a private window.
+
+Set the site key and the secret in the same deploy: the server starts demanding the check as soon as it has the secret. To switch it off, delete the secret (`wrangler pages secret delete TURNSTILE_SECRET --project-name madeforyou`) and redeploy. For a dry run, Cloudflare publishes test keys (site key `1x00000000000000000000AA` always passes, secret `1x0000000000000000000000000000000AA`). If real guests are refused, check that the widget's hostname list matches your address. Visitors with an ad blocker that blocks `challenges.cloudflare.com` cannot post.
 
 ## Email
 
@@ -162,14 +175,13 @@ Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE
 - **Link previews**: `/p/<link>` is rendered by `functions/p/[slug].ts`, which fills in the WhatsApp card. Locked, private and password pages show a generic card.
 - **Database changes** are numbered files in `packages/api/migrations/`; `cf:deploy` applies them. Never edit an old one: add the next number.
 - **Links** are stored only as https, http, mailto or tel; videos only as provider + id. YouTube loads only when tapped.
-- **Spam protection on guest forms** needs no extra service: the guest must have opened the page, a hidden field catches bots, forms filled in under 1.5 seconds are refused, 5 messages per visitor per 10 minutes, 40 per page per hour, 400 per page.
-- **Tests**: `pnpm test` runs 437 tests across schema, templates, renderer, api and studio. The studio tests run the real server in-process, so they cover whole journeys (publish, report, delete account, support).
+- **Spam protection on guest forms** works without any service: the guest must have opened the page, a hidden field catches bots, forms filled in under 1.5 seconds are refused, 5 messages per visitor per 10 minutes, 40 per page per hour, 400 per page. Turnstile (above) adds a stronger check on top.
+- **Tests**: `pnpm test` runs 446 tests across schema, templates, renderer, api and studio. The studio tests run the real server in-process, so they cover whole journeys (publish, report, delete account, support).
 
 ## Not done yet
 
 - Real-phone testing across Android and iPhone Safari (voice notes, crop dragging, story picture, the three themes' fonts).
 - Clerk production mode and a domain (Clerk production needs a domain you own). Until then Clerk runs in development mode, which is fine for a small beta.
-- Turnstile is optional and off until `TURNSTILE_SECRET` is set.
 - Fonts load from Google Fonts; self-host them for a faster, more private production site.
 - The Content-Security-Policy in `apps/studio/public/_headers` is report-only. Check the browser console on the live site, then rename it to `Content-Security-Policy` to enforce it.
 - Renderer UI words (countdown labels, form labels) are in `packages/renderer/src/labels.ts`; text a user writes has no Hindi version unless they add one.

@@ -16,3 +16,9 @@ export const supportUpi = (): string => {
 
 /** Where Clerk may send people when it needs a full page. They are pages of OUR site, so nobody lands on Clerk's own hosted page. */
 export const CLERK_ROUTES = { signInUrl: "/sign-in", signUpUrl: "/sign-up", after: "/" } as const;
+
+/** The public Cloudflare Turnstile site key, from VITE_TURNSTILE_SITE_KEY. Empty means the spam check is off. */
+export const turnstileSiteKey = (): string => {
+  const v = ((import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) ?? "").trim();
+  return /^[0-9A-Za-z_-]{10,64}$/.test(v) ? v : "";
+};

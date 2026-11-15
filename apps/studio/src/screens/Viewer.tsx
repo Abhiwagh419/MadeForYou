@@ -6,6 +6,7 @@ import { apiRaw } from "../lib/api";
 import { useAssets } from "../lib/assets";
 import { isRemote } from "../lib/config";
 import { useRoute } from "../lib/router";
+import { checkHuman } from "../lib/turnstile";
 import { sha256 } from "../lib/util";
 import { useStore, type PageRecord } from "../state/store";
 import { Button } from "../ui/Button";
@@ -122,7 +123,9 @@ function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: 
     wishes: v.wishes ?? {},
     canRemind: !!v.canRemind,
     submit: async (blockId, kind, payload, extra) => {
-      const r = await apiRaw(`/p/${slug}/submit`, { json: { token: v.assetToken, blockId, kind, payload, ...extra } });
+      const human = await checkHuman();
+      if (!human.ok) return { ok: false, error: human.error };
+      const r = await apiRaw(`/p/${slug}/submit`, { json: { token: v.assetToken, blockId, kind, payload, ...extra, ...(human.token ? { turnstile: human.token } : {}) } });
       return r.status === 200 ? { ok: true, status: r.data?.status } : { ok: false, error: r.data?.error ?? "Something went wrong. Please try again." };
     },
   }), [v.wishes, v.canRemind, v.assetToken, slug]);

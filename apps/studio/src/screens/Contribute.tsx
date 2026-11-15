@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { BRAND, themeToCssVars } from "@madeforyou/ui";
 import { apiRaw } from "../lib/api";
 import { useRoute } from "../lib/router";
+import { checkHuman } from "../lib/turnstile";
 import { Button } from "../ui/Button";
 import { Mark } from "../ui/Logo";
 
@@ -35,7 +36,9 @@ export function Contribute() {
     setState("sending");
     setError("");
     try {
-      const r = await apiRaw(`/c/${slug}/submit?k=${encodeURIComponent(k)}`, { auth: false, json: { payload: { name, message }, website, elapsedMs: Date.now() - started.current } });
+      const human = await checkHuman();
+      if (!human.ok) { setError(human.error); setState("idle"); return; }
+      const r = await apiRaw(`/c/${slug}/submit?k=${encodeURIComponent(k)}`, { auth: false, json: { payload: { name, message }, website, elapsedMs: Date.now() - started.current, ...(human.token ? { turnstile: human.token } : {}) } });
       if (r.status === 200) { setStatus(r.data.status); setState("done"); return; }
       setError(r.data?.error ?? "Something went wrong. Please try again.");
     } catch {

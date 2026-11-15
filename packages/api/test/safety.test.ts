@@ -15,6 +15,7 @@ const ADMIN = { "x-admin-token": "admin-token-123" };
 const fetchStub = (async (url: string, init: RequestInit) => {
   const u = String(url);
   if (u.startsWith("https://api.brevo.com/")) { brevo.push(JSON.parse(String(init.body))); return new Response("{}", { status: 201 }); }
+  if (u.startsWith("https://challenges.cloudflare.com/turnstile/v0/siteverify")) return new Response(JSON.stringify({ success: new URLSearchParams(String(init.body)).get("response") === "good" }), { status: 200 });
   if (u.startsWith("https://api.clerk.com/v1/users/") && init?.method === "DELETE") { clerkDeletes.push(u); return new Response("{}", { status: 200 }); }
   return new Response("{}", { status: 404 });
 }) as unknown as typeof fetch;
@@ -78,6 +79,15 @@ describe("reporting a page", () => {
     const same = { "cf-connecting-ip": "9.9.9.9" };
     for (let i = 0; i < 5; i++) expect((await call("POST", "/p/priya/report", { json: { reason: "spam" }, headers: same })).status).toBe(200);
     expect((await call("POST", "/p/priya/report", { json: { reason: "spam" }, headers: same })).status).toBe(429);
+  });
+  it("asks for the spam check when it is switched on", async () => {
+    boot({ TURNSTILE_SECRET: "ts-secret" });
+    await publish();
+    expect((await report({ reason: "spam" })).status).toBe(403);
+    expect((await report({ reason: "spam", turnstile: "bad" })).status).toBe(403);
+    expect(await open()).toHaveLength(0);
+    expect((await report({ reason: "spam", turnstile: "good" })).status).toBe(200);
+    expect(await open()).toHaveLength(1);
   });
   it("emails the site owner when email is on, and still saves it when it is off", async () => {
     boot({ BREVO_API_KEY: "k", MAIL_FROM: "owner@example.com", REPORT_EMAIL: "wabhi2009@gmail.com" });

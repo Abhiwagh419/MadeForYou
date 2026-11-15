@@ -59,6 +59,7 @@ export const PRIVACY: Legal = {
       "Cloudflare hosts the website and keeps the database and the files. Their servers may be outside India.",
       "Clerk handles signing in.",
       "Brevo sends emails when you or a guest ask for one. It receives the address and the message.",
+      "Cloudflare Turnstile checks that a visitor is a real person before a guest message or a report is sent. It looks at the visitor's browser and internet address to decide.",
       "Google Fonts supplies the lettering. When a page loads, the visitor's browser asks Google for the font files.",
       "If a page includes a YouTube, Vimeo, Spotify or OpenStreetMap item, the visitor's browser connects to that company when it loads. We use YouTube's privacy-enhanced mode.",
     ] },

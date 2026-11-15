@@ -494,8 +494,9 @@ export function createApp(overrides: Partial<Deps> = {}) {
   app.post("/p/:slug/report", async (c) => {
     const r = await publicRow(c, c.req.param("slug"));
     if (!r || r.visibility === "private") throw new HttpError(404, "Page not found");
-    const b = await readJson<{ reason?: unknown; details?: unknown; contact?: unknown; website?: unknown }>(c);
+    const b = await readJson<{ reason?: unknown; details?: unknown; contact?: unknown; website?: unknown; turnstile?: unknown }>(c);
     if (typeof b.website === "string" && b.website !== "") return c.json({ ok: true }); // a bot filled the hidden field
+    if (!(await verifyTurnstile(c, b.turnstile))) throw new HttpError(403, "We could not confirm you are a person. Please try again.");
     const reason = (REASONS as readonly string[]).includes(String(b.reason)) ? (b.reason as (typeof REASONS)[number]) : null;
     if (!reason) throw new HttpError(400, "Choose what is wrong with the page");
     const tidy = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max) : "");

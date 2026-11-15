@@ -21,6 +21,7 @@ jobs:
           VITE_REMOTE: "1"
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_SUPPORT_UPI: ${{ vars.VITE_SUPPORT_UPI }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
 
   deploy:
     needs: test
@@ -39,6 +40,7 @@ jobs:
           VITE_REMOTE: "1"
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_SUPPORT_UPI: ${{ vars.VITE_SUPPORT_UPI }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       - name: Apply database migrations
         uses: cloudflare/wrangler-action@v3
         with:

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BRAND } from "@madeforyou/ui";
 import { apiRaw } from "../lib/api";
+import { checkHuman } from "../lib/turnstile";
 import { Button } from "./Button";
 import { Sheet } from "./Controls";
 
@@ -24,7 +25,9 @@ export function ReportDialog({ slug, onClose }: { slug: string; onClose: () => v
   const send = async () => {
     setState("sending");
     setError("");
-    const r = await apiRaw(`/p/${slug}/report`, { json: { reason, details, contact, website }, auth: false }).catch(() => null);
+    const human = await checkHuman();
+    if (!human.ok) { setError(human.error); setState("form"); return; }
+    const r = await apiRaw(`/p/${slug}/report`, { json: { reason, details, contact, website, ...(human.token ? { turnstile: human.token } : {}) }, auth: false }).catch(() => null);
     if (r && r.status === 200) setState("done");
     else {
       setError(r?.data?.error ?? "We could not send it. Please try again.");
