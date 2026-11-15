@@ -82,6 +82,8 @@ async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
 }
 async function submit(form: Element) {
   await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 60)); });
+  // a slow computer takes longer: wait for the answer (thanks or an error) instead of guessing how long it takes
+  for (let i = 0; i < 200 && !q(".mfy-thanks") && !q(".mfy-form-error") && !text().includes("Thank you"); i++) await act(async () => { await new Promise((r) => setTimeout(r, 25)); });
 }
 
 async function publishParty() {

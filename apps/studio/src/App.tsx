@@ -12,6 +12,7 @@ import { Home } from "./screens/Home";
 import { Inbox } from "./screens/Inbox";
 import { Status } from "./screens/Status";
 import { Account } from "./screens/Account";
+import { AuthPage } from "./screens/AuthPage";
 import { Admin } from "./screens/Admin";
 import { Privacy, Terms } from "./screens/Legal";
 import { Support } from "./screens/Support";
@@ -110,6 +111,8 @@ export function App() {
     case "account": screen = <Account />; break;
     case "admin": screen = <Admin />; break;
     case "support": screen = <Support />; break;
+    case "signin": screen = <AuthPage mode="in" />; break;
+    case "signup": screen = <AuthPage mode="up" />; break;
     case "inbox": screen = <Inbox />; break;
     case "contribute": screen = <Contribute />; break;
     case "view": screen = <Viewer />; break;

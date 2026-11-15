@@ -54,6 +54,11 @@ afterEach(async () => {
   window.history.pushState({}, "", "/");
 });
 
+/** Waits until something is true (up to 6 s) instead of guessing how long a slow computer needs. */
+async function until(cond: () => boolean | Promise<boolean>, ms = 6000) {
+  const end = Date.now() + ms;
+  while (!(await cond()) && Date.now() < end) await act(async () => { await new Promise((r) => setTimeout(r, 25)); });
+}
 const settle = (ms = 120) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 async function visit(url: string, user?: string) {
   if (user) localStorage.setItem("mfy:dev-user", user);
@@ -135,7 +140,7 @@ describe("Report this page", () => {
     await act(async () => (document.body.querySelector('input[name="reason"][value="spam"]') as HTMLInputElement).click());
     await type(document.body.querySelector(".report textarea") as HTMLTextAreaElement, "Sells things");
     await act(async () => (button("Send report") as HTMLButtonElement).click());
-    await settle(150);
+    await until(() => document.body.textContent!.includes("Thank you. We have your report"));
     expect(document.body.textContent).toContain("Thank you. We have your report");
     expect(await row("SELECT reason, details, slug, status FROM reports")).toEqual({ reason: "spam", details: "Sells things", slug: "priya", status: "open" });
 
@@ -163,7 +168,7 @@ describe("Delete my account and all my data", () => {
     await type(input, "delete");
     expect(confirmBtn().disabled).toBe(false);
     await submit(document.body.querySelector(".sheet form")!);
-    await settle(250);
+    await until(async () => (await row("SELECT COUNT(*) AS n FROM pages")).n === 0 && window.location.hash === "#/");
 
     expect((await row("SELECT COUNT(*) AS n FROM pages")).n).toBe(0);
     expect((await row("SELECT COUNT(*) AS n FROM users")).n).toBe(0);
@@ -206,7 +211,8 @@ describe("the site owner's review page", () => {
     expect(text()).toContain("a@b.com");
 
     await act(async () => button("Take the page down").click());
-    await settle(200);
+    await until(async () => (await row("SELECT status FROM pages")).status === "draft");
+    await settle(150);
     expect((await row("SELECT status, taken_down_at FROM pages")).status).toBe("draft");
     expect((await apiRaw("/p/priya", { auth: false })).status).toBe(404);
     expect(text()).toContain("Nothing waiting");
@@ -223,6 +229,11 @@ describe("Support us", () => {
   it("is hidden until a valid UPI ID is set", async () => {
     for (const bad of ["", "   ", "not a upi id", "a@b", "x@y z", "<script>@evil"]) {
       vi.stubEnv("VITE_SUPPORT_UPI", bad);
+      expect(supportUpi()).toBe("");
+    }
+    // an ID made of a mobile number would publish that number, so it is never shown
+    for (const phone of ["9876543210@ybl", "919876543210@ybl", "+919876543210@okbank"]) {
+      vi.stubEnv("VITE_SUPPORT_UPI", phone);
       expect(supportUpi()).toBe("");
     }
     vi.stubEnv("VITE_SUPPORT_UPI", " abhi.wagh-1@okhdfcbank ");
@@ -272,5 +283,23 @@ describe("Support us", () => {
     expect(JSON.stringify(TERMS)).toContain("voluntary gift");
     expect(JSON.stringify(PRIVACY)).toContain("Support payments");
     expect(JSON.stringify(PRIVACY)).toContain("never see your bank details");
+  });
+});
+
+describe("Signing in stays on our site", () => {
+  it("has its own /sign-in and /sign-up pages, whatever Clerk puts after the #", async () => {
+    const { parseLocation } = await import("../src/lib/router");
+    expect(parseLocation("/sign-in", "").name).toBe("signin");
+    expect(parseLocation("/sign-in/", "#/sso-callback").name).toBe("signin");
+    expect(parseLocation("/sign-up", "#/continue").name).toBe("signup");
+    expect(parseLocation("/", "#/me").name).toBe("me"); // the studio's own routes are untouched
+  });
+  it("points Clerk at those pages, never at Clerk's hosted ones", async () => {
+    const { CLERK_ROUTES } = await import("../src/lib/config");
+    expect(CLERK_ROUTES).toEqual({ signInUrl: "/sign-in", signUpUrl: "/sign-up", after: "/" });
+  });
+  it("shows a clear message where sign-in is not set up", async () => {
+    await visit("/sign-in");
+    expect(text()).toContain("Signing in is not switched on here");
   });
 });

@@ -143,14 +143,16 @@ describe("browser and server together", () => {
     await visit("/p/priya");
     expect(text()).toContain("Enter the password");
     expect(wire.join("\n")).not.toContain(SECRET_TEXT);
-    const submit = async (pw: string) => {
+    const submit = async (pw: string, done: () => boolean) => {
       await type(q('input[aria-label="Password"]') as HTMLInputElement, pw);
-      await act(async () => { q("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 40)); });
+      await act(async () => { q("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+      // checking a password is deliberately slow on the server; wait for the answer instead of guessing how long it takes
+      for (let i = 0; i < 200 && !done(); i++) await act(async () => { await new Promise((r) => setTimeout(r, 25)); });
     };
-    await submit("nope-nope");
+    await submit("nope-nope", () => text().includes("not the password"));
     expect(text()).toContain("not the password");
     expect(wire.join("\n")).not.toContain(SECRET_TEXT);
-    await submit("zq7-secret");
+    await submit("zq7-secret", () => !!q(".mfy-page"));
     expect(q(".mfy-page")).toBeTruthy();
   });
 

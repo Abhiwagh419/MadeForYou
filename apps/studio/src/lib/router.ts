@@ -49,6 +49,9 @@ const subscribe = (cb: () => void) => {
 export function parseLocation(pathname: string, hash: string, search = ""): Route {
   const m = pathname.match(/^\/p\/([\w-]+)\/?$/);
   if (m) return { name: "view", params: { slug: m[1]! }, query: new URLSearchParams() };
+  // Clerk's full-page forms. Clerk puts its own steps after a # (for example #/sso-callback), so the hash is ignored here.
+  if (/^\/sign-in\/?$/.test(pathname)) return { name: "signin", params: {}, query: new URLSearchParams() };
+  if (/^\/sign-up\/?$/.test(pathname)) return { name: "signup", params: {}, query: new URLSearchParams() };
   const c = pathname.match(/^\/c\/([\w-]+)\/?$/);
   if (c) return { name: "contribute", params: { slug: c[1]! }, query: new URLSearchParams(search) };
   return parseHash(hash);

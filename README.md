@@ -86,7 +86,7 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 VITE_SUPPORT_UPI=yourname@yourbank
 ```
 
-`VITE_SUPPORT_UPI` is optional. Leave it out and every "Support us" button stays hidden. With GitHub Actions, put the same two values in the repository's secrets/variables (`VITE_CLERK_PUBLISHABLE_KEY` as a secret, `VITE_SUPPORT_UPI` as a variable).
+`VITE_SUPPORT_UPI` is optional. Leave it out and every "Support us" button stays hidden. Use a name-based UPI ID, not one made of your mobile number: it is shown to everyone, and an ID that is a phone number is refused on purpose. If the page shows an old value after a redeploy, see "The Support button shows an old UPI ID" under Troubleshooting. With GitHub Actions, put the same two values in the repository's secrets/variables (`VITE_CLERK_PUBLISHABLE_KEY` as a secret, `VITE_SUPPORT_UPI` as a variable).
 
 ### The scheduler (needed for email and clean-up)
 
@@ -147,8 +147,10 @@ Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE
 
 - **Sign-in works but saving says "please sign in"**: the site shows a banner explaining why (it calls `/api/diag`). Usually `CLERK_ISSUER` or `CLERK_JWKS_URL` belongs to a different Clerk application than the publishable key, or secrets were set after the last deploy. Run `pnpm run cf:deploy` again. Stray spaces, newlines and trailing slashes are ignored.
 - **"database_id" error when deploying**: `wrangler.toml` must hold the 36-character id of your database (not a URL). `pnpm run cf:deploy` fills it in; by hand, `pnpm exec wrangler d1 list` prints it.
+- **Sign-in sends people to a Clerk page (`accounts.dev`)**: sign-in is meant to stay on your site. The "Sign in" button opens a popup on the page; Google opens in a small window on computers (on phones the page goes to Google and comes back, because phone browsers handle popups badly). If Clerk ever needs a full page it uses `/sign-in` and `/sign-up` on your own address (the settings are in `apps/studio/src/lib/ClerkBridge.tsx` and `CLERK_ROUTES` in `config.ts`; `public/_redirects` makes those two addresses open the app). In the Clerk dashboard, under Configure, Paths, you can also set the sign-in and sign-up URLs to those same two pages.
 - **An email did not arrive**: check spam first; check `https://YOUR-SITE/api/mail/status`; look at the Brevo dashboard, Transactional, Logs; on the Share screen a failed email shows the reason.
 - **Reminders and scheduled emails never go out**: the scheduler is not running or its secret differs (see "The scheduler").
+- **The Support button shows an old UPI ID**: the ID is baked in when the site is built. (1) Check which file sets it: in `apps\studio` run `Get-ChildItem -Force -Filter ".env*"`; Vite reads `.env`, `.env.local`, `.env.production` and `.env.production.local`, and a later one wins. (2) A PowerShell variable beats every file: `$env:VITE_SUPPORT_UPI` must print nothing (clear it with `Remove-Item Env:VITE_SUPPORT_UPI`). (3) Rebuild and check the result before deploying: `pnpm build`, then `Get-ChildItem dist\assets\*.js | Where-Object { Select-String -Path $_.FullName -Pattern "@oldbank" -Quiet }` lists nothing once the old ID is gone. (4) Open the **main** address in a private window. Every deploy also keeps its own one-off address (`https://1a2b3c4d.madeforyou-xxxx.pages.dev`) frozen on the build it was made from, so an old link keeps showing the old ID. To remove those: Cloudflare dashboard, Workers & Pages, madeforyou, Deployments, delete the old ones.
 - **The Support button is missing**: `VITE_SUPPORT_UPI` is empty or not a valid UPI ID, or the site was not rebuilt after you set it.
 
 ## For developers
