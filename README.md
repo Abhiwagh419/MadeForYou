@@ -21,7 +21,7 @@ Needs Node 20+ and pnpm 9 (`npm i -g pnpm@9`).
 
 ```
 pnpm install
-pnpm test          # all tests (446)
+pnpm test          # all tests (450)
 pnpm typecheck
 pnpm studio        # the website, in local mode (see below)
 ```
@@ -123,7 +123,7 @@ Set the site key and the secret in the same deploy: the server starts demanding 
 Sent through Brevo's free plan (300 a day, no card). Email stays off until `BREVO_API_KEY` and `MAIL_FROM` are set; reminders and "ends soon" also need the scheduler.
 
 1. **A page sent to someone on a date**: Share screen, "Send it by email". Now or on a date you pick. 5 people per page, 10 a day per owner.
-2. **One reminder for guests** who add an email on the RSVP: a day before the event. The address is kept only for that, and only for guests who said yes or maybe. The page's owner can see it.
+2. **One reminder for guests** who add an email on the RSVP: a day before the event. The address is asked for only for that, and only from guests who said yes or maybe. It stays with the guest's reply, which the page's owner can see, until the reply, the page or the account is deleted.
 3. **"This page ends soon"**: a day before a page's end date, to the owner (needs `CLERK_SECRET_KEY`) and to people the page was emailed to.
 
 Every email has a stop link. It opens a confirmation page (so mail scanners cannot trigger it), and an address that stopped is never emailed again by anyone. The daily total is held under 280.
@@ -176,7 +176,7 @@ Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE
 - **Database changes** are numbered files in `packages/api/migrations/`; `cf:deploy` applies them. Never edit an old one: add the next number.
 - **Links** are stored only as https, http, mailto or tel; videos only as provider + id. YouTube loads only when tapped.
 - **Spam protection on guest forms** works without any service: the guest must have opened the page, a hidden field catches bots, forms filled in under 1.5 seconds are refused, 5 messages per visitor per 10 minutes, 40 per page per hour, 400 per page. Turnstile (above) adds a stronger check on top.
-- **Tests**: `pnpm test` runs 446 tests across schema, templates, renderer, api and studio. The studio tests run the real server in-process, so they cover whole journeys (publish, report, delete account, support).
+- **Tests**: `pnpm test` runs 450 tests across schema, templates, renderer, api and studio. The studio tests run the real server in-process, so they cover whole journeys (publish, report, delete account, support).
 
 ## Not done yet
 

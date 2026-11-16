@@ -362,8 +362,14 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
     for (const p of ending.results ?? []) {
       const endsAt = Date.parse(p.expires_at!);
       const people: { email: string; audience: "owner" | "recipient"; fromName?: string; id: string }[] = [];
-      const rec = await env.DB.prepare("SELECT DISTINCT to_email, from_name FROM deliveries WHERE page_id = ? AND status = 'sent'").bind(p.id).all<{ to_email: string; from_name: string }>();
-      for (const r of rec.results ?? []) people.push({ email: r.to_email, audience: "recipient", fromName: r.from_name, id: r.to_email });
+      // the log key uses the delivery's id, never the address itself, so no email address is left behind in the log
+      const rec = await env.DB.prepare("SELECT id, to_email, from_name FROM deliveries WHERE page_id = ? AND status = 'sent' ORDER BY sent_at").bind(p.id).all<{ id: string; to_email: string; from_name: string }>();
+      const seen = new Set<string>();
+      for (const r of rec.results ?? []) {
+        if (seen.has(r.to_email)) continue; // one reminder per address, even if the page was sent to it twice
+        seen.add(r.to_email);
+        people.push({ email: r.to_email, audience: "recipient", fromName: r.from_name, id: r.id });
+      }
       const owner = await ownerEmail(env, deps, p.owner_id, now);
       if (owner) people.push({ email: owner, audience: "owner", id: "owner" });
       for (const who of people) {

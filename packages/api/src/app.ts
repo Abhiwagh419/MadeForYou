@@ -127,7 +127,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
   app.get("/health", (c) => c.json({ ok: true }));
 
   /** "Why was my sign-in not accepted?" Safe to expose: it only repeats public Clerk addresses. */
-  app.get("/diag", async (c) => c.json(await diagnose(c.req.header("authorization"), c.env, deps)));
+  app.get("/diag", async (c) => c.json({ ...(await diagnose(c.req.header("authorization"), c.env, deps)), secretOk: (c.env.SESSION_SECRET ?? "").length >= 24 }));
 
   /* ------------------------------ owner: pages ------------------------------ */
 
@@ -626,7 +626,13 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (!secret) throw new HttpError(503, "The scheduler is not set up");
     const m = c.req.header("authorization")?.match(/^Bearer\s+(.+)$/i);
     if (!m || !timingSafeEqual(m[1]!.trim(), secret)) throw new HttpError(401, "Not allowed");
-    const cleaned = await purgeOld(c.env, deps.now());
+    let cleaned: unknown;
+    try {
+      cleaned = await purgeOld(c.env, deps.now());
+    } catch (e) {
+      console.error("clean-up failed", e); // a problem here must never hold back the emails
+      cleaned = { error: true };
+    }
     return c.json({ ...(await runTick(c.env, deps, originOf(c))), cleaned });
   });
 
@@ -735,12 +741,18 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ ok: true });
   });
 
-  const admin = (c: Ctx) => {
+  /** The site owner's door. Wrong guesses are counted per visitor, so the token cannot be guessed by trying again and again. */
+  const admin = async (c: Ctx) => {
     const t = c.req.header("x-admin-token") ?? "";
-    if (!c.env.ADMIN_TOKEN || !timingSafeEqual(t, c.env.ADMIN_TOKEN)) throw new HttpError(403, "Not allowed");
+    const key = `adm:${await ipOf(c)}`;
+    await throttle(c, key, 600, 10, false);
+    if (!c.env.ADMIN_TOKEN || !timingSafeEqual(t, c.env.ADMIN_TOKEN)) {
+      await c.env.DB.prepare("INSERT INTO throttle (key, at) VALUES (?, ?)").bind(key, deps.now()).run();
+      throw new HttpError(403, "Not allowed");
+    }
   };
   app.post("/admin/templates/:id/:action", async (c) => {
-    admin(c);
+    await admin(c);
     const action = c.req.param("action");
     if (action !== "approve" && action !== "reject") throw new HttpError(400, "Unknown action");
     const r = await c.env.DB.prepare("UPDATE templates SET status = ? WHERE id = ?").bind(action === "approve" ? "approved" : "rejected", c.req.param("id")).run();
@@ -748,7 +760,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
   });
   /** A quick look at how full the free database is. */
   app.get("/admin/usage", async (c) => {
-    admin(c);
+    await admin(c);
     const one = async (q: string) => (await c.env.DB.prepare(q).first<{ n: number }>())?.n ?? 0;
     return c.json({
       users: await one("SELECT COUNT(*) AS n FROM users"),
@@ -761,7 +773,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
   });
   /** Reports waiting for a decision, grouped by page. */
   app.get("/admin/reports", async (c) => {
-    admin(c);
+    await admin(c);
     const status = c.req.query("status") === "all" ? "all" : "open";
     const { results } = await c.env.DB.prepare(
       `SELECT r.id, r.page_id, r.slug, r.reason, r.details, r.contact, r.status, r.created_at, p.title, p.owner_id, p.status AS page_status, p.taken_down_at,
@@ -775,7 +787,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
 
   /** remove: take the page down (its owner cannot publish it again) and close every open report on it. dismiss: nothing wrong. */
   app.post("/admin/reports/:id/:action", async (c) => {
-    admin(c);
+    await admin(c);
     const action = c.req.param("action");
     if (action !== "remove" && action !== "dismiss") throw new HttpError(400, "Unknown action");
     const rep = await c.env.DB.prepare("SELECT id, page_id, reason FROM reports WHERE id = ?").bind(c.req.param("id")).first<{ id: string; page_id: string; reason: string }>();
@@ -793,13 +805,13 @@ export function createApp(overrides: Partial<Deps> = {}) {
 
   /** Let a page owner publish again after a mistake. */
   app.post("/admin/pages/:id/restore", async (c) => {
-    admin(c);
+    await admin(c);
     const r = await c.env.DB.prepare("UPDATE pages SET taken_down_at = NULL, takedown_reason = NULL WHERE id = ?").bind(c.req.param("id")).run();
     return c.json({ ok: true, changed: r.meta?.changes ?? 0 });
   });
 
   app.get("/admin/templates/pending", async (c) => {
-    admin(c);
+    await admin(c);
     const { results } = await c.env.DB.prepare("SELECT id, owner_id, meta, created_at FROM templates WHERE status = 'pending' ORDER BY created_at").all();
     return c.json({ pending: results ?? [] });
   });

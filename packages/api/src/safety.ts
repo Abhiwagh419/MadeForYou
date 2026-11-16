@@ -62,7 +62,13 @@ export async function purgeOld(env: Env, now: number): Promise<{ pages: number; 
   }
 
   // photos that no page uses any more (a deleted page, a replaced picture) after the same grace period
-  const loose = ((await env.DB.prepare("SELECT id FROM assets a WHERE a.created_at < ? AND NOT EXISTS (SELECT 1 FROM page_assets p WHERE p.asset_id = a.id) LIMIT 50").bind(cutoff).all<{ id: string }>()).results ?? []).map((a) => a.id);
+  // The second check is a safety net: a photo that a live page still mentions is never removed, even if its link was missed.
+  const loose = ((await env.DB.prepare(
+    `SELECT id FROM assets a WHERE a.created_at < ?
+        AND NOT EXISTS (SELECT 1 FROM page_assets p WHERE p.asset_id = a.id)
+        AND NOT EXISTS (SELECT 1 FROM pages g WHERE g.owner_id = a.owner_id AND g.deleted_at IS NULL AND instr(g.content, a.id) > 0)
+      LIMIT 50`,
+  ).bind(cutoff).all<{ id: string }>()).results ?? []).map((a) => a.id);
   await dropFiles(env, loose);
   for (const id of loose) {
     await env.DB.batch([env.DB.prepare("DELETE FROM asset_blobs WHERE id = ?").bind(id), env.DB.prepare("DELETE FROM assets WHERE id = ?").bind(id)]);
@@ -70,5 +76,7 @@ export async function purgeOld(env: Env, now: number): Promise<{ pages: number; 
 
   // reports that have been dealt with are not kept for ever
   const rep = await env.DB.prepare("DELETE FROM reports WHERE status != 'open' AND handled_at IS NOT NULL AND handled_at < ?").bind(iso(now - KEEP_REPORT_DAYS * DAY)).run();
+  // the record of emails already sent is only needed until the thing it guards has passed
+  await env.DB.prepare("DELETE FROM mail_log WHERE at < ?").bind(iso(now - 90 * DAY)).run();
   return { pages: pageCount, photos: loose.length, reports: rep.meta?.changes ?? 0 };
 }

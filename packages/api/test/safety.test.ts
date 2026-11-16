@@ -253,3 +253,53 @@ describe("old deleted data goes after 30 days", () => {
     expect(await count("SELECT COUNT(*) AS n FROM reports")).toBe(0);
   });
 });
+
+describe("review fixes", () => {
+  it("the admin token cannot be guessed by trying again and again", async () => {
+    const same = { "cf-connecting-ip": "7.7.7.7" };
+    for (let i = 0; i < 10; i++) expect((await call("GET", "/admin/reports", { headers: { ...same, "x-admin-token": `guess-${i}` } })).status).toBe(403);
+    // the 11th try is refused outright, even with the right token
+    expect((await call("GET", "/admin/reports", { headers: { ...same, ...ADMIN } })).status).toBe(429);
+    // someone else is not affected, and a correct token from a calm visitor never counts against them
+    for (let i = 0; i < 12; i++) expect((await call("GET", "/admin/reports", { headers: { "cf-connecting-ip": "8.8.8.8", ...ADMIN } })).status).toBe(200);
+  });
+
+  it("says when the signing secret is too short, so the owner can fix it", async () => {
+    expect((await call("GET", "/diag")).json.secretOk).toBe(true);
+    boot({ SESSION_SECRET: "short" });
+    expect((await call("GET", "/diag")).json.secretOk).toBe(false);
+  });
+
+  it("never keeps an email address in the record of sent emails, and forgets old records", async () => {
+    boot({ BREVO_API_KEY: "k", MAIL_FROM: "owner@example.com", CRON_SECRET: "cron-1" });
+    await env.DB.prepare("INSERT INTO users (id, created_at) VALUES ('dev_abhi', 'x') ON CONFLICT(id) DO NOTHING").run();
+    await call("PUT", "/pages/pg_safe0001", { user: "abhi", json: { title: "t", content: page() } });
+    await call("POST", "/pages/pg_safe0001/publish", { user: "abhi", json: { slug: "priya", expiresAt: new Date(t + 3 * D).toISOString() } });
+    await call("POST", "/pages/pg_safe0001/deliveries", { user: "abhi", json: { toEmail: "someone@example.com", fromName: "Abhi" } });
+    t += 2 * D + 3_600_000;
+    await call("POST", "/cron/tick", { headers: { authorization: "Bearer cron-1" } });
+    const rows = ((await env.DB.prepare("SELECT key FROM mail_log").all()) as any).results as { key: string }[];
+    expect(rows.some((r) => r.key.startsWith("end:"))).toBe(true); // the reminder was recorded
+    expect(JSON.stringify(rows)).not.toContain("someone@example.com");
+
+    t += 100 * D;
+    await call("POST", "/cron/tick", { headers: { authorization: "Bearer cron-1" } });
+    expect(((await env.DB.prepare("SELECT COUNT(*) AS n FROM mail_log").first()) as any).n).toBe(0);
+  });
+
+  it("never removes a photo that a live page still uses, even if its link was missed", async () => {
+    boot({ CRON_SECRET: "cron-1" });
+    // the page is saved BEFORE its photo arrives, so no link is recorded
+    const c = page();
+    c.blocks[0]!.fields.cover = { asset: "ast_late0001" };
+    await call("PUT", "/pages/pg_safe0001", { user: "abhi", json: { title: "t", content: c } });
+    await call("PUT", "/assets/ast_late0001", { user: "abhi", body: webp(), headers: { "content-type": "image/webp" } });
+    await call("PUT", "/assets/ast_loose001", { user: "abhi", body: webp(), headers: { "content-type": "image/webp" } }); // really unused
+    expect(((await env.DB.prepare("SELECT COUNT(*) AS n FROM page_assets").first()) as any).n).toBe(0);
+    t += 60 * D;
+    await call("POST", "/cron/tick", { headers: { authorization: "Bearer cron-1" } });
+    const left = ((await env.DB.prepare("SELECT id FROM assets").all()) as any).results.map((r: any) => r.id);
+    expect(left).toEqual(["ast_late0001"]);
+    expect(env.FILES.keys()).toEqual(["a/ast_late0001"]);
+  });
+});

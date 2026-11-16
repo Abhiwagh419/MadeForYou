@@ -49,13 +49,16 @@ export function Status() {
         out.push({ label: "Server", state: "bad", value: "Not reachable", hint: "Check your connection." });
       }
       if (session.userId) {
-        const d = await apiRaw<{ ok: boolean; problem: string | null; configuredIssuer: string | null; tokenIssuer: string | null }>("/diag");
+        const d = await apiRaw<{ ok: boolean; problem: string | null; configuredIssuer: string | null; tokenIssuer: string | null; secretOk?: boolean }>("/diag");
         out.push({
           label: "Server accepts your login",
           state: d.data?.ok ? "ok" : "bad",
           value: d.data?.ok ? "Yes" : "No",
           hint: d.data?.ok ? undefined : d.data?.problem ?? undefined,
         });
+        if (d.data?.secretOk === false) {
+          out.push({ label: "Signing secret", state: "bad", value: "Too short", hint: "SESSION_SECRET should be at least 24 random characters. A short one makes password pages and private photos easier to break. Set a new long one and deploy again." });
+        }
         if (d.data?.configuredIssuer || d.data?.tokenIssuer) {
           out.push({ label: "Clerk address on the server", state: "info", value: d.data.configuredIssuer ?? "not set" });
           out.push({ label: "Clerk address in your login", state: "info", value: d.data.tokenIssuer ?? "unknown" });
