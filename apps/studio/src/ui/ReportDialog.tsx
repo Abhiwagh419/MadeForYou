@@ -61,7 +61,7 @@ export function ReportDialog({ slug, onClose }: { slug: string; onClose: () => v
           </label>
           <div className="mfy-hp" aria-hidden="true"><label>Website<input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} /></label></div>
           {error && <p className="field-error" role="alert">{error}</p>}
-          <p className="field-hint">Reports go to {BRAND.operator}, who runs {BRAND.name}. Read how we handle them in the <a href="#/privacy">Privacy</a> page. Urgent or serious? Write to <a href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.</p>
+          <p className="field-hint">Reports go to {BRAND.operator}, who runs {BRAND.name}. Read how we handle them in the <a href="/#/privacy">Privacy</a> page. Urgent or serious? Write to <a href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.</p>
           <div className="report-actions">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={!reason || (reason === "other" && !details.trim()) || state === "sending"}>{state === "sending" ? "Sending…" : "Send report"}</Button>

@@ -48,7 +48,7 @@ export function Contribute() {
   };
 
   return (
-    <div className="gate" style={style}>
+    <main className="gate" style={style}>
       <div className="gate-card">
         {info === "loading" ? <p>Opening…</p>
           : info === "invalid" ? (<><h1>This invitation is not valid</h1><p>The link may have been switched off. Ask the person who sent it for a new one.</p></>)
@@ -70,6 +70,6 @@ export function Contribute() {
           )}
       </div>
       <p className="gate-foot"><Mark size={18} />{BRAND.badgeText}</p>
-    </div>
+    </main>
   );
 }

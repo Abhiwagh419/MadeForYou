@@ -1,10 +1,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "@madeforyou/api";
 import { makeEnv } from "@madeforyou/api/testing";
 import { createBlock, setField, starterSkeleton, type Content } from "@madeforyou/schema";
-import { App } from "../src/App";
+import { App, preloadScreens } from "../src/App";
 import { apiRaw, setTokenGetter } from "../src/lib/api";
 import { AuthProvider } from "../src/lib/auth";
 import { saveAudio } from "../src/lib/assets";
@@ -14,6 +14,9 @@ import { wrapLines } from "../src/lib/story";
 import { authRetry, publishRemote } from "../src/lib/sync";
 import { createPage, getState, resetStore } from "../src/state/store";
 import { VoiceRecorder } from "../src/ui/VoiceRecorder";
+
+// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
+beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 function party(): Content {
   let c = starterSkeleton();

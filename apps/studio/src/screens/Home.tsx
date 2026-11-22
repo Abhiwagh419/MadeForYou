@@ -36,7 +36,7 @@ export function Home() {
               {CHIPS.map((c) => <a key={c} className="chip" href={`#/templates?q=${encodeURIComponent(c)}`}>{c}</a>)}
             </div>
           </div>
-          <div className="hero-phones" aria-hidden="true">
+          <div className="hero-phones" aria-hidden="true" inert>
             {hero.map((t, i) => t && <PhoneThumb key={t.meta.id} content={t.content} className={`hp hp-${i + 1}`} />)}
           </div>
         </div>

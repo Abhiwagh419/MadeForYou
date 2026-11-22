@@ -16,10 +16,10 @@ import { ReportDialog } from "../ui/ReportDialog";
 function Centered({ page, preset, children }: { page?: PageRecord; preset?: string; children: React.ReactNode }) {
   const style = themeToCssVars(preset ?? page?.content.settings.theme.preset ?? "rose-garden") as CSSProperties;
   return (
-    <div className="gate" style={style}>
+    <main className="gate" style={style}>
       <div className="gate-card">{children}</div>
       <p className="gate-foot"><Mark size={18} />{BRAND.badgeText}</p>
-    </div>
+    </main>
   );
 }
 
@@ -63,7 +63,7 @@ function LocalViewer() {
       <Centered>
         <h1>This page is not here</h1>
         <p>The link may be mistyped, or the page may have been taken down.</p>
-        <Button href="#/" variant="secondary">Make your own</Button>
+        <Button href="/#/" variant="secondary">Make your own</Button>
       </Centered>
     );
   }
@@ -137,11 +137,11 @@ function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: 
       {v.owner && v.visibility === "private" && <div className="ribbon">Only you can see this page</div>}
       <PageRenderer content={v.content} resolveAsset={resolve} host={host} />
       {!v.owner && (
-        <footer className="viewer-foot">
+        <nav className="viewer-foot" aria-label="About this page">
           <button type="button" onClick={() => setReporting(true)}>Report this page</button>
-          <a href="#/privacy">Privacy</a>
-          <a href="#/terms">Terms</a>
-        </footer>
+          <a href="/#/privacy">Privacy</a>
+          <a href="/#/terms">Terms</a>
+        </nav>
       )}
       {reporting && <ReportDialog slug={slug} onClose={() => setReporting(false)} />}
     </>

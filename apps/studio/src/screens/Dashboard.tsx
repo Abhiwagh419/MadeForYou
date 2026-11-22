@@ -76,7 +76,7 @@ export function Dashboard() {
                   <article className="pagecard" key={p.id}>
                     <a className="pagecard-media" href={`#/edit/${p.id}`} aria-label={`Edit ${p.title}`}><Thumb content={p.content} /></a>
                     <div className="tcard-body">
-                      <h3>{p.title}</h3>
+                      <h2>{p.title}</h2>
                       <p><span className={`badge ${st.tone ? `badge-${st.tone}` : ""}`}>{st.label}</span> <span className="muted">edited {formatWhen(p.updatedAt)}</span></p>
                       {counts[p.id] && (
                         <div className="card-chips">

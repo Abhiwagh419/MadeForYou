@@ -41,17 +41,37 @@ export function Switch({ checked, onChange, label, hint }: { checked: boolean; o
 }
 
 /* ---------- Modal / bottom sheet ---------- */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Sheet({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const before = document.activeElement as HTMLElement | null;
+    box.current?.focus(); // a screen reader announces the dialog; a keyboard user starts inside it
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onCloseRef.current();
+      if (e.key !== "Tab" || !box.current) return;
+      // keep Tab inside the dialog
+      const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => { const s = getComputedStyle(el); return s.display !== "none" && s.visibility !== "hidden"; });
+      if (!items.length) { e.preventDefault(); return; }
+      const first = items[0]!, last = items[items.length - 1]!;
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === box.current)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      before?.focus?.(); // back to the button that opened it
+    };
+  }, [open]);
   if (!open) return null;
   return (
     <div className="sheet-wrap" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`sheet ${wide ? "sheet-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={box} tabIndex={-1} className={`sheet ${wide ? "sheet-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <span className="sheet-grab" aria-hidden="true" />
         <header>
           <h2>{title}</h2>

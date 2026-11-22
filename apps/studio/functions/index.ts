@@ -1,4 +1,4 @@
-import { injectMeta, type Env } from "@madeforyou/api";
+import { HTML_SECURITY_HEADERS, injectMeta, type Env } from "@madeforyou/api";
 
 type Ctx = { request: Request; env: Env & { ASSETS: { fetch: (r: Request) => Promise<Response> } } };
 
@@ -12,5 +12,5 @@ export async function onRequestGet({ request, env }: Ctx) {
     image: `${url.origin}/og-default.png`,
     url: url.origin,
   });
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...HTML_SECURITY_HEADERS } });
 }

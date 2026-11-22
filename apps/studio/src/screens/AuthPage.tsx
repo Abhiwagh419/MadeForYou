@@ -18,7 +18,7 @@ export function AuthPage({ mode }: { mode: "in" | "up" }) {
           <>
             <h1>Signing in is not switched on here</h1>
             <p className="field-hint">This copy of the site has no sign-in set up.</p>
-            <Button href="#/" iconRight="right">Back to home</Button>
+            <Button href="/#/" iconRight="right">Back to home</Button>
           </>
         )}
       </div>

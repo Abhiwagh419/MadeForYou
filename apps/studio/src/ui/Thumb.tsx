@@ -28,7 +28,7 @@ export function Thumb({ content, lang, className = "" }: { content: Content; lan
   return (
     <div ref={(n) => { box.current = n; (ref as { current: HTMLDivElement | null }).current = n; }} className={`thumb ${className}`} style={{ aspectRatio: `${W} / ${H}` }}>
       {seen && (
-        <div className="thumb-inner" style={{ width: W, height: H, scale: String(scale), "--mfy-screen": "0px" } as CSSProperties} aria-hidden="true">
+        <div className="thumb-inner" style={{ width: W, height: H, scale: String(scale), "--mfy-screen": "0px" } as CSSProperties} aria-hidden="true" inert>
           <PageRenderer static skipOpening content={content} lang={lang} resolveAsset={resolve} />
         </div>
       )}

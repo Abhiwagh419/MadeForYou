@@ -65,11 +65,41 @@ class HttpError extends Error {
   }
 }
 
+/**
+ * Reads a request body, stopping as soon as it passes `max` bytes. The Content-Length header is only a hint
+ * (it can be missing, as with chunked uploads, or simply wrong), so the bytes that really arrive are counted.
+ */
+async function readBody(c: Ctx, max: number, tooLarge: string): Promise<Uint8Array> {
+  const declared = Number(c.req.header("content-length") ?? 0);
+  if (declared > max) throw new HttpError(413, tooLarge);
+  const stream = c.req.raw.body;
+  if (!stream) return new Uint8Array(0);
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => undefined);
+      throw new HttpError(413, tooLarge);
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const part of chunks) {
+    out.set(part, at);
+    at += part.byteLength;
+  }
+  return out;
+}
+
 async function readJson<T>(c: Ctx): Promise<T> {
-  const len = Number(c.req.header("content-length") ?? 0);
-  if (len > MAX_JSON_BYTES) throw new HttpError(413, "That is too large");
+  const bytes = await readBody(c, MAX_JSON_BYTES, "That is too large");
   try {
-    return (await c.req.json()) as T;
+    return JSON.parse(new TextDecoder().decode(bytes)) as T;
   } catch {
     throw new HttpError(400, "Send valid JSON");
   }
@@ -81,7 +111,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
 
   app.use("*", async (c, next) => {
     const origin = c.env.ALLOWED_ORIGIN;
-    if (origin) return cors({ origin, allowHeaders: ["Authorization", "Content-Type"], allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], maxAge: 600 })(c, next);
+    if (origin) return cors({ origin, allowHeaders: ["Authorization", "Content-Type", "Range", "x-admin-token"], allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], exposeHeaders: ["Content-Range", "Accept-Ranges"], maxAge: 600 })(c, next);
     await next();
   });
   app.use("*", async (c, next) => {
@@ -312,11 +342,11 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (!isAssetId(id)) throw new HttpError(400, "That photo id is not valid");
     const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim();
     if (!ALLOWED.has(type)) throw new HttpError(415, "Use a WebP, JPEG or PNG photo, or a WebM, MP4, OGG or MP3 voice note");
-    if (Number(c.req.header("content-length") ?? 0) > LIMITS.assetBytes) throw new HttpError(413, "That photo is too large");
     await throttle(c, `up:${userId}`, 3600, 300);
 
-    const buf = await c.req.arrayBuffer();
-    if (buf.byteLength === 0 || buf.byteLength > LIMITS.assetBytes) throw new HttpError(413, "That photo is too large");
+    const bytes = await readBody(c, LIMITS.assetBytes, "That photo is too large");
+    if (bytes.byteLength === 0) throw new HttpError(413, "That photo is empty");
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     if (sniffMedia(new Uint8Array(buf)) !== type) throw new HttpError(415, "That file is not the kind of image it says it is");
 
     const existing = await c.env.DB.prepare("SELECT owner_id, bytes FROM assets WHERE id = ?").bind(id).first<{ owner_id: string; bytes: number }>();
@@ -343,8 +373,11 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (scope?.startsWith("u:")) allowed = scope === `u:${asset.owner_id}`;
     else if (scope?.startsWith("pg:")) {
       const hit = await c.env.DB.prepare(
-        "SELECT 1 AS x FROM page_assets pa JOIN pages p ON p.id = pa.page_id WHERE pa.asset_id = ? AND pa.page_id = ? AND p.status = 'published' AND p.deleted_at IS NULL",
-      ).bind(id, scope.slice(3)).first();
+        // A pass is good for hours, so the page's CURRENT state is checked too: ended, re-locked or private pages stop serving photos at once.
+        `SELECT 1 AS x FROM page_assets pa JOIN pages p ON p.id = pa.page_id
+          WHERE pa.asset_id = ? AND pa.page_id = ? AND p.status = 'published' AND p.deleted_at IS NULL AND p.visibility != 'private'
+            AND (p.expires_at IS NULL OR p.expires_at > ?) AND (p.unlock_at IS NULL OR p.unlock_at <= ?)`,
+      ).bind(id, scope.slice(3), iso(), iso()).first();
       allowed = !!hit;
     }
     if (!allowed) return notFound();
@@ -606,7 +639,13 @@ export function createApp(overrides: Partial<Deps> = {}) {
   const unsubHtml = (title: string, body: string) =>
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml(title)}</title></head><body style="margin:0;background:#FFF8F0;font-family:Helvetica,Arial,sans-serif;color:#4A0E1F"><main style="max-width:420px;margin:12vh auto;padding:28px;background:#fff;border:1px solid #F3DCCB;border-radius:20px"><h1 style="font-family:Georgia,serif;font-size:24px;margin:0 0 14px">${escHtml(title)}</h1>${body}</main></body></html>`;
 
+  const lockedDown = (c: Ctx) => {
+    c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+    c.header("Cache-Control", "no-store");
+    c.header("Referrer-Policy", "no-referrer");
+  };
   app.get("/mail/unsub", async (c) => {
+    lockedDown(c);
     const t = c.req.query("t") ?? "";
     const email = await readUnsub(c.env, t, deps.now());
     if (!email) return c.html(unsubHtml("This link is not valid", "<p>It may have expired. If you keep getting emails you do not want, reply to one of them.</p>"), 400);
@@ -614,6 +653,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
   });
   // Also the target of the one-click unsubscribe button some mail apps show.
   app.post("/mail/unsub", async (c) => {
+    lockedDown(c);
     const email = await readUnsub(c.env, c.req.query("t"), deps.now());
     if (!email) return c.html(unsubHtml("This link is not valid", "<p>It may have expired.</p>"), 400);
     await blockEmail(c.env, email, deps.now());
@@ -716,7 +756,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
     // Photos are personal by nature: a template carries structure only.
     if (assetIds(content).length) throw new HttpError(400, "Templates cannot contain photos. Remove them and try again.");
 
-    const existing = await c.env.DB.prepare("SELECT owner_id FROM templates WHERE id = ?").bind(id).first<{ owner_id: string }>();
+    const existing = await c.env.DB.prepare("SELECT owner_id, status FROM templates WHERE id = ?").bind(id).first<{ owner_id: string; status: string }>();
     if (existing && existing.owner_id !== userId) throw new HttpError(409, "That template name is taken");
     if (!existing) {
       const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM templates WHERE owner_id = ?").bind(userId).first<{ n: number }>();
@@ -727,10 +767,12 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (meta.visibility === "public") {
       const ok = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM templates WHERE owner_id = ? AND visibility = 'public' AND status = 'approved' AND id != ?").bind(userId, id).first<{ n: number }>();
       status = (ok?.n ?? 0) >= 3 ? "approved" : "pending";
+      // Saving again must not undo the site owner's decision to reject it.
+      if (existing?.status === "rejected") status = "rejected";
     }
     const fromPage = typeof body.fromPage === "string" && PAGE_ID.test(body.fromPage) ? body.fromPage : null;
     await c.env.DB.prepare(
-      "INSERT INTO templates (id, owner_id, meta, content, visibility, status, from_page, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET meta = excluded.meta, content = excluded.content, visibility = excluded.visibility, status = excluded.status",
+      "INSERT INTO templates (id, owner_id, meta, content, visibility, status, from_page, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET meta = excluded.meta, content = excluded.content, visibility = excluded.visibility, status = excluded.status WHERE templates.owner_id = excluded.owner_id",
     ).bind(id, userId, JSON.stringify(meta), JSON.stringify(content), meta.visibility, status, fromPage, iso()).run();
     return c.json({ id, status });
   });

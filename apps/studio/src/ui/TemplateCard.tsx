@@ -16,7 +16,7 @@ export function TemplateCard({ template, mine }: { template: Template; mine?: bo
         {mine && <span className="badge badge-rose">Yours</span>}
       </div>
       <div className="tcard-body">
-        <h3>{meta.title}</h3>
+        <h2>{meta.title}</h2>
         <p>
           {occ.slice(0, 2).join(" · ")}
           {theme && <> · {theme.label}</>}

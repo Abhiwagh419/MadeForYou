@@ -12,8 +12,8 @@ export const SettingsSchema = z
         kind: z.enum(["none", "envelope", "giftbox", "curtain", "diary"]).default("none"),
         text: z.string().max(60).optional(),
       })
-      .default({}),
-    theme: z.object({ preset: z.string().max(40).default("rose-garden") }).default({}),
+      .prefault({}),
+    theme: z.object({ preset: z.string().max(40).default("rose-garden") }).prefault({}),
     // What happens where the visitor taps the page. Off by default: not every page is a happy one.
     tap: z.enum(["none", "hearts", "sparkles"]).default("none"),
     ambience: z
@@ -21,13 +21,13 @@ export const SettingsSchema = z
         kind: z.enum(["none", "petals", "diyas", "stars", "confetti"]).default("none"),
         intensity: z.enum(["low", "medium"]).default("low"),
       })
-      .default({}),
+      .prefault({}),
     languages: z
       .object({
         default: z.string().min(2).max(8).default("en"),
         available: z.array(z.string().min(2).max(8)).max(8).default(["en"]),
       })
-      .default({}),
+      .prefault({}),
     // Embeds are stored as provider + id, never as raw URLs.
     music: z
       .object({
@@ -36,7 +36,7 @@ export const SettingsSchema = z
       })
       .optional(),
   })
-  .default({});
+  .prefault({});
 
 export const StyleSchema = z.object({
   align: z.enum(["left", "center", "right"]).default("center"),
@@ -53,7 +53,7 @@ export const BlockSchema = z.object({
   fields: z.record(z.string(), z.unknown()),
   /** Names of fields that still hold placeholder (sample) content. */
   ph: z.array(z.string()).default([]),
-  style: StyleSchema.default({}),
+  style: StyleSchema.prefault({}),
   visible: z.boolean().default(true),
   /** Second-language text: i18n[lang][fieldName]. The common single-language page never needs it. */
   i18n: z.record(z.string(), z.record(z.string(), z.string().max(5000))).optional(),

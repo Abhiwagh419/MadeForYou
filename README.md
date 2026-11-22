@@ -1,188 +1,339 @@
 # MadeForYou
 
-Free, no-code personal tribute pages. India-first, mobile-first. Pick a template, answer a few questions, add photos, and send a page to someone you love as a link, a WhatsApp card, a QR code or a story picture.
+Free, no-code personal tribute pages. Pick a template, answer a few questions, add photos and a voice note, and send the page to someone you love as a link, a WhatsApp card, a QR code or a story picture. India-first, mobile-first, English and Hindi.
 
 The product name, the operator and the contact email live in one place: `packages/ui/src/brand.ts`.
 
-## What it does
+## Contents
 
-- **26 blocks**: hero, featured photo, gallery, timeline, days together, video, text, letter, quote/shayari, reasons list, promises/bucket list, open-when letters, countdown, scratch card, the ask, quiz, memory match, event details (add to calendar), buttons/links, divider, signature, voice note, place on a map, wishes wall, reply box, RSVP.
-- **Guided mode and an editor**, English and Hindi, with templates, themes and a phone preview.
-- **Photos you crop yourself**: choose the part to show; the page shows exactly your crop (the cover frame and memory cards keep the theme's shape).
-- **Publish and share**: link, WhatsApp card, QR code, a 1080 x 1920 story picture, password, "opens on" lock, end date, private mode.
-- **Guest messages**: wishes (with approval), replies and RSVPs, read in an inbox; friends can add a wish through a contributor link without seeing the page.
+1. [Features](#features)
+2. [Technology stack](#technology-stack)
+3. [Architecture](#architecture)
+4. [Repository structure](#repository-structure)
+5. [Prerequisites and installation](#prerequisites-and-installation)
+6. [Local development](#local-development)
+7. [Configuration reference](#configuration-reference)
+8. [Database setup and migrations](#database-setup-and-migrations)
+9. [Authentication (Clerk)](#authentication-clerk)
+10. [Email (Brevo) and the scheduler](#email-brevo-and-the-scheduler)
+11. [Spam check (Turnstile)](#spam-check-turnstile)
+12. [Testing, checks and builds](#testing-checks-and-builds)
+13. [Deployment](#deployment)
+14. [Running the site](#running-the-site)
+15. [Security](#security)
+16. [Known limitations](#known-limitations)
+17. [Troubleshooting](#troubleshooting)
+18. [Developer notes](#developer-notes)
+
+## Features
+
+- **26 blocks**: hero, featured photo, gallery, timeline, days together, video, text, letter, quote or shayari, reasons list, promises or bucket list, open-when letters, countdown, scratch card, the ask, quiz, memory match, event details (with add to calendar), buttons and links, divider, signature, voice note, place on a map, wishes wall, reply box, RSVP.
+- **19 launch templates** and **3 themes** (Rose garden, Marigold sun, Midnight stars). Guided mode asks a few questions; an editor with a phone preview is there for everything else.
+- **Photos you crop yourself**: choose the part to show and the page shows exactly your crop. The cover frame and the memory cards keep the theme's shape and lock the crop box to it.
+- **Publish and share**: link, WhatsApp card, QR code, a 1080 x 1920 story picture, password, an "opens on" lock, an end date, private mode.
+- **Guest messages**: wishes (with approval), replies and RSVPs, read in an inbox. A friend can add a wish through an invite link without seeing the page.
 - **Email** (optional, free): send a page to someone on a date, one reminder to guests before an event, and "this page ends soon".
 - **Safety**: Terms and Privacy pages, "Report this page", a review page for the site owner, takedowns, and "Delete my account and all my data".
-- **Support us** (optional): a quiet page where people can pay any amount by UPI.
+- **Support us** (optional): a quiet page where people can give any amount by UPI.
+- **Reliability and access**: a crash in any screen shows a calm message instead of a blank page; popups keep keyboard focus; creator screens load on demand so a shared page opens quickly.
 
-## Run it on your computer
+## Technology stack
 
-Needs Node 20+ and pnpm 9 (`npm i -g pnpm@9`).
+| Area | Choice |
+|---|---|
+| Language | TypeScript 5 (strict, plus no unused code), pnpm 9 workspaces, Node 20 or newer |
+| Website | React 19, Vite 7, a small hash router |
+| Server | Hono 4 on Cloudflare Pages Functions, validation with Zod 4 |
+| Data | Cloudflare D1 (SQLite). Photos live in D1 by default; Cloudflare R2 is optional |
+| Sign-in | Clerk (`@clerk/clerk-react`) |
+| Email | Brevo transactional API (free plan), sent by a scheduled Cloudflare Worker |
+| Spam check | Cloudflare Turnstile (optional) |
+| Tests | Vitest 3 and jsdom. The server is tested against a SQLite database built from the real migration files |
+| Hosting | Cloudflare Pages, Wrangler 4 |
+
+## Architecture
 
 ```
-pnpm install
-pnpm test          # all tests (450)
-pnpm typecheck
-pnpm studio        # the website, in local mode (see below)
+  Visitor or creator (browser)
+        |
+        |  static site + /p/<link> link-preview page
+        v
+  Cloudflare Pages ------------------------------------------+
+    apps/studio (React app)                                   |
+    functions/p/[slug].ts   fills in the WhatsApp card        |
+    functions/api/[[route]].ts  -->  packages/api (Hono)  ----+--> D1 database (pages, photos, messages, ...)
+                                          |                   |--> Clerk (verifies logins, looks up an owner's email)
+                                          |                   |--> Brevo (sends email)
+                                          |                   +--> Turnstile (checks guest forms)
+                                          ^
+  workers/mailer  --every 15 minutes-->  POST /api/cron/tick  (sends due email, cleans up old data)
 ```
 
-**Local mode** (the default) keeps pages and photos in this browser. There is no server, no login and no email, and a share link only opens on the same computer. Use it to try the design.
+- A page is JSON. `packages/schema` defines and validates it; `packages/renderer` turns it into the page and never imports the editor.
+- The **server never trusts the browser**. It validates everything again, evaluates locks, end dates and passwords itself, and sends no content at all for a page that is locked, ended, private or password-protected until the visitor passes the gate.
+- Photos are served only to their owner, or to a visitor holding a short-lived signed pass earned by opening the page. The pass is checked against the page's **current** state on every request, so a page that has ended, been re-locked or made private stops serving photos at once.
+- With no account the website runs entirely in the browser (**local mode**): nothing is sent anywhere. With `VITE_REMOTE=1` it runs in **live mode** against the server.
 
-**Live mode** needs the backend (below). To try the real backend on your own computer with a fake login: copy `apps/studio/.dev.vars.example` to `apps/studio/.dev.vars`, apply the database with `pnpm exec wrangler d1 migrations apply madeforyou --local`, build with `VITE_REMOTE=1` and no Clerk key, then run `pnpm run cf:dev` in `apps/studio`.
-
-## Layout
+## Repository structure
 
 | Path | What it is |
 |---|---|
-| `packages/schema` | Block registry (26 blocks), Zod validation, template stripping, guided questions, publish check, guest-message cleaning, email check |
-| `packages/renderer` | JSON to page. Never imports the editor. Imports the schema as types only |
-| `packages/templates` | Launch templates as JSON, validated at load |
+| `packages/schema` | The 26-block registry, Zod validation, template stripping, guided questions, the publish check, guest-message cleaning, email check, limits |
+| `packages/renderer` | JSON to page. Imports the schema as types only |
+| `packages/templates` | The launch templates as JSON, validated when loaded |
 | `packages/ui` | Brand constants and theme tokens |
-| `packages/api` | The server: a Hono app, plain TypeScript, tested against a D1-shaped SQLite. Pages, photos, guest messages, email, reports, account deletion, the scheduled job |
-| `apps/studio` | The website (Vite + React) and the Cloudflare Pages Functions that wrap the API (`functions/`) |
-| `workers/mailer` | A tiny Worker that wakes up every 15 minutes and asks the website to send due email and clean up old data |
-| `apps/preview` | A phone-frame harness for template work |
+| `packages/api` | The server (plain TypeScript, no Cloudflare imports): pages, photos, guest messages, email, reports, account deletion, the scheduled job. Holds `migrations/` |
+| `apps/studio` | The website and the Pages Functions that wrap the API (`functions/`), the deploy scripts (`scripts/`) and the security headers (`public/_headers`) |
+| `apps/preview` | A phone-frame harness for working on templates (`pnpm renderer-lab`) |
+| `workers/mailer` | The scheduler Worker (`index.js`, `wrangler.toml`) |
+| `.github/workflows/ci.yml` | Typecheck, tests and build on every push; migrations and deploy on `main` |
 
-## Go live (free, no payment card)
+## Prerequisites and installation
 
-Everything is run in PowerShell, in `apps\studio`, after `pnpm install` in the project root.
-
-1. `pnpm exec wrangler login` (a browser opens; click Allow).
-2. `pnpm exec wrangler d1 create madeforyou`. You do not need to copy the id: `pnpm run cf:deploy` finds it and writes `wrangler.toml` for you. That file is not part of the downloads, so new code never erases it.
-3. **Clerk** (dashboard.clerk.com): create an application. On **API keys** copy the **Publishable key** and the **Frontend API URL**. The JWKS URL is that URL plus `/.well-known/jwks.json`.
-4. `pnpm exec wrangler pages project create madeforyou --production-branch main`
-5. Set the required secrets (paste the value when asked): `pnpm exec wrangler pages secret put NAME --project-name madeforyou`
-6. Create `apps/studio/.env.production` (see "Settings that go in `.env.production`" below).
-7. `pnpm run cf:deploy`. It applies the database changes, builds and deploys, and prints your address.
-8. Open `https://YOUR-ADDRESS/api/health` (should show `{"ok":true}`), then try the whole journey on your phone.
-
-**Secrets only reach a new deployment**: after changing any secret, run `pnpm run cf:deploy` again.
-
-### Secrets (set with `wrangler pages secret put`)
-
-| Secret | Needed? | What it is |
-|---|---|---|
-| `SESSION_SECRET` | yes | Long random text. Signs the short-lived tokens for photos and unsubscribe links |
-| `CLERK_JWKS_URL` | yes | Your Clerk Frontend API URL plus `/.well-known/jwks.json` |
-| `CLERK_ISSUER` | yes | Your Clerk Frontend API URL. Either this or the JWKS URL is enough; the server derives the other |
-| `ADMIN_TOKEN` | yes | Long random text. Opens your review page `#/admin` |
-| `BREVO_API_KEY` | for email | Brevo: Settings, SMTP & API, API keys |
-| `MAIL_FROM` | for email | A sender address verified in Brevo (Settings, Senders) |
-| `MAIL_FROM_NAME` | optional | The name people see. Default: MadeForYou |
-| `CRON_SECRET` | for email and clean-up | Any long random text. The same value must be given to the scheduler (below) |
-| `CLERK_SECRET_KEY` | optional | Lets the server find an owner's email for "ends soon", and remove the Clerk login when an account is deleted |
-| `REPORT_EMAIL` | optional | Where "page reported" notes go. Default: `MAIL_FROM` |
-| `PUBLIC_URL` | recommended | Your main address, e.g. `https://madeforyou-9pj.pages.dev`. Used in email links so they never show a one-off deploy address |
-| `TURNSTILE_SECRET` | optional | Cloudflare Turnstile secret key. With `VITE_TURNSTILE_SITE_KEY` it switches on the spam check (see below). Set both together |
-
-Never commit secrets, and never paste them into chats. Paste them only into the prompt.
-
-### Settings that go in `apps/studio/.env.production`
-
-This file is not committed (it is ignored by git). Vite reads it when building.
+You need Node 20 or newer and pnpm 9.
 
 ```
+npm i -g pnpm@9
+pnpm install
+```
+
+For live mode and deployment you also need free accounts with Cloudflare, Clerk and (for email) Brevo. No payment card is needed for any of them.
+
+## Local development
+
+```
+pnpm studio        # the website on http://localhost:5173, in local mode
+pnpm test          # every test
+pnpm typecheck     # types, plus unused-code checks
+pnpm renderer-lab  # the template preview harness
+```
+
+**Local mode** keeps pages and photos in the browser. There is no server, no login and no email, and a share link opens only on the same computer. It is the quickest way to work on design.
+
+**Live mode on your own computer** (the real server, a fake login, a local database):
+
+```
+cd apps/studio
+copy .dev.vars.example .dev.vars          # PowerShell. On macOS or Linux: cp
+pnpm exec wrangler d1 migrations apply madeforyou --local
+$env:VITE_REMOTE="1"; pnpm run cf:dev     # PowerShell. On macOS or Linux: VITE_REMOTE=1 pnpm run cf:dev
+```
+
+`.dev.vars.example` sets `ALLOW_DEV_AUTH=1`, which lets a visitor sign in with any name and no password. **Never set `ALLOW_DEV_AUTH` on a real deployment.** Leave `VITE_CLERK_PUBLISHABLE_KEY` unset for this mode.
+
+## Configuration reference
+
+### Secrets for the server
+
+Set each one with `pnpm exec wrangler pages secret put NAME --project-name madeforyou` (run in `apps/studio`; you paste the value when asked), then deploy again, because secrets only reach a new deployment.
+
+| Secret | Needed | What it is |
+|---|---|---|
+| `SESSION_SECRET` | yes | At least 24 random characters (the site's status page warns if it is shorter). Signs the photo and gate passes, invite and unsubscribe links, and is mixed into page-password hashes and visitor-address hashes. **Changing it later invalidates page passwords, invite links and unsubscribe links already sent.** |
+| `CLERK_ISSUER` | yes | Your Clerk Frontend API URL. `CLERK_JWKS_URL` is derived from it if you leave that out |
+| `CLERK_JWKS_URL` | optional | The Frontend API URL plus `/.well-known/jwks.json` |
+| `ADMIN_TOKEN` | yes | A long random text. Opens the review page `#/admin`. Wrong guesses are limited to 10 per 10 minutes per visitor |
+| `BREVO_API_KEY` | for email | Brevo, Settings, SMTP and API, API keys |
+| `MAIL_FROM` | for email | An address verified in Brevo (Settings, Senders) |
+| `MAIL_FROM_NAME` | optional | The sender name. Default: MadeForYou |
+| `CRON_SECRET` | for email and clean-up | A long random text, also given to the scheduler (below) |
+| `CLERK_SECRET_KEY` | optional | Lets the server find an owner's email for "ends soon", and remove the Clerk login when an account is deleted |
+| `REPORT_EMAIL` | optional | Where "page reported" notes go. Default: `MAIL_FROM` |
+| `PUBLIC_URL` | recommended | Your main address, such as `https://madeforyou-9pj.pages.dev`. Used in email links so they never show a one-off deploy address |
+| `TURNSTILE_SECRET` | optional | The Turnstile secret key. Set it together with `VITE_TURNSTILE_SITE_KEY` |
+| `ALLOWED_ORIGIN` | optional | One extra origin allowed to call the API (only if the website is served from a different address) |
+| `ALLOW_DEV_AUTH` | never in production | See Local development |
+
+### Build settings for the website
+
+These go in `apps/studio/.env.production`, which is not committed (git ignores `.env.*`). Vite reads it when building.
+
+```
+VITE_REMOTE=1
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 VITE_SUPPORT_UPI=yourname@yourbank
 VITE_TURNSTILE_SITE_KEY=0x4AAAA...
 ```
 
-`VITE_SUPPORT_UPI` is optional. Leave it out and every "Support us" button stays hidden. `VITE_TURNSTILE_SITE_KEY` is optional too; leave it out and the spam check is off. Use a name-based UPI ID, not one made of your mobile number: it is shown to everyone, and an ID that is a phone number is refused on purpose. If the page shows an old value after a redeploy, see "The Support button shows an old UPI ID" under Troubleshooting. With GitHub Actions, put the same two values in the repository's secrets/variables (`VITE_CLERK_PUBLISHABLE_KEY` as a secret, `VITE_SUPPORT_UPI` and `VITE_TURNSTILE_SITE_KEY` as variables).
+| Setting | Needed | What it is |
+|---|---|---|
+| `VITE_REMOTE` | yes | `1` makes the build talk to the server. Without it the site runs in local mode and saves nothing for anyone. `pnpm run cf:deploy` refuses to deploy without it |
+| `VITE_CLERK_PUBLISHABLE_KEY` | yes | Your Clerk publishable key |
+| `VITE_SUPPORT_UPI` | optional | Your UPI ID. Switches on the "Support us" page. A UPI ID that is just a mobile number is refused, so a phone number never ends up on a public page |
+| `VITE_TURNSTILE_SITE_KEY` | optional | The public Turnstile site key |
+| `VITE_API_URL` | optional | Only if the API lives at a different address from the website |
 
-### The scheduler (needed for email and clean-up)
+With GitHub Actions, set `VITE_CLERK_PUBLISHABLE_KEY` as a repository secret and `VITE_SUPPORT_UPI` and `VITE_TURNSTILE_SITE_KEY` as repository variables.
 
-Cloudflare Pages cannot run on a timer, so `workers/mailer` calls `/api/cron/tick` every 15 minutes. Deploy it once:
+## Database setup and migrations
+
+The schema is the numbered files in `packages/api/migrations/`, applied in order by Wrangler. Never edit an old one: add the next number.
+
+| File | Adds |
+|---|---|
+| `0001_init.sql` | users, pages, assets, page_assets, templates, throttle |
+| `0002_asset_blobs.sql` | photos stored in the database |
+| `0003_submissions.sql` | guest wishes, replies and RSVPs |
+| `0004_mail.sql` | deliveries, mail_log, mail_blocks, owner email, reminder columns |
+| `0005_safety.sql` | reports, takedown columns |
+
+First time:
 
 ```
-pnpm run mailer:secret    # paste the same CRON_SECRET; answer Y when it offers to create the Worker
+cd apps/studio
+pnpm exec wrangler login
+pnpm exec wrangler d1 create madeforyou
+```
+
+You do not have to copy the database id: `pnpm run cf:deploy` looks it up and writes `wrangler.toml` for you. `cf:deploy` also applies any new migrations. To apply them by hand: `pnpm exec wrangler d1 migrations apply madeforyou --remote` (use `--local` for the local copy). To look inside, always add `--remote`, or Wrangler reads an empty local database:
+
+```
+pnpm exec wrangler d1 execute madeforyou --remote --command "SELECT id, status, slug FROM pages LIMIT 10"
+```
+
+The tests build their database from these same files, so a migration that does not apply fails the tests.
+
+**Photos** are stored in D1 by default (25 MB per person, 1.5 MB per photo, 30 pages per person; the free database holds 500 MB in total). To use R2 instead, create a bucket and uncomment the `r2_buckets` lines in `wrangler.toml`; Cloudflare asks for a card to enable R2.
+
+**Back up** with `pnpm exec wrangler d1 export madeforyou --remote --output backup.sql`. Photos are inside the database, so this covers them too.
+
+## Authentication (Clerk)
+
+1. At dashboard.clerk.com create an application and enable the sign-in methods you want (email and Google work out of the box).
+2. Copy the **Publishable key** into `VITE_CLERK_PUBLISHABLE_KEY` and the **Frontend API URL** into the `CLERK_ISSUER` secret.
+3. Sign in uses a popup on the page. Google opens in a small window on computers; on phones the page goes to Google and comes back, because phone browsers handle popups badly. If Clerk needs a full page it uses `/sign-in` and `/sign-up` on your own address (settings in `apps/studio/src/lib/ClerkBridge.tsx` and `CLERK_ROUTES` in `config.ts`; Cloudflare Pages opens the app for any address it has no file for, so these need no extra rule). In the Clerk dashboard, under Configure, Paths, you can set the sign-in and sign-up URLs to the same two pages.
+4. The server verifies every login against Clerk's published keys, and gives each person only their own data. `#/status` shows whether the server accepts your login and which Clerk address it expects.
+
+Clerk's development instances show a "Development mode" label and are meant for testing. Moving to a production instance needs a domain you own.
+
+## Email (Brevo) and the scheduler
+
+Email is off until `BREVO_API_KEY` and `MAIL_FROM` are set. Reminders and clean-up also need the scheduler.
+
+1. At brevo.com create a free account (300 emails a day, no card), add and verify a sender address, and create an API key.
+2. Set `BREVO_API_KEY` and `MAIL_FROM` (and, if you like, `MAIL_FROM_NAME`, `REPORT_EMAIL`, `PUBLIC_URL`, `CLERK_SECRET_KEY`).
+3. Deploy the scheduler once. Cloudflare Pages cannot run on a timer, so `workers/mailer` wakes every 15 minutes and calls `/api/cron/tick`:
+
+```
+cd apps/studio
+pnpm run mailer:secret     # paste the same CRON_SECRET you set on the site; answer Y if it offers to create the Worker
 pnpm run mailer:deploy
 ```
 
-Check `TICK_URL` in `workers/mailer/wrangler.toml` first (your main address plus `/api/cron/tick`). In the Cloudflare dashboard, Workers & Pages, `madeforyou-mailer`, Logs, you should see `tick 200`. `tick 401` means the two `CRON_SECRET` values differ; `tick 503` means the website has none or was not redeployed.
+Check `TICK_URL` in `workers/mailer/wrangler.toml` first (your main address plus `/api/cron/tick`). In the Cloudflare dashboard, Workers and Pages, `madeforyou-mailer`, Logs, you should see `tick 200` (`401` means the two `CRON_SECRET` values differ; `503` means the site has none or was not redeployed). `https://YOUR-SITE/api/mail/status` shows whether email and reminders are on.
 
-Each run: sends due emails, then removes pages deleted more than 30 days ago, photos no page uses, and handled reports older than a year.
+**What is sent**
 
-### Photos
+1. A page emailed to someone, now or on a date you choose (Share screen). Up to 5 people per page and 10 emails a day per owner.
+2. One reminder for guests who left an email on the RSVP, a day before the event. The address is asked for only for that, and only from guests who said yes or maybe. It stays with the guest's reply, which the page's owner can see, until the reply, the page or the account is deleted.
+3. "This page ends soon", a day before a page's end date, to the owner (needs `CLERK_SECRET_KEY`) and to people the page was emailed to.
 
-Photos live in the database by default (25 MB per person; the free database holds 500 MB in total). To use R2 instead (Cloudflare asks for a card), uncomment the bucket lines in `wrangler.toml`.
-
-## Spam check on guest forms (Turnstile, free)
-
-Wishes, replies, RSVPs, contributor wishes and "Report this page" can be protected by Cloudflare Turnstile. It is almost always invisible; it shows a tick box only when Cloudflare is unsure, and says "We could not confirm you are a person" if the check fails.
-
-1. Cloudflare dashboard, **Turnstile**, **Add widget**. Name it MadeForYou, add the hostname of your site (for example `madeforyou-9pj.pages.dev`; its subdomains are covered), choose the **Managed** mode.
-2. Copy the **Site key** (public) and the **Secret key** (private).
-3. Put the site key in `apps/studio/.env.production` as `VITE_TURNSTILE_SITE_KEY=...`.
-4. Set the secret: `pnpm exec wrangler pages secret put TURNSTILE_SECRET --project-name madeforyou`.
-5. `pnpm run cf:deploy`, then post a test wish from a private window.
-
-Set the site key and the secret in the same deploy: the server starts demanding the check as soon as it has the secret. To switch it off, delete the secret (`wrangler pages secret delete TURNSTILE_SECRET --project-name madeforyou`) and redeploy. For a dry run, Cloudflare publishes test keys (site key `1x00000000000000000000AA` always passes, secret `1x0000000000000000000000000000000AA`). If real guests are refused, check that the widget's hostname list matches your address. Visitors with an ad blocker that blocks `challenges.cloudflare.com` cannot post.
-
-## Email
-
-Sent through Brevo's free plan (300 a day, no card). Email stays off until `BREVO_API_KEY` and `MAIL_FROM` are set; reminders and "ends soon" also need the scheduler.
-
-1. **A page sent to someone on a date**: Share screen, "Send it by email". Now or on a date you pick. 5 people per page, 10 a day per owner.
-2. **One reminder for guests** who add an email on the RSVP: a day before the event. The address is asked for only for that, and only from guests who said yes or maybe. It stays with the guest's reply, which the page's owner can see, until the reply, the page or the account is deleted.
-3. **"This page ends soon"**: a day before a page's end date, to the owner (needs `CLERK_SECRET_KEY`) and to people the page was emailed to.
-
-Every email has a stop link. It opens a confirmation page (so mail scanners cannot trigger it), and an address that stopped is never emailed again by anyone. The daily total is held under 280.
+**How it stays safe.** Every email has a stop link that opens a confirmation page, so mail scanners cannot trigger it; a stopped address is never emailed again by anyone. A delivery is marked in the log *before* it is sent, so two overlapping runs, or a server that stops half-way, can never send a second copy (a delivery whose outcome is unknown is shown as failed with an explanation, rather than being sent again). The daily total is held under 280. The same scheduled run also removes pages deleted more than 30 days ago, photos no page uses, handled reports older than a year, sent-email records older than 90 days and visitor-limit counters older than a day.
 
 Without a domain of your own, mail goes out from your verified address through Brevo, and mail from a Gmail-style address can land in spam. A domain you own fixes that.
 
-## Safety
+## Spam check (Turnstile)
 
-- **Terms** (`#/terms`) and **Privacy** (`#/privacy`): the words are in `apps/studio/src/lib/legal.ts`; the operator and contact email are in `brand.ts`. **If you change what the app stores or which companies handle data, change the Privacy page too.** Linked from the footer and from the Publish screen.
-- **Report this page**: at the bottom of every public page (not shown to its owner). Visitors choose a reason; 5 reports an hour per visitor. Saved, and emailed to `REPORT_EMAIL` if email is on.
-- **Your review page**, `#/admin`: asks for `ADMIN_TOKEN` (kept in that browser tab only). Open a reported page, dismiss the report, take the page down (its owner cannot publish it again) or restore it.
-- **Delete my account**, `#/account`: removes pages, photos, visitor messages, scheduled emails and templates at once, and the Clerk login if `CLERK_SECRET_KEY` is set. The person types DELETE to confirm.
-- **Clean-up**: see "The scheduler".
+Wishes, replies, RSVPs, invite-link wishes and "Report this page" can be protected by Cloudflare Turnstile. It is almost always invisible; it shows a tick box only when Cloudflare is unsure, and says "We could not confirm you are a person" if the check fails.
 
-## Support us (UPI)
+1. Cloudflare dashboard, **Turnstile**, **Add widget**. Add your site's hostname and choose **Managed**.
+2. Put the **site key** in `apps/studio/.env.production` as `VITE_TURNSTILE_SITE_KEY`.
+3. Set the **secret key**: `pnpm exec wrangler pages secret put TURNSTILE_SECRET --project-name madeforyou`.
+4. `pnpm run cf:deploy`, then post a test wish from a private window.
 
-A donate-what-you-like page at `#/support`, linked in the footer and gently on the Share screen. It shows a QR code and a "Pay with a UPI app" button, with one-tap amounts (₹20, ₹50, ₹100, ₹200) or any amount. Set `VITE_SUPPORT_UPI` to switch it on (see above), then redeploy.
+Set the site key and the secret in the same deploy: the server starts demanding the check as soon as it has the secret. To switch it off, delete the secret and deploy again. Visitors whose ad blocker blocks `challenges.cloudflare.com` cannot post. Without Turnstile the forms are still protected by a hidden field, a minimum fill time and per-visitor, per-page and per-address limits.
 
-Payments go straight from the payer's UPI app to your bank account. The website never touches the money or sees bank details. Change the wording in `apps/studio/src/screens/Support.tsx`, and keep the Terms and Privacy mentions in step.
+## Testing, checks and builds
 
-## Everyday operations
+```
+pnpm test           # 478 tests across five packages
+pnpm typecheck      # TypeScript strict mode, plus unused variables, imports and parameters
+pnpm --filter @madeforyou/studio build      # a local-mode build
+```
 
-- **See how full the database is**: `Invoke-RestMethod https://YOUR-ADDRESS/api/admin/usage -Headers @{"x-admin-token"="YOUR_ADMIN_TOKEN"}`, or open `#/admin`.
-- **Approve a new creator's public template**: `POST /api/admin/templates/<id>/approve` with the same header.
-- **Back up** (do this weekly): `pnpm exec wrangler d1 export madeforyou --remote --output backup.sql` and keep the file somewhere safe. Photos are inside the database, so this covers them too.
-- **Look inside the database**: always add `--remote`, otherwise wrangler reads an empty local copy: `pnpm exec wrangler d1 execute madeforyou --remote --command "SELECT id, owner_id, status, slug FROM pages"`.
-- **Is it connected?** `https://YOUR-SITE/#/status` shows the server, sign-in, how many pages are in your account, and a **Sync all my pages now** button. `https://YOUR-SITE/api/diag` shows which Clerk address the server expects. `https://YOUR-SITE/api/mail/status` shows whether email and reminders are on.
-- **Update the site**: copy new files over the project, `pnpm test`, then `pnpm run cf:deploy` from `apps\studio`.
-- **Deploy by hand as production**: `pnpm exec wrangler pages deploy dist --project-name madeforyou --branch main`, then open the address without the random prefix.
+For a live build: `VITE_REMOTE=1 pnpm --filter @madeforyou/studio build` (PowerShell: `$env:VITE_REMOTE="1"`).
 
-Optional: push to GitHub and add the secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `VITE_CLERK_PUBLISHABLE_KEY` (and the variable `VITE_SUPPORT_UPI`); `.github/workflows/ci.yml` then tests and deploys on every push to `main`.
+| Package | Tests | What they cover |
+|---|---|---|
+| `schema` | 43 | validation, templates, guest-message cleaning, email checks |
+| `templates` | 93 | every template validates, search |
+| `renderer` | 104 | every block, forms, locks |
+| `api` | 140 | the whole server: gates, photos, publishing, guest messages, email, reports, deletion, limits, clean-up |
+| `studio` | 98 | whole journeys through the real server in-process (publish, report, delete account, support, spam check), popups and crash handling, deploy helpers |
+
+There is no separate linter or formatter. `pnpm typecheck` includes the compiler's unused-code checks, which is what keeps dead code out. Check the dependencies with `pnpm audit --prod` (the code that runs on the site) and `pnpm audit` (adds the build and test tools).
+
+## Deployment
+
+**By hand** (the usual way), in `apps/studio`:
+
+```
+pnpm exec wrangler pages project create madeforyou --production-branch main     # once
+pnpm run cf:deploy
+```
+
+`cf:deploy` finds your database id, checks that `VITE_REMOTE=1` is set, applies new migrations, builds and deploys to the production branch. It does not run the tests, so run `pnpm test` first. Afterwards open `https://YOUR-SITE/api/health` (it should show `{"ok":true}`) and `https://YOUR-SITE/#/status`. Use the main address, not the one-off address with a random prefix.
+
+**With GitHub Actions** (`.github/workflows/ci.yml`): every push runs `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm test` and a live build. A push to `main` then applies the database migrations and deploys. Add the repository secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `VITE_CLERK_PUBLISHABLE_KEY` (and the variables `VITE_SUPPORT_UPI`, `VITE_TURNSTILE_SITE_KEY`). The scheduler Worker is deployed by hand (`pnpm run mailer:deploy`).
+
+**After changing code or a lockfile**, run `pnpm install` before `pnpm test` and `cf:deploy`.
+
+## Running the site
+
+- **Your review page**: `#/admin`, with your `ADMIN_TOKEN`. Open a reported page, dismiss the report, take the page down (its owner cannot publish it again) or restore it. It also shows how many people, pages and photos there are, and how full the database is. The same numbers: `GET /api/admin/usage` with the header `x-admin-token`.
+- **Public templates** made by users go through you: `GET /api/admin/templates/pending`, then `POST /api/admin/templates/<id>/approve` or `reject`. A rejected template stays rejected when its owner saves it again.
+- **Reports** arrive by email (if email is on) and wait in the review page.
+- **Weekly**: take a backup (see Database setup).
+- **Updating**: copy the new files over the project, `pnpm install`, `pnpm test`, `pnpm run cf:deploy`.
+- **Terms and Privacy** are the pages `#/terms` and `#/privacy`; the words are in `apps/studio/src/lib/legal.ts`. **If you change what the app stores or which companies handle data, change the Privacy page too.**
+
+## Security
+
+- **Sign-in and ownership.** Every route that changes data requires a verified login and checks that the page, photo, template, message or delivery belongs to that person. These checks are covered by tests.
+- **Locks are enforced on the server.** Locked, ended, private and password pages return no content. A visitor's photo pass lasts 6 hours but is re-checked against the page's current state, and a taken-down page serves nothing.
+- **Page passwords** are stored as a keyed hash (HMAC-SHA256 with the server secret and a per-page salt), never in the clear, and guessing is limited to 8 tries per visitor per page per 10 minutes. This is not a slow hash, so tell people to choose long passwords.
+- **Request limits** are enforced on the bytes that actually arrive, not on the `Content-Length` header: 400 KB of JSON, 1.5 MB per photo, 25 MB and 30 pages per person.
+- **Uploads** are accepted only if their first bytes really are JPEG, PNG, WebP or one of the audio formats (WebM, MP4, Ogg, MP3). SVG is never accepted. Photos are served with `nosniff`.
+- **Spam and abuse limits** on guest forms, reports, uploads, password attempts, admin guesses and email (see above).
+- **Privacy.** Visitor addresses are kept only as a hash. Deleting an account removes the person's data at once; deleted pages go after 30 days; the Privacy page says the same.
+- **Headers.** `nosniff`, no framing, a strict referrer policy and a permissions policy on every page; shared pages and invite links carry `noindex`. The stop-emails page has its own strict content-security policy.
+- **Content-Security-Policy is in report-only mode** (`apps/studio/public/_headers`). The pages that can be tested without Clerk, Turnstile and Google Fonts load with no reports. Before enforcing it, open the sign-in popup and a page with a guest form on the live site with the browser console open, look for "Content-Security-Policy-Report-Only" messages, fix the policy for anything legitimate, and then rename the header to `Content-Security-Policy`.
+- **Dependencies.** At the final review there were no known vulnerabilities in the code that runs on the site. The remaining advisories are in the test runner (`vitest` 3 and its `tinypool`), which only runs on a developer's machine; moving to vitest 4 needs the studio tests' use of Node's built-in SQLite to be reworked.
+- **Secrets** are never committed (`.env.*` and `.dev.vars` are ignored). If one leaks, set a new value and deploy again.
+
+## Known limitations
+
+- **Free-tier limits.** The free D1 database holds 500 MB in total; Brevo's free plan allows 300 emails a day (the site stops at 280); Workers have a limited CPU time per run. The review page shows how full the database is.
+- **One scheduled job.** Email and clean-up depend on the scheduler Worker running. If it stops, scheduled emails and reminders wait (and are not lost) until it runs again.
+- **Page passwords** use a keyed hash rather than a deliberately slow one (see Security). **Changing `SESSION_SECRET`** invalidates page passwords, invite links and unsubscribe links.
+- **Clerk development mode** until you have a domain; the sign-in box shows a "Development mode" label.
+- **Email from a personal address** can land in spam. A domain you own improves this.
+- **No account suspension.** The review page can take a page down, but there is no switch to block a person; a taken-down page's owner could make a new one.
+- **Third parties.** Fonts load from Google Fonts, and embedded YouTube, Vimeo, Spotify and OpenStreetMap items connect to those companies when loaded (the Privacy page says so). Self-hosting the fonts would be faster and more private.
+- **Not yet verified by me on live services.** Clerk sign-in, Turnstile, Brevo delivery and the scheduled job depend on your accounts. They are covered by tests that stand in for those services, and by the checks on `#/status`, `/api/mail/status` and the scheduler logs described above, but they can only be fully confirmed on your live site.
+- **Openings.** Only the envelope opening is fully designed; the gift box, curtain and diary fall back to it.
+- **Words on the page.** Text a person writes has no Hindi version unless they add one; the fixed interface words are in `packages/renderer/src/labels.ts`.
+- **Tooling.** No separate linter or formatter is configured.
 
 ## Troubleshooting
 
-- **Sign-in works but saving says "please sign in"**: the site shows a banner explaining why (it calls `/api/diag`). Usually `CLERK_ISSUER` or `CLERK_JWKS_URL` belongs to a different Clerk application than the publishable key, or secrets were set after the last deploy. Run `pnpm run cf:deploy` again. Stray spaces, newlines and trailing slashes are ignored.
+- **Sign-in works but saving says "please sign in"**: the site shows a banner explaining why (it calls `/api/diag`). Usually `CLERK_ISSUER` or `CLERK_JWKS_URL` belongs to a different Clerk application than the publishable key, or a secret was set after the last deploy. Run `pnpm run cf:deploy` again. Stray spaces, newlines and trailing slashes are ignored.
 - **"database_id" error when deploying**: `wrangler.toml` must hold the 36-character id of your database (not a URL). `pnpm run cf:deploy` fills it in; by hand, `pnpm exec wrangler d1 list` prints it.
-- **Sign-in sends people to a Clerk page (`accounts.dev`)**: sign-in is meant to stay on your site. The "Sign in" button opens a popup on the page; Google opens in a small window on computers (on phones the page goes to Google and comes back, because phone browsers handle popups badly). If Clerk ever needs a full page it uses `/sign-in` and `/sign-up` on your own address (the settings are in `apps/studio/src/lib/ClerkBridge.tsx` and `CLERK_ROUTES` in `config.ts`; `public/_redirects` makes those two addresses open the app). In the Clerk dashboard, under Configure, Paths, you can also set the sign-in and sign-up URLs to those same two pages.
-- **An email did not arrive**: check spam first; check `https://YOUR-SITE/api/mail/status`; look at the Brevo dashboard, Transactional, Logs; on the Share screen a failed email shows the reason.
-- **Reminders and scheduled emails never go out**: the scheduler is not running or its secret differs (see "The scheduler").
-- **The Support button shows an old UPI ID**: the ID is baked in when the site is built. (1) Check which file sets it: in `apps\studio` run `Get-ChildItem -Force -Filter ".env*"`; Vite reads `.env`, `.env.local`, `.env.production` and `.env.production.local`, and a later one wins. (2) A PowerShell variable beats every file: `$env:VITE_SUPPORT_UPI` must print nothing (clear it with `Remove-Item Env:VITE_SUPPORT_UPI`). (3) Rebuild and check the result before deploying: `pnpm build`, then `Get-ChildItem dist\assets\*.js | Where-Object { Select-String -Path $_.FullName -Pattern "@oldbank" -Quiet }` lists nothing once the old ID is gone. (4) Open the **main** address in a private window. Every deploy also keeps its own one-off address (`https://1a2b3c4d.madeforyou-xxxx.pages.dev`) frozen on the build it was made from, so an old link keeps showing the old ID. To remove those: Cloudflare dashboard, Workers & Pages, madeforyou, Deployments, delete the old ones.
-- **The Support button is missing**: `VITE_SUPPORT_UPI` is empty or not a valid UPI ID, or the site was not rebuilt after you set it.
+- **Deploy stops with "would NOT be connected to the server"**: add `VITE_REMOTE=1` to `apps/studio/.env.production`.
+- **Sign-in sends people to a Clerk page (`accounts.dev`)**: see Authentication. The popup, the Google window and the `/sign-in` and `/sign-up` pages are all meant to stay on your site.
+- **The status page shows a red "Signing secret" line**: `SESSION_SECRET` is shorter than 24 characters. Set a long random one and deploy again (see the warning about passwords and links above).
+- **An email did not arrive**: check spam; check `https://YOUR-SITE/api/mail/status`; look at the Brevo dashboard, Transactional, Logs; on the Share screen a failed email shows the reason.
+- **Reminders and scheduled emails never go out**: the scheduler is not running or its secret differs (see the scheduler section).
+- **The Support button is missing**: `VITE_SUPPORT_UPI` is empty, is not a valid UPI ID, is a phone number, or the site was not rebuilt after you set it.
+- **Guests are refused with "We could not confirm you are a person"**: the Turnstile widget's hostname list does not match your address, or an ad blocker is blocking Cloudflare's script.
+- **A test fails only on a slow computer**: the tests wait for results rather than for a fixed time; if one still fails, run it alone (`pnpm exec vitest run test/<file>` in the package) and look at the message.
 
-## For developers
+## Developer notes
 
 - **Adding a block**: define it in `packages/schema/src/blocks.ts` and register it in `registry.ts`; add a component in `packages/renderer/src/blocks.tsx` or `more.tsx` (and its table); add a description in `apps/studio/src/editor/blockInfo.ts`. Field tags (`personal`, `guided`, `required`, `prompt`, `placeholder`) drive guided mode, template stripping and the publish check automatically.
 - **Editing rule**: never assign `block.fields` directly. Use `setField()`: it clears the placeholder flag and drops stale translations of that field.
 - **Store selectors** must return a stable value. Select `s.pages`, then derive lists with `useMemo`; a selector that builds a new array each call re-renders forever.
-- **The server never trusts the browser**: it validates everything again. Locked, ended and password states return no content at all. Photos are served only to their owner or to a visitor holding a short-lived token earned by passing the page's gates.
+- **Screens** other than the page viewer and the invite page are loaded on demand (`apps/studio/src/App.tsx`). Tests call `preloadScreens()` first so each screen appears immediately.
 - **Link previews**: `/p/<link>` is rendered by `functions/p/[slug].ts`, which fills in the WhatsApp card. Locked, private and password pages show a generic card.
-- **Database changes** are numbered files in `packages/api/migrations/`; `cf:deploy` applies them. Never edit an old one: add the next number.
-- **Links** are stored only as https, http, mailto or tel; videos only as provider + id. YouTube loads only when tapped.
-- **Spam protection on guest forms** works without any service: the guest must have opened the page, a hidden field catches bots, forms filled in under 1.5 seconds are refused, 5 messages per visitor per 10 minutes, 40 per page per hour, 400 per page. Turnstile (above) adds a stronger check on top.
-- **Tests**: `pnpm test` runs 450 tests across schema, templates, renderer, api and studio. The studio tests run the real server in-process, so they cover whole journeys (publish, report, delete account, support).
-
-## Not done yet
-
-- Real-phone testing across Android and iPhone Safari (voice notes, crop dragging, story picture, the three themes' fonts).
-- Clerk production mode and a domain (Clerk production needs a domain you own). Until then Clerk runs in development mode, which is fine for a small beta.
-- Fonts load from Google Fonts; self-host them for a faster, more private production site.
-- The Content-Security-Policy in `apps/studio/public/_headers` is report-only. Check the browser console on the live site, then rename it to `Content-Security-Policy` to enforce it.
-- Renderer UI words (countdown labels, form labels) are in `packages/renderer/src/labels.ts`; text a user writes has no Hindi version unless they add one.
-- Only the envelope opening is fully designed (gift box, curtain and diary fall back to it).
+- **Links** are stored only as https, http, mailto or tel; videos only as provider and id; YouTube loads only when tapped.
+- **The server has no Cloudflare imports**, so it runs and is tested against a D1-shaped SQLite. New routes go in `packages/api/src/app.ts` with a test beside the existing ones.

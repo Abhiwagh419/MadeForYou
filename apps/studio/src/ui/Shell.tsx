@@ -15,17 +15,17 @@ export function Topbar({ active }: { active?: "templates" | "me" }) {
       <div className="wrap topbar-in">
         <Logo />
         <nav aria-label="Main">
-          <a href="#/templates" className={active === "templates" ? "on" : ""} aria-label="Templates">
+          <a href="/#/templates" className={active === "templates" ? "on" : ""} aria-label="Templates">
             <Icon name="grid" size={18} /><span>Templates</span>
           </a>
-          <a href="#/me" className={active === "me" ? "on" : ""} aria-label="My pages">
+          <a href="/#/me" className={active === "me" ? "on" : ""} aria-label="My pages">
             <Icon name="layers" size={18} /><span>My pages</span>{count > 0 && <em>{count}</em>}
           </a>
         </nav>
         {session.mode !== "none" && (session.userId
           ? <Button variant="ghost" size="sm" onClick={session.signOut} title={session.label}>Sign out</Button>
           : <Button variant="secondary" size="sm" onClick={session.signIn}>Sign in</Button>)}
-        <Button href="#/templates" size="sm" icon="plus" className="topbar-create">Create</Button>
+        <Button href="/#/templates" size="sm" icon="plus" className="topbar-create">Create</Button>
       </div>
     </header>
   );
@@ -42,12 +42,12 @@ export function Footer() {
         <div className="footer-right">
           <p className="footer-note">Free for everyone. No ads, no watermarks you cannot remove, no card needed.</p>
           <nav className="footer-links" aria-label="About and legal">
-            {supportUpi() && <a href="#/support" className="footer-support">Support us</a>}
-            <a href="#/terms">Terms</a>
-            <a href="#/privacy">Privacy</a>
+            {supportUpi() && <a href="/#/support" className="footer-support">Support us</a>}
+            <a href="/#/terms">Terms</a>
+            <a href="/#/privacy">Privacy</a>
             <a href={`mailto:${BRAND.contactEmail}`}>Contact</a>
-            <a href="#/account">Account</a>
-            <a href="#/status">Connection status</a>
+            <a href="/#/account">Account</a>
+            <a href="/#/status">Connection status</a>
           </nav>
         </div>
       </div>
@@ -72,7 +72,7 @@ export function NotFound({ what = "page" }: { what?: string }) {
         <div className="empty-arch" aria-hidden="true" />
         <h1>We could not find that {what}</h1>
         <p>It may have been deleted, or the link is not quite right.</p>
-        <Button href="#/" iconRight="right">Back to home</Button>
+        <Button href="/#/" iconRight="right">Back to home</Button>
       </div>
     </Shell>
   );

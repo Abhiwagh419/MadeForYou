@@ -1,10 +1,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "@madeforyou/api";
 import { makeEnv } from "@madeforyou/api/testing";
 import { createBlock, setField, starterSkeleton, type Content } from "@madeforyou/schema";
-import { App } from "../src/App";
+import { App, preloadScreens } from "../src/App";
 import { apiRaw, setTokenGetter } from "../src/lib/api";
 import { AuthProvider } from "../src/lib/auth";
 import { LEGAL_UPDATED, PRIVACY, TERMS } from "../src/lib/legal";
@@ -12,6 +12,9 @@ import { upiUri } from "../src/lib/support";
 import { supportUpi } from "../src/lib/config";
 import { authRetry, publishRemote } from "../src/lib/sync";
 import { createPage, getState, resetStore } from "../src/state/store";
+
+// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
+beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 function party(): Content {
   let c = starterSkeleton();
@@ -114,7 +117,7 @@ describe("Terms and Privacy", () => {
   it("are pages of their own, reachable from the footer on every screen", async () => {
     await visit("#/templates");
     const links = qa(".footer-links a").map((a) => [a.textContent, a.getAttribute("href")]);
-    expect(links).toEqual(expect.arrayContaining([["Terms", "#/terms"], ["Privacy", "#/privacy"], ["Contact", "mailto:wabhi2009@gmail.com"], ["Account", "#/account"]]));
+    expect(links).toEqual(expect.arrayContaining([["Terms", "/#/terms"], ["Privacy", "/#/privacy"], ["Contact", "mailto:wabhi2009@gmail.com"], ["Account", "/#/account"]]));
     await act(async () => { window.location.hash = "#/terms"; });
     await settle(60);
     expect(q("h1")?.textContent).toBe("Terms of use");
@@ -256,7 +259,7 @@ describe("Support us", () => {
     vi.stubEnv("VITE_SUPPORT_UPI", "abhi@okbank");
     await visit("#/templates");
     const link = qa(".footer-links a").find((a) => a.textContent === "Support us");
-    expect(link?.getAttribute("href")).toBe("#/support");
+    expect(link?.getAttribute("href")).toBe("/#/support");
 
     await act(async () => { window.location.hash = "#/support"; });
     await settle(150);
@@ -377,5 +380,27 @@ describe("The spam check on guest forms", () => {
     expect(holder.style.display).toBe("block");
     expect(await pending).toBe("good");
     expect(holder.style.display).toBe("none");
+  });
+});
+
+describe("links on a shared page", () => {
+  it("go to the website's own pages, not to a dead address on the page's own URL", async () => {
+    // On /p/<link> a bare "#/privacy" only changes the part after the #, and the page never changes.
+    await publishParty();
+    setTokenGetter(async () => null);
+    await visit("/p/priya");
+    const foot = q(".viewer-foot")!;
+    const links = [...foot.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(links).toEqual([["Privacy", "/#/privacy"], ["Terms", "/#/terms"]]);
+    await act(async () => button("Report this page").click());
+    const dialogLink = [...document.body.querySelectorAll(".report a")].find((a) => a.textContent === "Privacy");
+    expect(dialogLink?.getAttribute("href")).toBe("/#/privacy");
+  });
+
+  it("every link in the website's header and footer works from /sign-in too", async () => {
+    await visit("/sign-in");
+    const hrefs = [...host!.querySelectorAll("header a, footer a")].map((a) => a.getAttribute("href")!).filter((h) => h.includes("#/"));
+    expect(hrefs.length).toBeGreaterThan(5);
+    for (const h of hrefs) expect(h.startsWith("/#/")).toBe(true);
   });
 });

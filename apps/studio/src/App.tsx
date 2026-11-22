@@ -1,34 +1,50 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { useSession } from "./lib/auth";
 import { isRemote } from "./lib/config";
 import { authRetry, handleAuthError, pullPages, refreshOwnerToken, setAuthProblem, useAuthProblem } from "./lib/sync";
 import { Button } from "./ui/Button";
-import { Editor } from "./editor/Editor";
 import { useRoute } from "./lib/router";
-import { Dashboard } from "./screens/Dashboard";
-import { Guided } from "./screens/Guided";
 import { Contribute } from "./screens/Contribute";
-import { Home } from "./screens/Home";
-import { Inbox } from "./screens/Inbox";
-import { Status } from "./screens/Status";
-import { Account } from "./screens/Account";
-import { AuthPage } from "./screens/AuthPage";
-import { Admin } from "./screens/Admin";
-import { Privacy, Terms } from "./screens/Legal";
-import { Support } from "./screens/Support";
-import { Publish } from "./screens/Publish";
-import { Share } from "./screens/Share";
-import { TemplateFrom } from "./screens/TemplateFrom";
-import { TemplatePreview } from "./screens/TemplatePreview";
-import { Templates } from "./screens/Templates";
 import { Viewer } from "./screens/Viewer";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { Toaster, toast } from "./ui/Controls";
 import { NotFound } from "./ui/Shell";
+
+
+/**
+ * A visitor opening a shared page needs the page viewer and nothing else, so every creator screen is fetched only
+ * when someone goes there. (The viewer and the invite page stay in the main file: they are what most people open.)
+ */
+const loaders = {
+  Home: () => import("./screens/Home").then((m) => m.Home),
+  Templates: () => import("./screens/Templates").then((m) => m.Templates),
+  TemplatePreview: () => import("./screens/TemplatePreview").then((m) => m.TemplatePreview),
+  Guided: () => import("./screens/Guided").then((m) => m.Guided),
+  Editor: () => import("./editor/Editor").then((m) => m.Editor),
+  Publish: () => import("./screens/Publish").then((m) => m.Publish),
+  Share: () => import("./screens/Share").then((m) => m.Share),
+  TemplateFrom: () => import("./screens/TemplateFrom").then((m) => m.TemplateFrom),
+  Dashboard: () => import("./screens/Dashboard").then((m) => m.Dashboard),
+  Inbox: () => import("./screens/Inbox").then((m) => m.Inbox),
+  Status: () => import("./screens/Status").then((m) => m.Status),
+  Account: () => import("./screens/Account").then((m) => m.Account),
+  Admin: () => import("./screens/Admin").then((m) => m.Admin),
+  Support: () => import("./screens/Support").then((m) => m.Support),
+  Terms: () => import("./screens/Legal").then((m) => m.Terms),
+  Privacy: () => import("./screens/Legal").then((m) => m.Privacy),
+  AuthPage: () => import("./screens/AuthPage").then((m) => m.AuthPage),
+} satisfies Record<string, () => Promise<ComponentType<any>>>;
+
+const L = Object.fromEntries(Object.entries(loaders).map(([k, load]) => [k, lazy(() => load().then((c) => ({ default: c })))])) as unknown as { [K in keyof typeof loaders]: ComponentType<any> };
+
+/** Fetches every creator screen now. Used by the tests, so a screen shows up instantly. */
+export const preloadScreens = () => Promise.all(Object.values(loaders).map((load) => load()));
 
 /** When someone signs in: fetch their photo access, then bring their saved pages onto this device. */
 function SyncOnSignIn() {
   const { userId } = useSession();
   useEffect(() => {
+    if (!userId) setAuthProblem(null); // signed out: the "server did not accept your login" notice no longer applies
     if (!isRemote() || !userId) return;
     let alive = true;
     (async () => {
@@ -51,7 +67,6 @@ function SyncOnSignIn() {
     return () => {
       alive = false;
     };
-    if (!userId) setAuthProblem(null);
   }, [userId]);
   return null;
 }
@@ -96,24 +111,24 @@ export function App() {
 
   let screen;
   switch (route.name) {
-    case "home": screen = <Home />; break;
-    case "templates": screen = <Templates />; break;
-    case "template": screen = <TemplatePreview />; break;
-    case "make": screen = <Guided />; break;
-    case "edit": screen = <Editor />; break;
-    case "publish": screen = <Publish />; break;
-    case "share": screen = <Share />; break;
-    case "astemplate": screen = <TemplateFrom />; break;
-    case "me": screen = <Dashboard />; break;
-    case "status": screen = <Status />; break;
-    case "terms": screen = <Terms />; break;
-    case "privacy": screen = <Privacy />; break;
-    case "account": screen = <Account />; break;
-    case "admin": screen = <Admin />; break;
-    case "support": screen = <Support />; break;
-    case "signin": screen = <AuthPage mode="in" />; break;
-    case "signup": screen = <AuthPage mode="up" />; break;
-    case "inbox": screen = <Inbox />; break;
+    case "home": screen = <L.Home />; break;
+    case "templates": screen = <L.Templates />; break;
+    case "template": screen = <L.TemplatePreview />; break;
+    case "make": screen = <L.Guided />; break;
+    case "edit": screen = <L.Editor />; break;
+    case "publish": screen = <L.Publish />; break;
+    case "share": screen = <L.Share />; break;
+    case "astemplate": screen = <L.TemplateFrom />; break;
+    case "me": screen = <L.Dashboard />; break;
+    case "status": screen = <L.Status />; break;
+    case "terms": screen = <L.Terms />; break;
+    case "privacy": screen = <L.Privacy />; break;
+    case "account": screen = <L.Account />; break;
+    case "admin": screen = <L.Admin />; break;
+    case "support": screen = <L.Support />; break;
+    case "signin": screen = <L.AuthPage mode="in" />; break;
+    case "signup": screen = <L.AuthPage mode="up" />; break;
+    case "inbox": screen = <L.Inbox />; break;
     case "contribute": screen = <Contribute />; break;
     case "view": screen = <Viewer />; break;
     default: screen = <NotFound />;
@@ -122,7 +137,9 @@ export function App() {
     <>
       <LocalModeBanner />
       <AuthProblemBanner />
-      {screen}
+      <ErrorBoundary key={`${route.name}:${Object.values(route.params).join("/")}`}>
+        <Suspense fallback={<main className="wrap" aria-busy="true"><p className="field-hint">Loading…</p></main>}>{screen}</Suspense>
+      </ErrorBoundary>
       <SyncOnSignIn />
       <Toaster />
     </>

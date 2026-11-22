@@ -1,15 +1,18 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "@madeforyou/api";
 import { makeEnv } from "@madeforyou/api/testing";
 import { guidedQuestions, setField, starterSkeleton, type Content } from "@madeforyou/schema";
-import { App } from "../src/App";
+import { App, preloadScreens } from "../src/App";
 import { apiRaw, setTokenGetter } from "../src/lib/api";
 import { AuthProvider } from "../src/lib/auth";
 import { authRetry, mergeServerPages, publishRemote, pullPages, pushPage, syncAll, toLocalPage, type ServerPage } from "../src/lib/sync";
 import { createPage, getState, resetStore, savePage } from "../src/state/store";
 import * as assets from "../src/lib/assets";
+
+// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
+beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 const SECRET_TEXT = "A secret message only Priya should read.";
 

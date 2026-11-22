@@ -12,7 +12,7 @@ export function Mark({ size = 28 }: { size?: number }) {
 
 export function Logo() {
   return (
-    <a className="logo" href="#/" aria-label={`${BRAND.name} home`}>
+    <a className="logo" href="/#/" aria-label={`${BRAND.name} home`}>
       <Mark />
       <span>{BRAND.name}</span>
     </a>

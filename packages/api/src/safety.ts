@@ -78,5 +78,7 @@ export async function purgeOld(env: Env, now: number): Promise<{ pages: number; 
   const rep = await env.DB.prepare("DELETE FROM reports WHERE status != 'open' AND handled_at IS NOT NULL AND handled_at < ?").bind(iso(now - KEEP_REPORT_DAYS * DAY)).run();
   // the record of emails already sent is only needed until the thing it guards has passed
   await env.DB.prepare("DELETE FROM mail_log WHERE at < ?").bind(iso(now - 90 * DAY)).run();
+  // the visitor-limit counters only matter for the last day
+  await env.DB.prepare("DELETE FROM throttle WHERE at < ?").bind(now - DAY).run();
   return { pages: pageCount, photos: loose.length, reports: rep.meta?.changes ?? 0 };
 }

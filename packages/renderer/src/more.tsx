@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import type { AssetRef, Block } from "@madeforyou/schema";
 import { useFields, useRender } from "./context";
 import { label } from "./labels";
-import { buildIcs, formatEvent, parseTarget, safeHref, shape, togetherSince } from "./util";
+import { buildIcs, formatEvent, safeHref, shape, togetherSince } from "./util";
 
 type P = { block: Block };
 const idx = (i: number) => ({ "--i": i }) as CSSProperties;

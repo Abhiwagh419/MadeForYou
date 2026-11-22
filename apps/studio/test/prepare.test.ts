@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { liveModeConfigured } from "../scripts/liveMode.mjs";
 import { PLACEHOLDER, applyDatabaseId, currentDatabaseId, isDatabaseId, pickDatabaseId } from "../scripts/dbid.mjs";
 
 const ID = "1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d";
@@ -23,5 +24,22 @@ describe("database id helper", () => {
     expect(currentDatabaseId(next)).toBe(ID);
     expect(next).toContain('binding = "DB"');
     expect(currentDatabaseId(TOML)).toBe(PLACEHOLDER);
+  });
+});
+
+describe("live-mode guard for deploys", () => {
+  it("accepts VITE_REMOTE=1 from the .env file or from the environment", () => {
+    expect(liveModeConfigured(["VITE_CLERK_PUBLISHABLE_KEY=pk_x\nVITE_REMOTE=1\n"], {})).toBe(true);
+    expect(liveModeConfigured(['  VITE_REMOTE = "1"  # on'], {})).toBe(true);
+    expect(liveModeConfigured([], { VITE_REMOTE: "1" })).toBe(true);
+  });
+  it("refuses a build that would not be connected to the server", () => {
+    expect(liveModeConfigured([], {})).toBe(false);
+    expect(liveModeConfigured(["VITE_CLERK_PUBLISHABLE_KEY=pk_x"], {})).toBe(false);
+    expect(liveModeConfigured(["VITE_REMOTE=0"], {})).toBe(false);
+    expect(liveModeConfigured(["# VITE_REMOTE=1"], {})).toBe(false);
+    expect(liveModeConfigured(["VITE_REMOTE=10"], {})).toBe(false);
+    expect(liveModeConfigured(["NOT_VITE_REMOTE=1"], {})).toBe(false);
+    expect(liveModeConfigured(undefined as never, { VITE_REMOTE: "0" })).toBe(false);
   });
 });

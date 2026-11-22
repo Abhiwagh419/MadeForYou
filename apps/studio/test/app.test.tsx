@@ -1,11 +1,14 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { guidedQuestions, setField, starterSkeleton, type Content } from "@madeforyou/schema";
 import { getTemplate } from "@madeforyou/templates";
-import { App } from "../src/App";
+import { App, preloadScreens } from "../src/App";
 import { sha256 } from "../src/lib/util";
 import { createPage, getState, resetStore, savePage } from "../src/state/store";
+
+// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
+beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 let root: Root | null = null;
 let host: HTMLElement | null = null;

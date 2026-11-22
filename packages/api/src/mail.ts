@@ -186,9 +186,9 @@ function render(l: Layout): { html: string; text: string } {
 ${l.paragraphs.map(p).join("")}
 ${l.quote ? `<div style="margin:6px 0 18px;padding:12px 16px;border-left:3px solid #E11D48;background:#FFF8F0;border-radius:6px;font-family:Georgia,serif;font-style:italic;font-size:16px;line-height:1.5;color:#4A0E1F">${nl(l.quote)}</div>` : ""}
 ${l.button ? `<p style="margin:22px 0"><a href="${escHtml(l.button.url)}" style="display:inline-block;background:#E11D48;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:13px 26px;border-radius:999px">${escHtml(l.button.label)}</a></p>` : ""}
-${(l.small ?? []).map((t) => `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#8A6B73">${nl(t)}</p>`).join("")}
+${(l.small ?? []).map((t) => `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#7E626A">${nl(t)}</p>`).join("")}
 </td></tr></table>
-<p style="max-width:520px;margin:16px auto 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8A6B73;text-align:center">${escHtml(l.footer)}<br><a href="${escHtml(l.unsubscribeUrl)}" style="color:#8A6B73">Stop emails like this</a></p>
+<p style="max-width:520px;margin:16px auto 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#7E626A;text-align:center">${escHtml(l.footer)}<br><a href="${escHtml(l.unsubscribeUrl)}" style="color:#7E626A">Stop emails like this</a></p>
 </td></tr></table></body></html>`;
   const text = [l.heading, "", ...l.paragraphs.flatMap((t) => [t, ""]), ...(l.quote ? [`"${l.quote}"`, ""] : []), ...(l.button ? [`${l.button.label}: ${l.button.url}`, ""] : []), ...(l.small ?? []), "", l.footer, `Stop emails like this: ${l.unsubscribeUrl}`].join("\n");
   return { html, text };
@@ -277,11 +277,16 @@ export async function deliverOne(env: Env, deps: Deps, origin: string, id: strin
     return "retry";
   }
 
+  // The send is marked in the log BEFORE it happens. If the server stops half-way (after the email left but before
+  // we could write that down), the next run finds the mark and does NOT send a second copy; it asks the owner to check.
+  const key = `dl:${id}`;
+  if (!(await claim(env, key, now))) return fail("The server stopped while sending this, so we cannot tell if it arrived. Please check with them, then send it again if needed.");
   const unsubscribeUrl = `${origin}/api/mail/unsub?t=${await unsubToken(env, d.to_email, now)}`;
   const mail = deliveryEmail({ origin, page: p as PageLite, fromName: d.from_name, toName: d.to_name ?? "", note: d.note ?? "", unsubscribeUrl, now });
   try {
     await sendMail(env, deps, { to: d.to_email, toName: d.to_name ?? undefined, subject: mail.subject, html: mail.html, text: mail.text, unsubscribeUrl });
   } catch (e) {
+    await release(env, key); // it did not go out, so a later try is allowed
     const err = e as MailError;
     if (err.retry && d.attempts < MAX_TRIES) {
       await env.DB.prepare("UPDATE deliveries SET status = 'scheduled', error = ? WHERE id = ?").bind(err.message, id).run();
@@ -289,7 +294,6 @@ export async function deliverOne(env: Env, deps: Deps, origin: string, id: strin
     }
     return fail(err.message);
   }
-  await claim(env, `dl:${id}`, now);
   await env.DB.prepare("UPDATE deliveries SET status = 'sent', sent_at = ?, error = NULL WHERE id = ?").bind(iso(deps.now()), id).run();
   return "sent";
 }

@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "@madeforyou/schema": "workspace:*",
-    "hono": "^4.6.0",
+    "hono": "^4.13.19",
     "jose": "^5.9.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
-    "vitest": "^3.2.4",
+    "@madeforyou/templates": "workspace:*",
     "@types/node": "^22.0.0",
-    "@madeforyou/templates": "workspace:*"
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
   },
   "exports": {
     ".": "./src/index.ts",
