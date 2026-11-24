@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { BRAND } from "@madeforyou/ui";
 import { useAssets } from "../lib/assets";
+import { askForHelp } from "../lib/helpNote";
 import { makeStoryImage } from "../lib/story";
 import { isRemote } from "../lib/config";
 import { useRoute } from "../lib/router";
@@ -9,9 +10,9 @@ import { formatWhen, pageUrl, waLink } from "../lib/util";
 import { useStore } from "../state/store";
 import { Button } from "../ui/Button";
 import { toast } from "../ui/Controls";
-import { supportUpi } from "../lib/config";
 import { EmailDelivery } from "../ui/EmailDelivery";
 import { Icon } from "../ui/Icon";
+import { SupportNudge } from "../ui/Promo";
 import { NotFound, Shell } from "../ui/Shell";
 import { Thumb } from "../ui/Thumb";
 
@@ -62,10 +63,11 @@ export function Share() {
     if (!story) return;
     const file = new File([story.blob], `${page.slug}-story.png`, { type: "image/png" });
     if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], text: message }); return; } catch { /* cancelled: fall back to a download */ }
+      try { await navigator.share({ files: [file], text: message }); askForHelp("export"); return; } catch { /* cancelled: fall back to a download */ }
     }
     const a = document.createElement("a");
     a.href = story.url; a.download = file.name; a.click();
+    askForHelp("export");
   };
 
   return (
@@ -120,7 +122,7 @@ export function Share() {
                 <img src={story.url} alt="Preview of your story picture" />
                 <div className="share-actions">
                   <Button icon="share" onClick={shareStory}>Share the picture</Button>
-                  <Button variant="secondary" icon="download" href={story.url} download={`${page.slug}-story.png`}>Download</Button>
+                  <Button variant="secondary" icon="download" href={story.url} download={`${page.slug}-story.png`} onClick={() => askForHelp("export")}>Download</Button>
                 </div>
               </div>
             ) : (
@@ -130,15 +132,7 @@ export function Share() {
 
           <EmailDelivery pageId={id} defaultTo={hero?.ph.includes("recipient") ? "" : recipient} defaultFrom={String(sig && !sig.ph.includes("name") ? sig.fields.name ?? "" : "")} />
 
-          {supportUpi() && (
-            <div className="pcard support-nudge">
-              <div>
-                <h2>Did {BRAND.name} help you today?</h2>
-                <p className="field-hint">It is free, with no ads. If you like, you can chip in any amount to keep it running. If not, that is completely fine.</p>
-              </div>
-              <Button variant="secondary" icon="heart" href="#/support">Support us</Button>
-            </div>
-          )}
+          <SupportNudge />
 
           <div className="share-more">
             {hasGuests && <Button variant="ghost" icon="mail" href={`#/inbox/${id}`}>Messages</Button>}
@@ -152,7 +146,7 @@ export function Share() {
           <div className="qrcard">
             {qr ? <img src={qr} alt="QR code for your page link" /> : <div className="qr-skel" />}
             <p>Print it on a card or a gift</p>
-            <Button variant="secondary" size="sm" icon="download" href={qr || "#"} download={`${page.slug}-qr.png`}>Download QR</Button>
+            <Button variant="secondary" size="sm" icon="download" href={qr || "#"} download={`${page.slug}-qr.png`} onClick={() => askForHelp("export")}>Download QR</Button>
           </div>
         </aside>
       </div>

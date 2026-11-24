@@ -24,6 +24,8 @@ export function Admin() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [all, setAll] = useState(false);
   const [error, setError] = useState("");
+  /** The reason written for each open report. It goes in the emails to the reporter and the page's owner. */
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -44,8 +46,9 @@ export function Admin() {
 
   const act = async (r: Report, action: "remove" | "dismiss") => {
     if (action === "remove" && !window.confirm(`Take down “${r.title}”? Its owner will not be able to publish it again until you restore it.`)) return;
-    const res = await apiRaw(`/admin/reports/${r.id}/${action}`, { method: "POST", headers: { "x-admin-token": token }, auth: false });
-    toast(res.status === 200 ? (action === "remove" ? "Page taken down" : "Report dismissed") : "That did not work");
+    const res = await apiRaw(`/admin/reports/${r.id}/${action}`, { method: "POST", json: { note: (notes[r.id] ?? "").trim() }, headers: { "x-admin-token": token }, auth: false });
+    toast(res.status === 200 ? (action === "remove" ? "Page taken down. The reporter and the owner are told." : "Report dismissed. The reporter and the owner are told.") : "That did not work");
+    if (res.status === 200) setNotes((n) => { const { [r.id]: _done, ...rest } = n; return rest; });
     await load();
   };
   const restore = async (r: Report) => {
@@ -95,6 +98,12 @@ export function Admin() {
                   {r.open_for_page > 1 ? `${r.open_for_page} open reports on this page · ` : ""}
                   owner {r.owner_id}
                 </p>
+                {r.status === "open" && (
+                  <div className="field">
+                    <span className="field-hint">Your reason. It is sent by email to the reporter (if they left an address) and to the page’s owner.</span>
+                    <textarea className="in in-sm in-area" aria-label={`Your reason for “${r.title}”`} rows={2} maxLength={600} value={notes[r.id] ?? ""} placeholder="For example: it showed a private phone number, so we took it down." onChange={(e) => setNotes((n) => ({ ...n, [r.id]: e.target.value }))} />
+                  </div>
+                )}
                 <div className="report-actions">
                   <Button size="sm" variant="secondary" icon="eye" href={`#/p/${r.slug}`} target="_blank" rel="noreferrer">Open the page</Button>
                   {r.status === "open" ? (

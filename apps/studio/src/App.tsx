@@ -8,6 +8,7 @@ import { Contribute } from "./screens/Contribute";
 import { Viewer } from "./screens/Viewer";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { Toaster, toast } from "./ui/Controls";
+import { HelpNote } from "./ui/HelpNote";
 import { NotFound } from "./ui/Shell";
 
 
@@ -142,6 +143,7 @@ export function App() {
       </ErrorBoundary>
       <SyncOnSignIn />
       <Toaster />
+      <HelpNote />
     </>
   );
 }

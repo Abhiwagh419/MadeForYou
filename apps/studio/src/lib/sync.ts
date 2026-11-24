@@ -24,12 +24,20 @@ export const toLocalPage = (s: ServerPage): PageRecord => ({
   access: toLocalAccess(s.access), createdAt: s.createdAt, updatedAt: s.updatedAt, publishedAt: s.publishedAt, takenDown: s.takenDown,
 });
 
-/** Last write wins: a server page replaces the local copy only if it is newer. Pure, so it is easy to test. */
+const sameTakedown = (a?: { at: string }, b?: { at: string }) => (a?.at ?? null) === (b?.at ?? null);
+
+/**
+ * Last write wins: a server page replaces the local copy only if it is newer. Pure, so it is easy to test.
+ * One exception: whether a page is taken down is decided by the server alone. If it differs here (a page was
+ * restored, or taken down, while this browser held an older copy), that one field is brought into line even when
+ * the local copy is newer, and the owner's edits are kept.
+ */
 export function mergeServerPages(local: Record<string, PageRecord>, server: ServerPage[]): PageRecord[] {
   const out: PageRecord[] = [];
   for (const s of server) {
     const mine = local[s.id];
     if (!mine || Date.parse(s.updatedAt) > Date.parse(mine.updatedAt)) out.push(toLocalPage(s));
+    else if (!sameTakedown(mine.takenDown, s.takenDown)) out.push({ ...mine, takenDown: s.takenDown });
   }
   return out;
 }
@@ -89,7 +97,7 @@ export async function publishRemote(id: string, o: PublishOptions): Promise<Page
   await pushPage(rec);
   const { page } = await api<{ page: ServerPage }>(`/pages/${id}/publish`, { method: "POST", json: o });
   const local = toLocalPage(page);
-  savePage(id, { slug: local.slug, status: local.status, access: local.access, publishedAt: local.publishedAt });
+  savePage(id, { slug: local.slug, status: local.status, access: local.access, publishedAt: local.publishedAt, takenDown: local.takenDown });
   return getState().pages[id]!;
 }
 

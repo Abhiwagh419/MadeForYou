@@ -413,3 +413,86 @@ export async function notifyReport(env: Env, deps: Deps, o: { origin: string; sl
     /* the report is saved either way; it will be waiting in the review page */
   }
 }
+
+/* ---------- notes about a report to the page's owner and to the people who reported it ---------- */
+
+const REPORT_REASON_WORDS: Record<string, string> = {
+  abuse: "it is hurtful, threatening or unlawful",
+  private: "it shows someone's private details without their consent",
+  copyright: "it uses a photo, music or writing without permission",
+  spam: "it looks like spam or a scam",
+  other: "something else",
+};
+/** Where people can write about a decision: the report address, else the sender address. */
+export const contactAddress = (env: Env) => cleanEmail(env.REPORT_EMAIL ?? "") ?? mailConfig(env)?.from ?? "";
+
+export const reportReasonWords = (reason: string) => REPORT_REASON_WORDS[reason] ?? reason;
+
+/** A plain, personal note. These are one-off notices about something that happened, not a mailing, so there is no stop link. */
+async function sendNotice(env: Env, deps: Deps, to: string, subject: string, heading: string, paragraphs: string[], quote?: { label: string; text: string }): Promise<void> {
+  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#4A0E1F;line-height:1.55;max-width:520px"><h2 style="font-family:Georgia,serif;margin:0 0 14px">${escHtml(heading)}</h2>${paragraphs.map((p) => `<p style="margin:0 0 12px">${nl(p)}</p>`).join("")}${quote ? `<p style="margin:0 0 4px;font-size:13px;color:#7E626A">${escHtml(quote.label)}</p><div style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #E11D48;background:#FFF8F0">${nl(quote.text)}</div>` : ""}</div>`;
+  const text = [heading, "", ...paragraphs.flatMap((p) => [p, ""]), ...(quote ? [`${quote.label}`, quote.text] : [])].join("\n");
+  try {
+    await sendMail(env, deps, { to, subject: subject.slice(0, 120), html, text });
+  } catch {
+    /* the decision is saved either way; a failed note must never undo it */
+  }
+}
+
+/** Tells the owner of a page that someone reported it. The reporter's details are not shared. */
+export async function notifyOwnerReported(env: Env, deps: Deps, o: { ownerId: string; title: string; slug: string; reason: string; origin: string; contactEmail: string }): Promise<void> {
+  if (!mailConfig(env)) return;
+  const to = await ownerEmail(env, deps, o.ownerId, deps.now());
+  if (!to || (await isBlocked(env, to))) return;
+  await sendNotice(env, deps, to, `Your page was reported: ${o.title}`, "Someone reported your page", [
+    `Your page “${o.title}” (${o.origin}/p/${o.slug}) was reported because ${reportReasonWords(o.reason)}.`,
+    "It is still online while we take a look. We will write to you again with what we decide, and why.",
+    ...(o.contactEmail ? [`If you have something to tell us about it, write to ${o.contactEmail}.`] : []),
+  ]);
+}
+
+/**
+ * Tells the people involved what was decided: every reporter who left an email address, and the owner of the page.
+ * `note` is the reason written on the review page. Each address gets one note, however many reports it made.
+ */
+export async function notifyDecision(
+  env: Env,
+  deps: Deps,
+  o: { decision: "removed" | "dismissed"; note: string; title: string; slug: string; ownerId: string; origin: string; contactEmail: string; reporters: (string | null)[] },
+): Promise<void> {
+  if (!mailConfig(env)) return;
+  const removed = o.decision === "removed";
+  const note = o.note.trim();
+
+  const seen = new Set<string>();
+  for (const raw of o.reporters) {
+    const to = cleanEmail(raw ?? "");
+    if (!to || seen.has(to) || (await isBlocked(env, to))) continue;
+    seen.add(to);
+    await sendNotice(
+      env, deps, to,
+      removed ? `We took the page down: ${o.title}` : `About your report: ${o.title}`,
+      removed ? "Thank you. We took the page down" : "Thank you for your report",
+      [
+        removed
+          ? `You reported the page “${o.title}”. We looked at it and took it down.`
+          : `You reported the page “${o.title}”. We looked at it and decided to leave it online.`,
+        ...(note ? [] : ["We did not add a note."]),
+      ],
+      note ? { label: "Our reason", text: note } : undefined,
+    );
+  }
+
+  const to = await ownerEmail(env, deps, o.ownerId, deps.now());
+  if (to && !(await isBlocked(env, to))) {
+    await sendNotice(
+      env, deps, to,
+      removed ? `Your page was taken down: ${o.title}` : `Your page stays online: ${o.title}`,
+      removed ? "We took your page down" : "Your page stays online",
+      removed
+        ? [`After a report, we looked at “${o.title}” and took it down. It can no longer be opened, and it cannot be published again for now.`, ...(o.contactEmail ? [`If you think this was a mistake, write to ${o.contactEmail}.`] : [])]
+        : [`Someone reported “${o.title}” (${o.origin}/p/${o.slug}). We looked at it and decided there was nothing wrong. It stays online and you do not need to do anything.`],
+      note ? { label: "Our reason", text: note } : undefined,
+    );
+  }
+}

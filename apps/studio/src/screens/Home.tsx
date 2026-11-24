@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { getTemplate, templates } from "@madeforyou/templates";
 import { Button } from "../ui/Button";
+import { SupportNudge } from "../ui/Promo";
 import { Shell } from "../ui/Shell";
 import { SearchBox } from "../ui/SearchBox";
 import { PhoneThumb } from "../ui/Thumb";
@@ -77,6 +78,10 @@ export function Home() {
           </div>
           <Button size="lg" icon="plus" onClick={() => startFromScratch()}>Start from scratch</Button>
         </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap"><SupportNudge /></div>
       </section>
     </Shell>
   );

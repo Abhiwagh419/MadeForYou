@@ -11,6 +11,7 @@ import { sha256 } from "../lib/util";
 import { useStore, type PageRecord } from "../state/store";
 import { Button } from "../ui/Button";
 import { Mark } from "../ui/Logo";
+import { ViewerPromo } from "../ui/Promo";
 import { ReportDialog } from "../ui/ReportDialog";
 
 function Centered({ page, preset, children }: { page?: PageRecord; preset?: string; children: React.ReactNode }) {
@@ -100,6 +101,7 @@ function LocalViewer() {
     <>
       {access.visibility === "private" && <div className="ribbon">Only you can see this page</div>}
       <Open page={page} />
+      <ViewerPromo />
     </>
   );
 }
@@ -136,6 +138,7 @@ function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: 
     <>
       {v.owner && v.visibility === "private" && <div className="ribbon">Only you can see this page</div>}
       <PageRenderer content={v.content} resolveAsset={resolve} host={host} />
+      {!v.owner && <ViewerPromo />}
       {!v.owner && (
         <nav className="viewer-foot" aria-label="About this page">
           <button type="button" onClick={() => setReporting(true)}>Report this page</button>

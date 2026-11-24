@@ -8,6 +8,7 @@ import { formatWhen } from "../lib/util";
 import { go } from "../lib/router";
 import { Button } from "../ui/Button";
 import { Segmented, Sheet, toast } from "../ui/Controls";
+import { SupportNudge } from "../ui/Promo";
 import { Shell } from "../ui/Shell";
 import { TemplateCard } from "../ui/TemplateCard";
 import { Thumb } from "../ui/Thumb";
@@ -117,6 +118,8 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      <div className="wrap"><SupportNudge /></div>
 
       <Sheet open={!!doomed} onClose={() => setDoomed(null)} title="Delete this page?">
         <p>“{doomed?.title}” will be removed from this device. This cannot be undone.</p>

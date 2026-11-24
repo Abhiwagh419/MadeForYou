@@ -131,6 +131,7 @@ describe("the site owner's review", () => {
 
     // a mistake can be undone
     expect((await call("POST", "/admin/pages/pg_safe0001/restore", { headers: ADMIN })).json.changed).toBe(1);
+    expect((await call("GET", "/me/pages", { user: "abhi" })).json.pages[0].takenDown).toBeUndefined();
     expect((await call("POST", "/pages/pg_safe0001/publish", { user: "abhi", json: { slug: "priya" } })).status).toBe(200);
     expect((await call("GET", "/p/priya")).status).toBe(200);
   });
@@ -301,5 +302,88 @@ describe("review fixes", () => {
     const left = ((await env.DB.prepare("SELECT id FROM assets").all()) as any).results.map((r: any) => r.id);
     expect(left).toEqual(["ast_late0001"]);
     expect(env.FILES.keys()).toEqual(["a/ast_late0001"]);
+  });
+});
+
+describe("emails about a report", () => {
+  const MAIL = { BREVO_API_KEY: "k", MAIL_FROM: "owner@example.com", REPORT_EMAIL: "help@example.com" };
+  const giveOwnerEmail = (email = "owner-person@example.com") =>
+    env.DB.prepare("UPDATE users SET email = ?, email_at = ? WHERE id = ?").bind(email, new Date(t).toISOString(), "dev_abhi").run();
+  const to = () => brevo.map((m) => m.to[0].email);
+
+  it("tells the owner of the page once, on the first report, without naming the reporter", async () => {
+    boot(MAIL);
+    await publish();
+    await giveOwnerEmail();
+    await report({ reason: "private", contact: "me@example.com", details: "my number" });
+    await report({ reason: "spam" });
+    const toOwner = brevo.filter((m) => m.to[0].email === "owner-person@example.com");
+    expect(toOwner).toHaveLength(1);
+    expect(toOwner[0].subject).toContain("For Priya");
+    expect(toOwner[0].htmlContent).toContain("private details");
+    expect(JSON.stringify(toOwner[0])).not.toContain("me@example.com");
+    expect(JSON.stringify(toOwner[0])).not.toContain("my number");
+    expect(toOwner[0].headers).toBeUndefined();
+  });
+
+  it("taking a page down writes to every reporter with an address, and to the owner, with the reason", async () => {
+    boot(MAIL);
+    await publish();
+    await giveOwnerEmail();
+    await report({ reason: "abuse", contact: "a@example.com" });
+    await report({ reason: "spam", contact: "A@example.com" }); // the same person again
+    await report({ reason: "spam", contact: "not an email" });
+    brevo = [];
+    const first = (await open()).find((x) => x.reason === "abuse");
+    expect((await call("POST", `/admin/reports/${first.id}/remove`, { headers: ADMIN, json: { note: "It shared a private number." } })).status).toBe(200);
+    expect(to().sort()).toEqual(["a@example.com", "owner-person@example.com"]);
+    for (const m of brevo) expect(m.htmlContent).toContain("It shared a private number.");
+    const mine = (await call("GET", "/me/pages", { user: "abhi" })).json.pages[0];
+    expect(mine.takenDown.reason).toBe("Reported: abuse. It shared a private number.");
+  });
+
+  it("dismissing writes to that reporter and the owner, and leaves the page up", async () => {
+    boot(MAIL);
+    await publish();
+    await giveOwnerEmail();
+    await report({ reason: "other", details: "I do not like it", contact: "b@example.com" });
+    brevo = [];
+    const [r] = await open();
+    expect((await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN, json: { note: "Nothing here breaks the rules." } })).status).toBe(200);
+    expect(to().sort()).toEqual(["b@example.com", "owner-person@example.com"]);
+    expect(brevo[0].htmlContent).toContain("Nothing here breaks the rules.");
+    expect((await call("GET", "/p/priya")).status).toBe(200);
+  });
+
+  it("works with no reason, with email off, and never fails the decision if a note cannot be sent", async () => {
+    boot(MAIL);
+    await publish();
+    await giveOwnerEmail();
+    await report({ reason: "spam", contact: "c@example.com" });
+    brevo = [];
+    const [r] = await open();
+    expect((await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN })).status).toBe(200);
+    expect(brevo.length).toBe(2);
+
+    boot(); // email off
+    await publish("abhi", "pg_safe0002", "second");
+    await report({ reason: "spam", contact: "c@example.com" }, "second");
+    const [r2] = await open();
+    expect((await call("POST", `/admin/reports/${r2.id}/remove`, { headers: ADMIN, json: { note: "x" } })).status).toBe(200);
+    expect(brevo).toHaveLength(2);
+  });
+
+  it("does not write again when a report was already handled, or to someone who asked for no emails", async () => {
+    boot(MAIL);
+    await publish();
+    await report({ reason: "spam", contact: "d@example.com" });
+    await env.DB.prepare("INSERT INTO mail_blocks (email, at) VALUES (?, ?)").bind("d@example.com", new Date(t).toISOString()).run();
+    brevo = [];
+    const [r] = await open();
+    await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN });
+    expect(to()).not.toContain("d@example.com");
+    brevo = [];
+    await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN }); // again
+    expect(brevo).toHaveLength(0);
   });
 });

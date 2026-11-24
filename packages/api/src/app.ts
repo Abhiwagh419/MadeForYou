@@ -6,7 +6,7 @@ import {
 } from "@madeforyou/schema";
 import { authenticate, diagnose, verifyClerk } from "./auth";
 import { hashIp, hashPassword, randomHex, readToken, signToken, timingSafeEqual } from "./crypto";
-import { DAILY_CAP, blockEmail, deliverOne, escHtml, isBlocked, mailConfig, nextEvent, notifyReport, readUnsub, remindersOn, runTick } from "./mail";
+import { DAILY_CAP, blockEmail, contactAddress, deliverOne, escHtml, isBlocked, mailConfig, nextEvent, notifyDecision, notifyOwnerReported, notifyReport, readUnsub, remindersOn, runTick } from "./mail";
 import { eraseUser, purgeOld } from "./safety";
 import { sniffMedia } from "./sniff";
 import type { Deps, Env } from "./types";
@@ -544,6 +544,8 @@ export function createApp(overrides: Partial<Deps> = {}) {
       .bind(`rp_${randomHex(8)}`, r.id, r.slug, reason, details || null, contact || null, ip, iso()).run();
     const count = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE page_id = ? AND status = 'open'").bind(r.id).first<{ n: number }>())?.n ?? 1;
     await notifyReport(c.env, deps, { origin: originOf(c), slug: r.slug!, title: r.title, reason, details, contact, count });
+    // The owner hears about it once, on the first open report, so a pile-on cannot fill their inbox.
+    if (count === 1) await notifyOwnerReported(c.env, deps, { ownerId: r.owner_id, title: r.title, slug: r.slug!, reason, origin: originOf(c), contactEmail: contactAddress(c.env) });
     return c.json({ ok: true });
   });
 
@@ -832,15 +834,29 @@ export function createApp(overrides: Partial<Deps> = {}) {
     await admin(c);
     const action = c.req.param("action");
     if (action !== "remove" && action !== "dismiss") throw new HttpError(400, "Unknown action");
-    const rep = await c.env.DB.prepare("SELECT id, page_id, reason FROM reports WHERE id = ?").bind(c.req.param("id")).first<{ id: string; page_id: string; reason: string }>();
+    const rep = await c.env.DB.prepare("SELECT id, page_id, reason, status FROM reports WHERE id = ?").bind(c.req.param("id")).first<{ id: string; page_id: string; reason: string; status: string }>();
     if (!rep) throw new HttpError(404, "Report not found");
+    const body = await readJson<{ note?: unknown }>(c).catch(() => ({}) as { note?: unknown });
+    const note = typeof body.note === "string" ? body.note.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, 600) : "";
+    const pageRow = await c.env.DB.prepare("SELECT title, slug, owner_id FROM pages WHERE id = ?").bind(rep.page_id).first<{ title: string; slug: string | null; owner_id: string }>();
+    // Who to write to: the reporter of this report, or every reporter whose open report this takes care of.
+    const who = action === "dismiss"
+      ? ((await c.env.DB.prepare("SELECT contact FROM reports WHERE id = ?").bind(rep.id).all<{ contact: string | null }>()).results ?? [])
+      : ((await c.env.DB.prepare("SELECT contact FROM reports WHERE page_id = ? AND status = 'open'").bind(rep.page_id).all<{ contact: string | null }>()).results ?? []);
+    const slug = pageRow?.slug ?? (await c.env.DB.prepare("SELECT slug FROM reports WHERE id = ?").bind(rep.id).first<{ slug: string | null }>())?.slug ?? "";
     if (action === "dismiss") {
       await c.env.DB.prepare("UPDATE reports SET status = 'dismissed', handled_at = ? WHERE id = ?").bind(iso(), rep.id).run();
     } else {
       await c.env.DB.batch([
-        c.env.DB.prepare("UPDATE pages SET status = 'draft', taken_down_at = ?, takedown_reason = ?, updated_at = ? WHERE id = ?").bind(iso(), `Reported: ${rep.reason}`, iso(), rep.page_id),
+        c.env.DB.prepare("UPDATE pages SET status = 'draft', taken_down_at = ?, takedown_reason = ?, updated_at = ? WHERE id = ?").bind(iso(), note ? `Reported: ${rep.reason}. ${note}` : `Reported: ${rep.reason}`, iso(), rep.page_id),
         c.env.DB.prepare("UPDATE reports SET status = 'removed', handled_at = ? WHERE page_id = ? AND status = 'open'").bind(iso(), rep.page_id),
       ]);
+    }
+    if (pageRow && rep.status === "open") {
+      await notifyDecision(c.env, deps, {
+        decision: action === "remove" ? "removed" : "dismissed", note, title: pageRow.title, slug, ownerId: pageRow.owner_id,
+        origin: originOf(c), contactEmail: contactAddress(c.env), reporters: who.map((w) => w.contact),
+      });
     }
     return c.json({ ok: true });
   });
@@ -848,7 +864,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
   /** Let a page owner publish again after a mistake. */
   app.post("/admin/pages/:id/restore", async (c) => {
     await admin(c);
-    const r = await c.env.DB.prepare("UPDATE pages SET taken_down_at = NULL, takedown_reason = NULL WHERE id = ?").bind(c.req.param("id")).run();
+    const r = await c.env.DB.prepare("UPDATE pages SET taken_down_at = NULL, takedown_reason = NULL, updated_at = ? WHERE id = ?").bind(iso(), c.req.param("id")).run();
     return c.json({ ok: true, changed: r.meta?.changes ?? 0 });
   });
 

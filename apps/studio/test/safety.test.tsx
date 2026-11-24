@@ -10,6 +10,7 @@ import { AuthProvider } from "../src/lib/auth";
 import { LEGAL_UPDATED, PRIVACY, TERMS } from "../src/lib/legal";
 import { upiUri } from "../src/lib/support";
 import { supportUpi } from "../src/lib/config";
+import { askForHelp, closeHelpNote, shouldAsk } from "../src/lib/helpNote";
 import { authRetry, publishRemote } from "../src/lib/sync";
 import { createPage, getState, resetStore } from "../src/state/store";
 
@@ -291,6 +292,64 @@ describe("Support us", () => {
     expect(JSON.stringify(TERMS)).toContain("voluntary gift");
     expect(JSON.stringify(PRIVACY)).toContain("Support payments");
     expect(JSON.stringify(PRIVACY)).toContain("never see your bank details");
+  });
+});
+
+describe("promos and the help note", () => {
+  const DAY = 86_400_000;
+  it("asks once after a first publish, and at most once a day after downloads", () => {
+    expect(shouldAsk("publish", {}, 1)).toBe(true);
+    expect(shouldAsk("publish", { publish: 1 }, 99 * DAY)).toBe(false);
+    expect(shouldAsk("export", {}, 1)).toBe(true);
+    expect(shouldAsk("export", { export: 1000 }, 1000 + DAY / 2)).toBe(false);
+    expect(shouldAsk("export", { export: 1000 }, 1000 + DAY + 1)).toBe(true);
+  });
+
+  it("shows nothing when support is switched off", async () => {
+    vi.stubEnv("VITE_SUPPORT_UPI", "");
+    localStorage.removeItem("mfy:help-note");
+    await visit("#/templates");
+    await act(async () => askForHelp("publish"));
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("opens after a publish, explains the limits, and leads to the support page", async () => {
+    vi.stubEnv("VITE_SUPPORT_UPI", "abhi@okbank");
+    localStorage.removeItem("mfy:help-note");
+    await visit("#/templates");
+    await act(async () => askForHelp("publish"));
+    const dialog = document.body.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute("aria-label")).toBe("A small favour");
+    expect(dialog.textContent).toContain("limited resources");
+    expect(dialog.textContent).toContain("completely fine");
+    expect(([...dialog.querySelectorAll("a")].find((a) => a.textContent?.includes("Help keep it running")) as HTMLAnchorElement).getAttribute("href")).toBe("#/support");
+    await act(async () => closeHelpNote());
+    await act(async () => askForHelp("publish")); // once only
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("opens after the QR code is downloaded on the share screen", async () => {
+    vi.stubEnv("VITE_SUPPORT_UPI", "abhi@okbank");
+    localStorage.removeItem("mfy:help-note");
+    const rec = await publishParty();
+    await visit(`#/share/${rec.id}`, "abhi");
+    await settle(200);
+    await act(async () => (button("Download QR") as HTMLAnchorElement).addEventListener("click", (e) => e.preventDefault()));
+    await act(async () => button("Download QR").click());
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("A small favour");
+    await act(async () => closeHelpNote());
+  });
+
+  it("puts a way back to the website under every shared page, but not for its owner", async () => {
+    vi.stubEnv("VITE_SUPPORT_UPI", "abhi@okbank");
+    await publishParty();
+    setTokenGetter(async () => null);
+    await visit("/p/priya");
+    await settle(100);
+    const promo = q(".viewer-promo")!;
+    expect(promo.textContent).toContain("Reply with a page");
+    expect(promo.textContent).toContain("Create a page like this");
+    expect([...promo.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual(["/#/templates", "/#/templates", "/#/support"]);
   });
 });
 

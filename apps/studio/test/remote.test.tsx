@@ -95,6 +95,16 @@ describe("merging server pages", () => {
     expect(mergeServerPages(local, [base("2026-09-30T00:00:00Z")])).toHaveLength(0);
     expect(mergeServerPages({}, [base("2026-10-02T00:00:00Z")])).toHaveLength(1);
   });
+  it("brings a restore (or a takedown) across even when the local copy is newer, keeping local edits", () => {
+    const down = { at: "2026-10-01T00:00:00Z", reason: "Reported: spam" };
+    const local = { pg_aaaaaa: { ...toLocalPage(base("2026-10-03T00:00:00Z")), title: "mine", takenDown: down } };
+    const [restored] = mergeServerPages(local, [base("2026-10-02T00:00:00Z")]); // the server no longer has a takedown
+    expect(restored.takenDown).toBeUndefined();
+    expect(restored.title).toBe("mine");
+    expect(mergeServerPages(local, [{ ...base("2026-10-02T00:00:00Z"), takenDown: down }])).toHaveLength(0); // already in line
+    const [taken] = mergeServerPages({ pg_aaaaaa: toLocalPage(base("2026-10-03T00:00:00Z")) }, [{ ...base("2026-10-02T00:00:00Z"), takenDown: down }]);
+    expect(taken.takenDown).toEqual(down);
+  });
   it("marks a password as set without ever holding it", () => {
     expect(toLocalPage(base("2026-10-02T00:00:00Z")).access.passwordHash).toBe("server");
   });

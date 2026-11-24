@@ -674,3 +674,11 @@ select.in-sm { padding-right: 1.5rem; }
 .auth-page { display: grid; justify-items: center; padding-block: 2.5rem 4rem; }
 
 .sheet:focus { outline: none; }
+
+/* promos on the shared page, and the pop-up that asks for help */
+.viewer-promo { padding: 2rem 1.2rem 0.4rem; text-align: center; background: var(--cream, #FFF8F0); color: #4A0E1F; }
+.viewer-promo h2 { margin: 0 0 0.3rem; font-family: Georgia, serif; font-size: 1.25rem; }
+.viewer-promo p { margin: 0 auto 0.9rem; max-width: 30rem; }
+.viewer-promo-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+.viewer-promo-small { margin: 1rem auto 0 !important; font-size: 0.82rem; color: #7a5a62; }
+.viewer-promo-small a { color: inherit; text-underline-offset: 3px; }

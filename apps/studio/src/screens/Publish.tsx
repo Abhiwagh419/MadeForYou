@@ -4,7 +4,8 @@ import { BRAND } from "@madeforyou/ui";
 import { api } from "../lib/api";
 import { useSession } from "../lib/auth";
 import { isRemote } from "../lib/config";
-import { handleAuthError, publishRemote } from "../lib/sync";
+import { askForHelp } from "../lib/helpNote";
+import { handleAuthError, publishRemote, pullPages } from "../lib/sync";
 import { go, useRoute } from "../lib/router";
 import { SLUG_MESSAGES, formatWhen, sha256, slugStatus, slugSuggestions, slugify } from "../lib/util";
 import { savePage, slugTaken, useStore } from "../state/store";
@@ -67,6 +68,11 @@ function PublishInner({ id }: { id: string }) {
     }, 350);
     return () => clearTimeout(t);
   }, [slug, id, localStatus]);
+  // A page that looks taken down may have been restored since this browser last heard: ask the server.
+  const looksTakenDown = !!page.takenDown;
+  useEffect(() => {
+    if (isRemote() && looksTakenDown && session.userId) pullPages().catch(() => {});
+  }, [looksTakenDown, session.userId]);
   const pwNeeded = usePw && !page.access.passwordHash && pw.length < 4;
   const lockInvalid = useLock && (!unlock || new Date(unlock).getTime() <= Date.now());
   const expiryInvalid = useExpiry && (!expiry || new Date(expiry).getTime() <= Date.now());
@@ -86,6 +92,7 @@ function PublishInner({ id }: { id: string }) {
           expiresAt: useExpiry && expiry ? new Date(expiry).toISOString() : null,
         });
         go(`/share/${id}`);
+        askForHelp("publish");
       } catch (e) {
         setError(((await handleAuthError(e)) ? "The server did not accept your sign-in. The reason is shown at the top of the page." : (e as Error).message));
         setBusy(false);
@@ -102,6 +109,7 @@ function PublishInner({ id }: { id: string }) {
       },
     });
     go(`/share/${id}`);
+    askForHelp("publish");
   };
 
   return (
