@@ -1,7 +1,6 @@
 import { apiBase } from "./config";
 
 let getToken: () => Promise<string | null> = async () => null;
-/** The auth layer registers how to fetch a login token. */
 export const setTokenGetter = (fn: () => Promise<string | null>) => {
   getToken = fn;
 };
@@ -20,7 +19,6 @@ interface Opts {
   auth?: boolean;
 }
 
-/** Returns the status and body without throwing: the visitor page reads 404, 410 and 401 as meaningful states. */
 export async function apiRaw<T = any>(path: string, opts: Opts = {}): Promise<{ status: number; data: T }> {
   const headers: Record<string, string> = { ...opts.headers };
   if (opts.json !== undefined) headers["content-type"] = "application/json";
@@ -36,9 +34,7 @@ export async function apiRaw<T = any>(path: string, opts: Opts = {}): Promise<{ 
   let data: any = null;
   try {
     data = await res.json();
-  } catch {
-    /* empty body */
-  }
+  } catch {}
   return { status: res.status, data };
 }
 

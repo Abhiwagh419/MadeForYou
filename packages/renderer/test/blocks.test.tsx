@@ -59,7 +59,6 @@ describe("the ask", () => {
   it("the No button runs away from a mouse, and the Yes button grows", async () => {
     await mount(ask());
     const no = q(".mfy-ask-nobtn");
-    // jsdom has no PointerEvent, so build the event by hand (React turns pointerover into onPointerEnter)
     const over = new Event("pointerover", { bubbles: true });
     Object.defineProperty(over, "pointerType", { value: "mouse" });
     const before = no.style.translate;
@@ -89,12 +88,12 @@ describe("the quiz", () => {
   it("marks answers, then shows the score and the matching message", async () => {
     await mount(quiz());
     expect(q(".mfy-quiz-q").textContent).toBe("Q1?");
-    expect(qa(".mfy-quiz-opts button")).toHaveLength(2); // empty options are not shown
+    expect(qa(".mfy-quiz-opts button")).toHaveLength(2);
     await click(qa(".mfy-quiz-opts button")[0]!);
     expect(qa(".mfy-quiz-opts button")[0]!.dataset.state).toBe("right");
     await act(async () => { await vi.advanceTimersByTimeAsync(1200); });
     expect(q(".mfy-quiz-q").textContent).toBe("Q2?");
-    await click(qa(".mfy-quiz-opts button")[0]!); // wrong
+    await click(qa(".mfy-quiz-opts button")[0]!);
     expect(qa(".mfy-quiz-opts button")[0]!.dataset.state).toBe("wrong");
     expect(qa(".mfy-quiz-opts button")[1]!.dataset.state).toBe("right");
     await act(async () => { await vi.advanceTimersByTimeAsync(1200); });
@@ -209,7 +208,7 @@ describe("event", () => {
 });
 
 describe("days together", () => {
-  const now = Date.parse("2026-10-07T06:00:00Z"); // 11:30 IST on 7 Oct 2026
+  const now = Date.parse("2026-10-07T06:00:00Z");
   it("counts years, months and days on the calendar", () => {
     expect(togetherSince("2023-08-02", now)).toMatchObject({ y: 3, m: 2, d: 5, future: false });
     expect(togetherSince("2026-10-07", now)).toMatchObject({ y: 0, m: 0, d: 0, days: 0 });
@@ -234,11 +233,10 @@ describe("memory match", () => {
     await mount(page("memory", { title: "Match", photos: [], winMessage: "You won" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(50); });
     const cards = qa(".mfy-mem-card");
-    expect(cards).toHaveLength(8); // four pairs of sample symbols when there are no photos yet
+    expect(cards).toHaveLength(8);
     const symbolOf = (c: HTMLElement) => c.querySelector(".mfy-mem-front")!.textContent;
     const groups = new Map<string, HTMLElement[]>();
     for (const c of cards) groups.set(symbolOf(c)!, [...(groups.get(symbolOf(c)!) ?? []), c]);
-    // a wrong pair first
     const keys = [...groups.keys()];
     await click(groups.get(keys[0]!)![0]!);
     await click(groups.get(keys[1]!)![0]!);
@@ -313,7 +311,7 @@ describe("guest messages on the page", () => {
     const host: Host = { submit: async (_b, _k, payload) => { calls.push(payload); return { ok: true }; } };
     const el = await mountWith(page("rsvp", { title: "Coming?", thanksYes: "See you!", thanksNo: "We will miss you" }), host);
     await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Raj");
-    expect(el.querySelector("select")).toBeNull(); // no answer yet
+    expect(el.querySelector("select")).toBeNull();
     await click(el.querySelectorAll(".mfy-choice button")[0]!);
     expect(el.querySelector("select")).toBeTruthy();
     await act(async () => { const s = el.querySelector("select")!; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(s, "3"); s.dispatchEvent(new Event("change", { bubbles: true })); });
@@ -329,14 +327,14 @@ describe("guest messages on the page", () => {
     expect(off.querySelector("input[type=email]")).toBeNull();
 
     const el = await mountWith(page("rsvp", { title: "Coming?" }), { submit, canRemind: true });
-    expect(el.querySelector("input[type=email]")).toBeNull(); // not before an answer
+    expect(el.querySelector("input[type=email]")).toBeNull();
     await type(el.querySelector("input.mfy-in") as HTMLInputElement, "Raj");
     await click(el.querySelectorAll(".mfy-choice button")[0]!);
     const box = el.querySelector("input[type=email]") as HTMLInputElement;
     expect(box).toBeTruthy();
     expect(el.textContent).toContain("Only the person who made this page can see your address");
     await type(box, "raj@example.com");
-    await click(el.querySelectorAll(".mfy-choice button")[1]!); // changes the answer to "no"
+    await click(el.querySelectorAll(".mfy-choice button")[1]!);
     expect(el.querySelector("input[type=email]")).toBeNull();
     await submitForm(el);
     expect(calls[0]).toMatchObject({ response: "no" });

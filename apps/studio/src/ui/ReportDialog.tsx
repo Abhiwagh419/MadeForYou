@@ -13,12 +13,11 @@ export const REPORT_REASONS = [
   { value: "other", label: "Something else" },
 ] as const;
 
-/** "Report this page": a short form that goes to the person who runs the site. */
 export function ReportDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
   const [reason, setReason] = useState<string>("");
   const [details, setDetails] = useState("");
   const [contact, setContact] = useState("");
-  const [website, setWebsite] = useState(""); // a field real people never see; bots fill it
+  const [website, setWebsite] = useState("");
   const [state, setState] = useState<"form" | "sending" | "done">("form");
   const [error, setError] = useState("");
 

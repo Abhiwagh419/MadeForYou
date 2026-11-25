@@ -9,7 +9,6 @@ import { Button } from "../ui/Button";
 import { Sheet, toast } from "../ui/Controls";
 import { Shell } from "../ui/Shell";
 
-/** Your account, and the way to delete all of it. */
 export function Account() {
   const session = useSession();
   const pageCount = useStore((s) => Object.keys(s.pages).length);

@@ -63,7 +63,7 @@ export function Share() {
     if (!story) return;
     const file = new File([story.blob], `${page.slug}-story.png`, { type: "image/png" });
     if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], text: message }); askForHelp("export"); return; } catch { /* cancelled: fall back to a download */ }
+      try { await navigator.share({ files: [file], text: message }); askForHelp("export"); return; } catch { }
     }
     const a = document.createElement("a");
     a.href = story.url; a.download = file.name; a.click();

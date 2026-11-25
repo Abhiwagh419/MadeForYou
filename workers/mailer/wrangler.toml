@@ -1,4 +1,3 @@
-# The scheduler Worker. Deploy it once with:  pnpm run mailer:deploy   (from apps\studio)
 name = "madeforyou-mailer"
 main = "index.js"
 compatibility_date = "2026-09-01"
@@ -7,6 +6,5 @@ compatibility_date = "2026-09-01"
 crons = ["*/15 * * * *"]
 
 [vars]
-# Your website's main address plus /api/cron/tick. Change it if your address is different.
 TICK_URL = "https://madeforyou-9pj.pages.dev/api/cron/tick"
-# The secret CRON_SECRET is set with:  pnpm run mailer:secret
+# CRON_SECRET is set with: pnpm run mailer:secret

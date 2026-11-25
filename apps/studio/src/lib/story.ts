@@ -9,7 +9,6 @@ export interface StoryInput {
   coverUrl?: string;
 }
 
-/** Splits text into at most `maxLines` lines that fit `maxWidth`. `measure` is the canvas's measureText width. */
 export function wrapLines(text: string, maxWidth: number, maxLines: number, measure: (s: string) => number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -37,7 +36,6 @@ const loadImage = (src: string) =>
     img.src = src;
   });
 
-/** A 1080 x 1920 picture for Instagram or WhatsApp status: the page's look, its title, and a QR code to open it. */
 export async function makeStoryImage(i: StoryInput): Promise<Blob> {
   const t = THEMES[i.theme] ?? THEMES["rose-garden"]!;
   const W = 1080, H = 1920;
@@ -59,7 +57,6 @@ export async function makeStoryImage(i: StoryInput): Promise<Blob> {
     ctx.fillRect(0, 0, W, H);
   }
 
-  // the arched cover, as on the page
   const aw = 480, ah = 620, ax = (W - aw) / 2, ay = 150;
   const arch = (pad = 0) => {
     ctx.beginPath();
@@ -79,7 +76,7 @@ export async function makeStoryImage(i: StoryInput): Promise<Blob> {
       const img = await loadImage(i.coverUrl);
       const k = Math.max(aw / img.width, ah / img.height);
       ctx.drawImage(img, ax + (aw - img.width * k) / 2, ay + (ah - img.height * k) / 2, img.width * k, img.height * k);
-    } catch { /* keep the colour fill */ }
+    } catch { }
   }
   ctx.restore();
 
@@ -96,7 +93,6 @@ export async function makeStoryImage(i: StoryInput): Promise<Blob> {
     y += 90;
   }
 
-  /* Always dark squares on a white card, whatever the theme is. Theme colours made light themes' QR codes unreadable. */
   const qrData = QRCode.create(i.url, { errorCorrectionLevel: "M" }).modules;
   const quiet = 4;
   const cell = Math.floor(380 / (qrData.size + quiet * 2));

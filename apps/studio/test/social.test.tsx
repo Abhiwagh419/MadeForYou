@@ -15,7 +15,6 @@ import { authRetry, publishRemote } from "../src/lib/sync";
 import { createPage, getState, resetStore } from "../src/state/store";
 import { VoiceRecorder } from "../src/ui/VoiceRecorder";
 
-// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
 beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 function party(): Content {
@@ -63,7 +62,7 @@ const settle = (ms = 120) => act(async () => { await new Promise((r) => setTimeo
 async function visit(url: string, user?: string) {
   if (user) localStorage.setItem("mfy:dev-user", user);
   else localStorage.removeItem("mfy:dev-user");
-  if (url.startsWith("#")) { window.history.pushState({}, "", "/"); window.location.hash = url; } // studio screens live at the root path
+  if (url.startsWith("#")) { window.history.pushState({}, "", "/"); window.location.hash = url; }
   else window.history.pushState({}, "", url);
   host = document.createElement("div");
   document.body.append(host);
@@ -85,7 +84,6 @@ async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
 }
 async function submit(form: Element) {
   await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 60)); });
-  // a slow computer takes longer: wait for the answer (thanks or an error) instead of guessing how long it takes
   for (let i = 0; i < 200 && !q(".mfy-thanks") && !q(".mfy-form-error") && !text().includes("Thank you"); i++) await act(async () => { await new Promise((r) => setTimeout(r, 25)); });
 }
 
@@ -115,7 +113,7 @@ describe("small helpers", () => {
     const long = wrapLines("one two three four five six seven eight nine ten", 80, 2, measure);
     expect(long).toHaveLength(2);
     expect(long[1]!.endsWith("…")).toBe(true);
-    expect(wrapLines("Supercalifragilistic", 50, 3, measure)).toEqual(["Supercalifragilistic"]); // one long word still shows
+    expect(wrapLines("Supercalifragilistic", 50, 3, measure)).toEqual(["Supercalifragilistic"]);
   });
   it("recognises invite links by their path", () => {
     expect(parseLocation("/c/priya", "", "?k=abc")).toMatchObject({ name: "contribute", params: { slug: "priya" } });
@@ -137,7 +135,7 @@ describe("voice notes in the editor", () => {
     document.body.append(host);
     root = createRoot(host);
     await act(async () => root!.render(<VoiceRecorder value={null} onChange={(v) => seen.push(v)} />));
-    expect(text()).toContain("Upload an audio file"); // jsdom has no MediaRecorder
+    expect(text()).toContain("Upload an audio file");
     const input = q('input[type="file"]') as HTMLInputElement;
     Object.defineProperty(input, "files", { value: [new File([new Uint8Array(400)], "note.webm", { type: "audio/webm" })] });
     await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise((r) => setTimeout(r, 30)); });
@@ -149,18 +147,17 @@ describe("voice notes in the editor", () => {
 describe("guest messages, end to end through the real server", () => {
   it("a guest's wish waits for approval, then shows to the next visitor", async () => {
     const rec = await publishParty();
-    setTokenGetter(async () => null); // a stranger opens the page
+    setTokenGetter(async () => null);
     await visit("/p/priya");
     expect(text()).toContain("Wishes for Priya");
     expect(qa(".mfy-wishes li")).toHaveLength(0);
     await type(q("form input.mfy-in") as HTMLInputElement, "Meera");
     await type(q("form textarea") as HTMLTextAreaElement, "Happy birthday Priya!");
-    await act(async () => { await new Promise((r) => setTimeout(r, 1600)); }); // a real person takes longer than 1.5 s
+    await act(async () => { await new Promise((r) => setTimeout(r, 1600)); });
     await submit(q("form")!);
     expect(q(".mfy-thanks")?.textContent).toContain("approved");
     await leave();
 
-    // the owner sees it in the inbox and approves it
     setTokenGetter(async () => "dev:abhi");
     await visit(`#/inbox/${rec.id}`, "abhi");
     await settle(250);
@@ -171,7 +168,6 @@ describe("guest messages, end to end through the real server", () => {
     expect(text()).toContain("On the wall");
     await leave();
 
-    // the next visitor sees the wish on the wall
     setTokenGetter(async () => null);
     await visit("/p/priya");
     expect(q(".mfy-wishes")?.textContent).toContain("Happy birthday Priya!");
@@ -194,7 +190,7 @@ describe("guest messages, end to end through the real server", () => {
     await settle(150);
     expect(text()).toContain("Wishes for Priya");
     expect(text()).toContain("For Priya");
-    expect(text()).not.toContain("A secret plan."); // the page itself is never shown here
+    expect(text()).not.toContain("A secret plan.");
     await type(q('input[aria-label="Your name"]') as HTMLInputElement, "Rohan");
     await type(q('textarea[aria-label="Your wish"]') as HTMLTextAreaElement, "Cannot wait for the party");
     await act(async () => { await new Promise((r) => setTimeout(r, 1600)); });

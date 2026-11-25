@@ -110,7 +110,7 @@ describe("templates", () => {
   it("only the owner can change a template", async () => {
     expect((await call("PUT", "/templates/shared-id", { user: "abhi", json: { template: tmpl("shared-id") } })).status).toBe(200);
     expect((await call("PUT", "/templates/shared-id", { user: "mallory", json: { template: tmpl("shared-id") } })).status).toBe(409);
-    await call("DELETE", "/templates/shared-id", { user: "mallory" }); // quietly does nothing: it is not theirs
+    await call("DELETE", "/templates/shared-id", { user: "mallory" });
     expect((await call("GET", "/me/templates", { user: "abhi" })).json.templates).toHaveLength(1);
   });
   it("saving again never undoes a rejection", async () => {
@@ -120,7 +120,6 @@ describe("templates", () => {
     }
     await call("PUT", "/templates/bad-one", { user: "abhi", json: { template: tmpl("bad-one") } });
     await call("POST", "/admin/templates/bad-one/reject", { headers: ADMIN });
-    // this owner has 3 approved templates, which would normally approve a new one on the spot
     const again = await call("PUT", "/templates/bad-one", { user: "abhi", json: { template: tmpl("bad-one") } });
     expect(again.status).toBe(200);
     expect(again.json.status).toBe("rejected");
@@ -140,7 +139,6 @@ describe("email is never sent twice", () => {
 
   it("if the server stopped after the email left, the next run does not send a second copy", async () => {
     const id = await queue();
-    // what a crash leaves behind: marked as sending a long time ago, with the send already written in the log
     await env.DB.prepare("UPDATE deliveries SET status = 'sending', claimed_at = ? WHERE id = ?").bind(new Date(t).toISOString(), id).run();
     await env.DB.prepare("INSERT INTO mail_log (key, at, sent) VALUES (?, ?, 1)").bind(`dl:${id}`, new Date(t).toISOString()).run();
     t += 2 * H;

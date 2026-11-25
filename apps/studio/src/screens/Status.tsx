@@ -16,7 +16,6 @@ interface Row {
   hint?: string;
 }
 
-/** One screen that says exactly what is connected and what is not. Screenshot it when something looks wrong. */
 export function Status() {
   const session = useSession();
   const [rows, setRows] = useState<Row[]>([]);

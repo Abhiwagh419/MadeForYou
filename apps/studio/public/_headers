@@ -5,8 +5,7 @@
   Permissions-Policy: camera=(), geolocation=(), payment=(), microphone=(self)
   Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.openstreetmap.org https://open.spotify.com https://*.clerk.accounts.dev https://challenges.cloudflare.com; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 
-# Personal pages and invite links are for the people who were given the link, not for search results.
-# (Shared pages at /p/<link> send the same header from their own function.)
+# keep invite links and sign-in pages out of search results
 /c/*
   X-Robots-Tag: noindex, nofollow, noarchive
 /sign-in

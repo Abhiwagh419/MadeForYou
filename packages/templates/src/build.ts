@@ -5,19 +5,15 @@ import {
 
 export interface BlockSpec {
   type: string;
-  /** Sample content. Personal fields stay flagged as placeholders unless listed in `final`. */
   fields?: Record<string, unknown>;
-  /** Fields whose text the template author wrote and the visitor normally keeps (e.g. the greeting). */
   final?: string[];
   style?: Partial<Block["style"]>;
-  /** Hindi versions of template-authored text. */
   hi?: Record<string, string>;
 }
 export const block = (type: string, spec: Omit<BlockSpec, "type"> = {}): BlockSpec => ({ type, ...spec });
 
 export interface TemplateSpec {
   id: string;
-  /** Short unique prefix for block ids. */
   abbr: string;
   title: string;
   titleHi?: string;

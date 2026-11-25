@@ -8,7 +8,6 @@ import { Segmented, toast } from "./Controls";
 interface Delivery { id: string; toEmail: string; toName: string; fromName: string; note: string; sendAt: string; status: "scheduled" | "sending" | "sent" | "failed" | "cancelled"; error?: string; sentAt?: string }
 
 const pad = (n: number) => String(n).padStart(2, "0");
-/** A value for a datetime-local box: tomorrow at 9 in the morning, in the person's own time. */
 const tomorrowMorning = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -23,7 +22,6 @@ const statusLine = (d: Delivery) =>
         : d.status === "cancelled" ? "Cancelled"
           : `Could not send: ${d.error ?? "unknown reason"}`;
 
-/** "Send it by email": the page, sent to one person now or on a date. */
 export function EmailDelivery({ pageId, defaultTo, defaultFrom }: { pageId: string; defaultTo: string; defaultFrom: string }) {
   const [on, setOn] = useState<boolean | null>(null);
   const [list, setList] = useState<Delivery[]>([]);
@@ -39,9 +37,7 @@ export function EmailDelivery({ pageId, defaultTo, defaultFrom }: { pageId: stri
   const load = useCallback(async () => {
     try {
       setList((await api<{ deliveries: Delivery[] }>(`/pages/${pageId}/deliveries`)).deliveries);
-    } catch {
-      /* the list is a convenience; the form still works */
-    }
+    } catch {}
   }, [pageId]);
 
   useEffect(() => {

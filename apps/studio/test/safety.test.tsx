@@ -14,7 +14,6 @@ import { askForHelp, closeHelpNote, shouldAsk } from "../src/lib/helpNote";
 import { authRetry, publishRemote } from "../src/lib/sync";
 import { createPage, getState, resetStore } from "../src/state/store";
 
-// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
 beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 function party(): Content {
@@ -42,7 +41,6 @@ beforeEach(() => {
   const app = createApp();
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : (input as Request).url;
-    // Cloudflare's own check: accept the token "good" and nothing else
     if (url.includes("challenges.cloudflare.com/turnstile/v0/siteverify")) return new Response(JSON.stringify({ success: new URLSearchParams(String(init?.body)).get("response") === "good" }));
     return app.request(url, init, env);
   }) as typeof fetch;
@@ -63,7 +61,6 @@ afterEach(async () => {
   window.history.pushState({}, "", "/");
 });
 
-/** Waits until something is true (up to 6 s) instead of guessing how long a slow computer needs. */
 async function until(cond: () => boolean | Promise<boolean>, ms = 6000) {
   const end = Date.now() + ms;
   while (!(await cond()) && Date.now() < end) await act(async () => { await new Promise((r) => setTimeout(r, 25)); });
@@ -109,7 +106,6 @@ describe("Terms and Privacy", () => {
       expect(doc.sections.length).toBeGreaterThanOrEqual(9);
       expect(all).not.toMatch(/TODO|lorem|xxx/i);
     }
-    // what the privacy page promises matches what the server does
     expect(JSON.stringify(PRIVACY)).toContain("30 days");
     expect(JSON.stringify(PRIVACY)).toMatch(/Brevo/);
     expect(JSON.stringify(PRIVACY)).toMatch(/Clerk/);
@@ -145,7 +141,7 @@ describe("Report this page", () => {
     await act(async () => button("Report this page").click());
     expect(document.body.textContent).toContain("What is wrong with this page?");
     const send = button("Send report") as HTMLButtonElement;
-    expect(send.disabled).toBe(true); // a reason must be chosen first
+    expect(send.disabled).toBe(true);
     await act(async () => (document.body.querySelector('input[name="reason"][value="spam"]') as HTMLInputElement).click());
     await type(document.body.querySelector(".report textarea") as HTMLTextAreaElement, "Sells things");
     await act(async () => (button("Send report") as HTMLButtonElement).click());
@@ -172,7 +168,7 @@ describe("Delete my account and all my data", () => {
     const input = document.body.querySelector('input[aria-label="Type DELETE to confirm"]') as HTMLInputElement;
     await type(input, "nope");
     expect(confirmBtn().disabled).toBe(true);
-    expect((await row("SELECT COUNT(*) AS n FROM pages")).n).toBe(1); // nothing happened yet
+    expect((await row("SELECT COUNT(*) AS n FROM pages")).n).toBe(1);
 
     await type(input, "delete");
     expect(confirmBtn().disabled).toBe(false);
@@ -182,7 +178,7 @@ describe("Delete my account and all my data", () => {
     expect((await row("SELECT COUNT(*) AS n FROM pages")).n).toBe(0);
     expect((await row("SELECT COUNT(*) AS n FROM users")).n).toBe(0);
     expect(Object.keys(getState().pages)).toHaveLength(0);
-    expect(localStorage.getItem("mfy:dev-user")).toBeNull(); // signed out
+    expect(localStorage.getItem("mfy:dev-user")).toBeNull();
     expect(window.location.hash).toBe("#/");
     expect((await apiRaw("/p/priya", { auth: false })).status).toBe(404);
   });
@@ -240,7 +236,6 @@ describe("Support us", () => {
       vi.stubEnv("VITE_SUPPORT_UPI", bad);
       expect(supportUpi()).toBe("");
     }
-    // an ID made of a mobile number would publish that number, so it is never shown
     for (const phone of ["9876543210@ybl", "919876543210@ybl", "+919876543210@okbank"]) {
       vi.stubEnv("VITE_SUPPORT_UPI", phone);
       expect(supportUpi()).toBe("");
@@ -265,7 +260,7 @@ describe("Support us", () => {
     await act(async () => { window.location.hash = "#/support"; });
     await settle(150);
     expect(q("h1")?.textContent).toContain("helped you, you can say thanks");
-    expect(text()).toContain("completely fine"); // it never pressures anyone
+    expect(text()).toContain("completely fine");
     expect(text()).toContain("abhi@okbank");
     expect(q(".support-qr img")?.getAttribute("src")).toMatch(/^data:image\/svg\+xml/);
     const pay = () => button("Pay with a UPI app") as HTMLAnchorElement;
@@ -324,7 +319,7 @@ describe("promos and the help note", () => {
     expect(dialog.textContent).toContain("completely fine");
     expect(([...dialog.querySelectorAll("a")].find((a) => a.textContent?.includes("Help keep it running")) as HTMLAnchorElement).getAttribute("href")).toBe("#/support");
     await act(async () => closeHelpNote());
-    await act(async () => askForHelp("publish")); // once only
+    await act(async () => askForHelp("publish"));
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 
@@ -359,7 +354,7 @@ describe("Signing in stays on our site", () => {
     expect(parseLocation("/sign-in", "").name).toBe("signin");
     expect(parseLocation("/sign-in/", "#/sso-callback").name).toBe("signin");
     expect(parseLocation("/sign-up", "#/continue").name).toBe("signup");
-    expect(parseLocation("/", "#/me").name).toBe("me"); // the studio's own routes are untouched
+    expect(parseLocation("/", "#/me").name).toBe("me");
   });
   it("points Clerk at those pages, never at Clerk's hosted ones", async () => {
     const { CLERK_ROUTES } = await import("../src/lib/config");
@@ -372,7 +367,7 @@ describe("Signing in stays on our site", () => {
 });
 
 describe("The spam check on guest forms", () => {
-  const KEY = "1x00000000000000000000AA"; // Cloudflare's test key
+  const KEY = "1x00000000000000000000AA";
   let rendered: Record<string, any>[] = [];
   const fakeTurnstile = (answer: "pass" | "fail") => {
     rendered = [];
@@ -444,7 +439,6 @@ describe("The spam check on guest forms", () => {
 
 describe("links on a shared page", () => {
   it("go to the website's own pages, not to a dead address on the page's own URL", async () => {
-    // On /p/<link> a bare "#/privacy" only changes the part after the #, and the page never changes.
     await publishParty();
     setTokenGetter(async () => null);
     await visit("/p/priya");

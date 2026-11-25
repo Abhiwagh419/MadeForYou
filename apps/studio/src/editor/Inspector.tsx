@@ -11,7 +11,6 @@ import { BLOCK_INFO } from "./blockInfo";
 
 type Dispatch = (a: EditorAction) => void;
 
-/* ---------------- selected block ---------------- */
 export function BlockInspector({
   block, theme, lang, defaultLang, dispatch, onDuplicate, onDelete,
 }: {
@@ -75,7 +74,6 @@ export function BlockInspector({
   );
 }
 
-/* ---------------- look and feel ---------------- */
 export function DesignPanel({ content, dispatch }: { content: Content; dispatch: Dispatch }) {
   const s = content.settings;
   const [musicText, setMusicText] = useState("");
@@ -147,7 +145,6 @@ export function DesignPanel({ content, dispatch }: { content: Content; dispatch:
   );
 }
 
-/* ---------------- page settings ---------------- */
 const LANGS: [string, string][] = [["hi", "हिन्दी (Hindi)"], ["mr", "मराठी (Marathi)"], ["gu", "ગુજરાતી (Gujarati)"], ["ta", "தமிழ் (Tamil)"], ["bn", "বাংলা (Bengali)"], ["te", "తెలుగు (Telugu)"]];
 
 export function SettingsPanel({ content, dispatch, onDeletePage }: { content: Content; dispatch: Dispatch; onDeletePage: () => void }) {

@@ -12,7 +12,6 @@ import { NotFound } from "../ui/Shell";
 
 type Step = { kind: "q"; q: GuidedQuestion } | { kind: "bridge"; count: number };
 
-/** Required questions first, then a pause, then the optional "make it richer" ones. */
 export function buildSteps(content: Content): Step[] {
   const qs = guidedQuestions(content);
   const essential = qs.filter((q) => q.tier === "essential");

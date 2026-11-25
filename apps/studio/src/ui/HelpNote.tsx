@@ -3,7 +3,6 @@ import { closeHelpNote, useHelpNote } from "../lib/helpNote";
 import { Button } from "./Button";
 import { Sheet } from "./Controls";
 
-/** Mounted once in the app. Opens after a publish or an export, see lib/helpNote. */
 export function HelpNote() {
   const moment = useHelpNote();
   return (

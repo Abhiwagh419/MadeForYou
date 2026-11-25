@@ -1,5 +1,4 @@
--- Safety: reports about pages, takedowns by the site owner, and clean-up of old deleted pages.
--- Apply with: wrangler d1 migrations apply madeforyou --remote   (pnpm run cf:deploy does this for you)
+-- reports and takedowns
 
 CREATE TABLE reports (
   id         TEXT PRIMARY KEY,
@@ -16,6 +15,6 @@ CREATE TABLE reports (
 CREATE INDEX reports_open ON reports (status, created_at DESC);
 CREATE INDEX reports_page ON reports (page_id);
 
--- A page the site owner has taken down. Its owner cannot publish it again until it is restored.
+-- set when the site owner takes a page down
 ALTER TABLE pages ADD COLUMN taken_down_at TEXT;
 ALTER TABLE pages ADD COLUMN takedown_reason TEXT;

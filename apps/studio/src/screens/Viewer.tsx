@@ -72,7 +72,6 @@ function LocalViewer() {
   if (access.expiresAt && new Date(access.expiresAt).getTime() < Date.now()) {
     return <Centered page={page}><h1>This page has ended</h1><p>Its time is up, but the person who made it can always share it again.</p></Centered>;
   }
-  // Locked content is never rendered before its time. (Enforced on the server once live.)
   const lockAt = access.unlockAt ? new Date(access.unlockAt).getTime() : 0;
   if (lockAt > Date.now() && !unlocked) {
     return (
@@ -106,8 +105,6 @@ function LocalViewer() {
   );
 }
 
-/* ---------- online: the server decides what this visitor may receive ---------- */
-
 type Remote =
   | { state: "loading" }
   | { state: "missing" }
@@ -120,7 +117,6 @@ type Remote =
 function RemoteOpen({ v, slug }: { v: Extract<Remote, { state: "open" }>; slug: string }) {
   const resolve = useAssets(v.content, v.assetToken);
   const [reporting, setReporting] = useState(false);
-  // Guests' messages go to the server with the token this visitor earned by getting past the lock and password.
   const host = useMemo<Host>(() => ({
     wishes: v.wishes ?? {},
     canRemind: !!v.canRemind,

@@ -1,6 +1,5 @@
 import { turnstileSiteKey } from "./config";
 
-/** The few parts of Cloudflare Turnstile's script that we use. */
 interface TurnstileApi {
   render(container: HTMLElement, options: Record<string, unknown>): string;
   execute(widget: string): void;
@@ -26,7 +25,6 @@ function loadScript(): Promise<TurnstileApi> {
   return script;
 }
 
-/** A box that stays hidden unless Cloudflare needs the person to tick something. */
 function box(): HTMLElement {
   let el = document.getElementById("mfy-turnstile");
   if (!el) {
@@ -38,11 +36,6 @@ function box(): HTMLElement {
   return el;
 }
 
-/**
- * Asks Cloudflare to confirm a real person is here. Almost always this is invisible and takes under a second.
- * Resolves to a one-use token the server checks, or to undefined when the spam check is not switched on.
- * Rejects when the check could not be completed.
- */
 export async function humanToken(timeoutMs = 25_000): Promise<string | undefined> {
   const sitekey = turnstileSiteKey();
   if (!sitekey) return undefined;
@@ -56,7 +49,7 @@ export async function humanToken(timeoutMs = 25_000): Promise<string | undefined
       done = true;
       clearTimeout(timer);
       holder.style.display = "none";
-      try { if (widget) api.remove(widget); } catch { /* already gone */ }
+      try { if (widget) api.remove(widget); } catch { }
       fn();
     };
     const timer = setTimeout(() => finish(() => reject(new Error("timeout"))), timeoutMs);
@@ -74,7 +67,6 @@ export async function humanToken(timeoutMs = 25_000): Promise<string | undefined
   });
 }
 
-/** Runs the check, and says in plain words when it fails. */
 export async function checkHuman(): Promise<{ ok: true; token?: string } | { ok: false; error: string }> {
   try {
     return { ok: true, token: await humanToken() };

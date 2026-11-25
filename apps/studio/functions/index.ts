@@ -2,7 +2,6 @@ import { HTML_SECURITY_HEADERS, injectMeta, type Env } from "@madeforyou/api";
 
 type Ctx = { request: Request; env: Env & { ASSETS: { fetch: (r: Request) => Promise<Response> } } };
 
-/** The home page, with its own link-preview card. */
 export async function onRequestGet({ request, env }: Ctx) {
   const url = new URL(request.url);
   const shell = await (await env.ASSETS.fetch(request)).text();

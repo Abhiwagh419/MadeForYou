@@ -5,7 +5,6 @@ import { Shell } from "../ui/Shell";
 
 const ClerkPage = lazy(() => import("../lib/ClerkBridge").then((m) => ({ default: m.AuthPage })));
 
-/** /sign-in and /sign-up: the same Clerk forms as the popup, on a page of our own. */
 export function AuthPage({ mode }: { mode: "in" | "up" }) {
   return (
     <Shell>

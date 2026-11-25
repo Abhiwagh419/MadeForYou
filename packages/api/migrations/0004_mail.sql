@@ -1,16 +1,15 @@
--- Email: pages sent to someone on a date, reminders for guests, and "ending soon" notices.
--- Apply with: wrangler d1 migrations apply madeforyou --remote   (pnpm run cf:deploy does this for you)
+-- email
 
--- The page owner's email, looked up from Clerk the first time it is needed.
+-- owner email, looked up from Clerk
 ALTER TABLE users ADD COLUMN email TEXT;
 ALTER TABLE users ADD COLUMN email_at TEXT;
 
--- A guest who typed an email on the RSVP gets one reminder: remind_at is a day before event_at (both UTC).
+-- RSVP reminder: remind_at is one day before event_at (UTC)
 ALTER TABLE submissions ADD COLUMN remind_at TEXT;
 ALTER TABLE submissions ADD COLUMN event_at TEXT;
 CREATE INDEX submissions_remind ON submissions (remind_at) WHERE remind_at IS NOT NULL;
 
--- "Send my page to this person on this date."
+-- pages scheduled to be emailed
 CREATE TABLE deliveries (
   id         TEXT PRIMARY KEY,
   page_id    TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
@@ -30,7 +29,7 @@ CREATE TABLE deliveries (
 CREATE INDEX deliveries_due ON deliveries (status, send_at);
 CREATE INDEX deliveries_page ON deliveries (page_id);
 
--- One row per email decided on, so nothing is ever sent twice and the daily limit can be counted.
+-- one row per email, so nothing is sent twice and the daily limit can be counted
 CREATE TABLE mail_log (
   key  TEXT PRIMARY KEY,
   at   TEXT NOT NULL,
@@ -38,7 +37,7 @@ CREATE TABLE mail_log (
 );
 CREATE INDEX mail_log_at ON mail_log (at);
 
--- People who asked never to be emailed by MadeForYou again.
+-- addresses that opted out
 CREATE TABLE mail_blocks (
   email TEXT PRIMARY KEY,
   at    TEXT NOT NULL

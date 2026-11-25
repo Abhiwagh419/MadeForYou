@@ -17,7 +17,6 @@ const NONE: Session = { mode: "none", ready: true, userId: null, label: "", sign
 const Ctx = createContext<Session>(NONE);
 export const useSession = () => useContext(Ctx);
 
-/** Production sign-in (Clerk) is loaded only when it is configured. */
 const ClerkBridge = lazy(() => import("./ClerkBridge"));
 
 const DEV_KEY = "mfy:dev-user";
@@ -43,7 +42,7 @@ function DevAuth({ children }: { children: ReactNode }) {
     const n = draft.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40);
     if (n.length < 3) return;
     localStorage.setItem(DEV_KEY, n);
-    setTokenGetter(async () => `dev:${n}`); // ready before the app reacts to being signed in
+    setTokenGetter(async () => `dev:${n}`);
     setName(n);
     setOpen(false);
   };
@@ -64,8 +63,6 @@ function ClerkAuth({ children }: { children: ReactNode }) {
   const [b, setB] = useState<{ ready: boolean; userId: string | null; label: string; getToken: () => Promise<string | null>; signOut: () => void }>({
     ready: false, userId: null, label: "", getToken: async () => null, signOut: () => {},
   });
-  // Registered the moment the sign-in state arrives, not in an effect: effects of child components (which start
-  // syncing pages) run BEFORE a parent's effects, so they used to fire with no token and get a "please sign in".
   const onState = useCallback((s: typeof b) => {
     setTokenGetter(s.getToken);
     setB(s);

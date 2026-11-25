@@ -19,7 +19,6 @@ export interface PageRecord {
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
-  /** Set when the site owner took the page down after a report. */
   takenDown?: { at: string; reason: string };
 }
 export interface TemplateRecord {
@@ -43,7 +42,6 @@ function load(): State {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem(KEY) : null;
     if (!raw) return out;
     const parsed = JSON.parse(raw) as State;
-    // Anything that fails validation is dropped rather than crashing the app.
     for (const [id, p] of Object.entries(parsed.pages ?? {})) {
       const r = validateContent(p.content);
       if (r.ok) out.pages[id] = { ...p, content: r.content };
@@ -52,9 +50,7 @@ function load(): State {
       const r = validateTemplate(t.template);
       if (r.ok) out.templates[id] = { ...t, template: r.template };
     }
-  } catch {
-    /* start fresh */
-  }
+  } catch {}
   return out;
 }
 
@@ -63,9 +59,7 @@ function persist() {
   timer = setTimeout(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* storage full or blocked: the session keeps working */
-    }
+    } catch {}
   }, 250);
 }
 
@@ -75,15 +69,12 @@ function set(next: State) {
   persist();
 }
 
-/** Empties the pages and templates kept on this device (used when someone clears their data). */
 export function resetState() {
   clearTimeout(timer);
   state = { pages: {}, templates: {} };
   try {
     localStorage.removeItem(KEY);
-  } catch {
-    /* storage blocked */
-  }
+  } catch {}
   listeners.forEach((l) => l());
 }
 
@@ -114,7 +105,6 @@ export function savePage(id: string, patch: Partial<Omit<PageRecord, "id">>) {
   set({ ...state, pages: { ...state.pages, [id]: { ...cur, ...patch, updatedAt: now() } } });
 }
 
-/** Insert or replace whole records (used when pages arrive from the server). */
 export function upsertPages(records: PageRecord[]) {
   if (!records.length) return;
   const pages = { ...state.pages };
@@ -145,7 +135,6 @@ export function deleteTemplate(id: string) {
   set({ ...state, templates: rest });
 }
 
-/** Used by tests. */
 export function resetStore(next: State = { pages: {}, templates: {} }) {
   set(next);
 }

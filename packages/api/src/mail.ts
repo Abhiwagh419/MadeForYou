@@ -2,29 +2,19 @@ import { cleanEmail, type Content } from "@madeforyou/schema";
 import { readToken, signToken } from "./crypto";
 import type { Deps, Env } from "./types";
 
-/* =============================================================================================
- * Email. Three kinds are sent, all through Brevo's free plan (300 a day, no card):
- *   1. a page, sent to someone on a date the owner chose ("deliveries")
- *   2. one reminder to a guest who left an email on the RSVP, a day before the event
- *   3. "this page ends soon", a day before it switches off, to the owner and to people it was sent to
- * Nothing here runs on its own: a small scheduler Worker calls /api/cron/tick every 15 minutes.
- * ============================================================================================= */
-
-export const DAILY_CAP = 280; // Brevo's free plan stops at 300 a day; keep a margin
-const PER_TICK = 25; // stays well under the platform's limit of outside calls per request
+export const DAILY_CAP = 280; // brevo free plan is 300 a day
+const PER_TICK = 25;
 const DAY = 86_400_000;
 const MAX_TRIES = 4;
 
 export interface MailConfig { key: string; from: string; fromName: string }
 
-/** Email works only when a Brevo key and a verified sender address are both set. */
 export function mailConfig(env: Env): MailConfig | null {
   const key = env.BREVO_API_KEY?.trim();
   const from = cleanEmail(env.MAIL_FROM ?? "");
   if (!key || !from) return null;
   return { key, from, fromName: (env.MAIL_FROM_NAME ?? "").trim().slice(0, 60) || "MadeForYou" };
 }
-/** Reminders also need the scheduler's shared secret. */
 export const remindersOn = (env: Env) => !!mailConfig(env) && !!env.CRON_SECRET?.trim();
 
 export class MailError extends Error {
@@ -34,8 +24,6 @@ export class MailError extends Error {
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
-
-/* ---------- sending ---------- */
 
 interface Outgoing { to: string; toName?: string; subject: string; html: string; text: string; unsubscribeUrl?: string }
 
@@ -63,13 +51,9 @@ export async function sendMail(env: Env, deps: Deps, m: Outgoing): Promise<void>
   let detail = "";
   try {
     detail = String(((await res.json()) as { message?: unknown }).message ?? "");
-  } catch {
-    /* no body */
-  }
+  } catch {}
   throw new MailError(`The email service refused it (${res.status})${detail ? `: ${detail.slice(0, 120)}` : ""}`, res.status >= 500 || res.status === 429);
 }
-
-/* ---------- who has said stop ---------- */
 
 const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const unb64 = (s: string) => {
@@ -83,7 +67,6 @@ const unb64 = (s: string) => {
 
 export const unsubToken = (env: Env, email: string, now: number) => signToken(env.SESSION_SECRET, `unsub:${b64(email)}`, 400 * 86400, now);
 
-/** The address a valid stop-emails link is for, or null. */
 export async function readUnsub(env: Env, token: string | undefined | null, now: number): Promise<string | null> {
   const scope = await readToken(env.SESSION_SECRET, token, now);
   if (!scope?.startsWith("unsub:")) return null;
@@ -95,11 +78,8 @@ export async function isBlocked(env: Env, email: string): Promise<boolean> {
 }
 export async function blockEmail(env: Env, email: string, now: number): Promise<void> {
   await env.DB.prepare("INSERT INTO mail_blocks (email, at) VALUES (?, ?) ON CONFLICT(email) DO NOTHING").bind(email, iso(now)).run();
-  // anything still waiting for this address is cancelled
   await env.DB.prepare("UPDATE deliveries SET status = 'cancelled', error = 'This person asked not to get emails' WHERE to_email = ? AND status IN ('scheduled', 'sending')").bind(email).run();
 }
-
-/* ---------- the book-keeping that stops double sends and counts the daily limit ---------- */
 
 const claim = async (env: Env, key: string, now: number) =>
   (await env.DB.prepare("INSERT INTO mail_log (key, at, sent) VALUES (?, ?, 1) ON CONFLICT(key) DO NOTHING").bind(key, iso(now)).run()).meta?.changes === 1;
@@ -112,9 +92,6 @@ export async function sentInLastDay(env: Env, now: number): Promise<number> {
   return r?.n ?? 0;
 }
 
-/* ---------- events and dates ---------- */
-
-/** A date with no zone means India time, wherever the server runs. */
 export function eventStart(when: unknown): number | null {
   if (typeof when !== "string" || !when.trim()) return null;
   let v = when.trim();
@@ -126,7 +103,6 @@ export function eventStart(when: unknown): number | null {
 
 export interface EventInfo { at: number; hasTime: boolean; title: string; place: string; mapsLink: string; note: string }
 
-/** The earliest event on the page that has not started yet. */
 export function nextEvent(content: Content, now: number): EventInfo | null {
   let best: EventInfo | null = null;
   for (const b of content.blocks) {
@@ -147,8 +123,6 @@ const fmtDate = (ms: number, withTime: boolean) => {
   return new Date(ms).toLocaleString("en-IN", o).replace(/\bam\b/, "am").replace(/\bpm\b/, "pm") + (withTime ? " (India time)" : "");
 };
 
-/* ---------- the owner's email, looked up once from Clerk ---------- */
-
 export async function ownerEmail(env: Env, deps: Deps, userId: string, now: number): Promise<string | null> {
   const u = await env.DB.prepare("SELECT email, email_at FROM users WHERE id = ?").bind(userId).first<{ email: string | null; email_at: string | null }>();
   if (u?.email && u.email_at && now - Date.parse(u.email_at) < 30 * DAY) return u.email;
@@ -167,8 +141,6 @@ export async function ownerEmail(env: Env, deps: Deps, userId: string, now: numb
     return u?.email ?? null;
   }
 }
-
-/* ---------- the emails themselves ---------- */
 
 export const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const nl = (s: string) => escHtml(s).replace(/\r?\n/g, "<br>");
@@ -251,12 +223,9 @@ export function endingEmail(o: { origin: string; page: PageLite; endsAt: number;
   return { subject: owner ? `Your page “${o.page.title}” ends soon` : `${o.fromName ? `${o.fromName}'s` : "Your"} page ends soon`, ...r };
 }
 
-/* ---------- 1. a page sent on a date ---------- */
-
 interface DeliveryRow { id: string; page_id: string; owner_id: string; to_email: string; to_name: string | null; from_name: string; note: string | null; send_at: string; status: string; attempts: number }
 interface PageRow { id: string; owner_id: string; title: string; slug: string | null; status: string; password_hash: string | null; unlock_at: string | null; expires_at: string | null; content: string }
 
-/** Sends one waiting delivery. Safe to call twice: only the call that wins the claim sends. */
 export async function deliverOne(env: Env, deps: Deps, origin: string, id: string): Promise<"sent" | "failed" | "retry" | "skipped"> {
   const now = deps.now();
   const won = await env.DB.prepare("UPDATE deliveries SET status = 'sending', claimed_at = ?, attempts = attempts + 1 WHERE id = ? AND status = 'scheduled'").bind(iso(now), id).run();
@@ -277,8 +246,7 @@ export async function deliverOne(env: Env, deps: Deps, origin: string, id: strin
     return "retry";
   }
 
-  // The send is marked in the log BEFORE it happens. If the server stops half-way (after the email left but before
-  // we could write that down), the next run finds the mark and does NOT send a second copy; it asks the owner to check.
+  // mark it as sent before sending, so a crash can never cause a second email
   const key = `dl:${id}`;
   if (!(await claim(env, key, now))) return fail("The server stopped while sending this, so we cannot tell if it arrived. Please check with them, then send it again if needed.");
   const unsubscribeUrl = `${origin}/api/mail/unsub?t=${await unsubToken(env, d.to_email, now)}`;
@@ -286,7 +254,7 @@ export async function deliverOne(env: Env, deps: Deps, origin: string, id: strin
   try {
     await sendMail(env, deps, { to: d.to_email, toName: d.to_name ?? undefined, subject: mail.subject, html: mail.html, text: mail.text, unsubscribeUrl });
   } catch (e) {
-    await release(env, key); // it did not go out, so a later try is allowed
+    await release(env, key);
     const err = e as MailError;
     if (err.retry && d.attempts < MAX_TRIES) {
       await env.DB.prepare("UPDATE deliveries SET status = 'scheduled', error = ? WHERE id = ?").bind(err.message, id).run();
@@ -298,8 +266,6 @@ export async function deliverOne(env: Env, deps: Deps, origin: string, id: strin
   return "sent";
 }
 
-/* ---------- the scheduled job ---------- */
-
 export interface TickResult { deliveries: number; reminders: number; ending: number; left: number }
 
 export async function runTick(env: Env, deps: Deps, origin: string): Promise<TickResult> {
@@ -308,10 +274,8 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
   const now = deps.now();
   const budget = { n: Math.max(0, Math.min(PER_TICK, DAILY_CAP - (await sentInLastDay(env, now)))) };
 
-  // a send that was claimed but never finished (the server stopped part-way) is tried again
   await env.DB.prepare("UPDATE deliveries SET status = 'scheduled' WHERE status = 'sending' AND claimed_at < ?").bind(iso(now - 10 * 60_000)).run();
 
-  /* 1. pages that are due */
   const due = await env.DB.prepare("SELECT id FROM deliveries WHERE status = 'scheduled' AND send_at <= ? ORDER BY send_at LIMIT ?").bind(iso(now), budget.n).all<{ id: string }>();
   for (const r of due.results ?? []) {
     if (budget.n <= 0) break;
@@ -319,7 +283,6 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
     if ((await deliverOne(env, deps, origin, r.id)) === "sent") out.deliveries++;
   }
 
-  /* 2. one reminder to guests who left an email */
   if (budget.n > 0) {
     const subs = await env.DB.prepare(
       `SELECT s.id, s.page_id, s.payload, s.event_at FROM submissions s
@@ -337,7 +300,6 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
       const ev = nextEvent(JSON.parse(p.content) as Content, now);
       if (!ev) { await skip(env, key, now); continue; }
       if (ev.at !== Date.parse(s.event_at)) {
-        // the owner moved the event: wait for the new time instead of reminding about the old one
         await env.DB.prepare("UPDATE submissions SET event_at = ?, remind_at = ? WHERE id = ?").bind(iso(ev.at), iso(Math.max(now, ev.at - DAY)), s.id).run();
         continue;
       }
@@ -358,7 +320,6 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
     }
   }
 
-  /* 3. "this page ends soon", to the owner and to the people it was sent to */
   if (budget.n > 0) {
     const ending = await env.DB.prepare(
       "SELECT id, owner_id, title, slug, expires_at, password_hash, unlock_at FROM pages WHERE status = 'published' AND deleted_at IS NULL AND slug IS NOT NULL AND expires_at > ? AND expires_at <= ? ORDER BY expires_at LIMIT 15",
@@ -366,11 +327,10 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
     for (const p of ending.results ?? []) {
       const endsAt = Date.parse(p.expires_at!);
       const people: { email: string; audience: "owner" | "recipient"; fromName?: string; id: string }[] = [];
-      // the log key uses the delivery's id, never the address itself, so no email address is left behind in the log
       const rec = await env.DB.prepare("SELECT id, to_email, from_name FROM deliveries WHERE page_id = ? AND status = 'sent' ORDER BY sent_at").bind(p.id).all<{ id: string; to_email: string; from_name: string }>();
       const seen = new Set<string>();
       for (const r of rec.results ?? []) {
-        if (seen.has(r.to_email)) continue; // one reminder per address, even if the page was sent to it twice
+        if (seen.has(r.to_email)) continue;
         seen.add(r.to_email);
         people.push({ email: r.to_email, audience: "recipient", fromName: r.from_name, id: r.id });
       }
@@ -399,8 +359,6 @@ export async function runTick(env: Env, deps: Deps, origin: string): Promise<Tic
   return out;
 }
 
-/* ---------- a note to the site owner when a page is reported ---------- */
-
 export async function notifyReport(env: Env, deps: Deps, o: { origin: string; slug: string; title: string; reason: string; details: string; contact: string; count: number }): Promise<void> {
   const to = cleanEmail(env.REPORT_EMAIL ?? "") ?? mailConfig(env)?.from;
   if (!to || !mailConfig(env)) return;
@@ -409,12 +367,8 @@ export async function notifyReport(env: Env, deps: Deps, o: { origin: string; sl
   const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#4A0E1F;line-height:1.5"><h2 style="font-family:Georgia,serif">A page was reported</h2>${lines.map((l) => `<p style="margin:0 0 8px">${escHtml(l)}</p>`).join("")}<p><a href="${escHtml(link)}">Open the review page</a></p></div>`;
   try {
     await sendMail(env, deps, { to, subject: `Page reported: ${o.title}`.slice(0, 120), html, text: `${lines.join("\n")}\n\nReview: ${link}` });
-  } catch {
-    /* the report is saved either way; it will be waiting in the review page */
-  }
+  } catch {}
 }
-
-/* ---------- notes about a report to the page's owner and to the people who reported it ---------- */
 
 const REPORT_REASON_WORDS: Record<string, string> = {
   abuse: "it is hurtful, threatening or unlawful",
@@ -423,23 +377,18 @@ const REPORT_REASON_WORDS: Record<string, string> = {
   spam: "it looks like spam or a scam",
   other: "something else",
 };
-/** Where people can write about a decision: the report address, else the sender address. */
 export const contactAddress = (env: Env) => cleanEmail(env.REPORT_EMAIL ?? "") ?? mailConfig(env)?.from ?? "";
 
 export const reportReasonWords = (reason: string) => REPORT_REASON_WORDS[reason] ?? reason;
 
-/** A plain, personal note. These are one-off notices about something that happened, not a mailing, so there is no stop link. */
 async function sendNotice(env: Env, deps: Deps, to: string, subject: string, heading: string, paragraphs: string[], quote?: { label: string; text: string }): Promise<void> {
   const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#4A0E1F;line-height:1.55;max-width:520px"><h2 style="font-family:Georgia,serif;margin:0 0 14px">${escHtml(heading)}</h2>${paragraphs.map((p) => `<p style="margin:0 0 12px">${nl(p)}</p>`).join("")}${quote ? `<p style="margin:0 0 4px;font-size:13px;color:#7E626A">${escHtml(quote.label)}</p><div style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #E11D48;background:#FFF8F0">${nl(quote.text)}</div>` : ""}</div>`;
   const text = [heading, "", ...paragraphs.flatMap((p) => [p, ""]), ...(quote ? [`${quote.label}`, quote.text] : [])].join("\n");
   try {
     await sendMail(env, deps, { to, subject: subject.slice(0, 120), html, text });
-  } catch {
-    /* the decision is saved either way; a failed note must never undo it */
-  }
+  } catch {}
 }
 
-/** Tells the owner of a page that someone reported it. The reporter's details are not shared. */
 export async function notifyOwnerReported(env: Env, deps: Deps, o: { ownerId: string; title: string; slug: string; reason: string; origin: string; contactEmail: string }): Promise<void> {
   if (!mailConfig(env)) return;
   const to = await ownerEmail(env, deps, o.ownerId, deps.now());
@@ -451,10 +400,6 @@ export async function notifyOwnerReported(env: Env, deps: Deps, o: { ownerId: st
   ]);
 }
 
-/**
- * Tells the people involved what was decided: every reporter who left an email address, and the owner of the page.
- * `note` is the reason written on the review page. Each address gets one note, however many reports it made.
- */
 export async function notifyDecision(
   env: Env,
   deps: Deps,

@@ -45,11 +45,9 @@ const subscribe = (cb: () => void) => {
   };
 };
 
-/** Visitor links are real paths (/p/priya) so the server can add a link preview; the studio uses #/ routes. */
 export function parseLocation(pathname: string, hash: string, search = ""): Route {
   const m = pathname.match(/^\/p\/([\w-]+)\/?$/);
   if (m) return { name: "view", params: { slug: m[1]! }, query: new URLSearchParams() };
-  // Clerk's full-page forms. Clerk puts its own steps after a # (for example #/sso-callback), so the hash is ignored here.
   if (/^\/sign-in\/?$/.test(pathname)) return { name: "signin", params: {}, query: new URLSearchParams() };
   if (/^\/sign-up\/?$/.test(pathname)) return { name: "signup", params: {}, query: new URLSearchParams() };
   const c = pathname.match(/^\/c\/([\w-]+)\/?$/);

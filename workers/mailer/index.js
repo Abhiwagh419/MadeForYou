@@ -1,6 +1,3 @@
-// MadeForYou's scheduler. Cloudflare Pages cannot run on a timer, so this tiny Worker wakes up every
-// 15 minutes and asks the website to send whatever email is due (pages waiting for their date,
-// reminders for guests, "this page ends soon"). It holds no data and sends nothing itself.
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(tick(env));

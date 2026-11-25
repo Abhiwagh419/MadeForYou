@@ -8,20 +8,14 @@ import { Music } from "./Music";
 import { Opening } from "./Opening";
 import { useTapEffect } from "./Tap";
 
-// useLayoutEffect warns on the server; this picks the right one for each side.
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export interface PageRendererProps {
   content: Content;
-  /** Language to show; falls back to the page's default language. */
   lang?: string;
-  /** Turns an asset reference into a URL. Supplied by the host app. */
   resolveAsset?: (ref: AssetRef) => string | undefined;
-  /** Skip the opening screen (editor preview, screenshots). */
   skipOpening?: boolean;
-  /** Thumbnail mode: no motion, music, particles or tap effects; everything visible. */
   static?: boolean;
-  /** Lets guests send messages (wishes, replies, RSVPs). Without it those blocks show a preview only. */
   host?: Host;
 }
 
@@ -32,7 +26,6 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
   const activeLang = lang ?? settings.languages.default;
   const gated = !isStatic && !skipOpening && settings.opening.kind !== "none";
   const [opened, setOpened] = useState(!gated);
-  // Entrances only hide content once scripts are running, so a page without JS still shows everything.
   const [armed, setArmed] = useState(false);
   useIsoLayoutEffect(() => setArmed(!isStatic), [isStatic]);
   const tap = useTapEffect(isStatic ? "none" : settings.tap);
@@ -62,7 +55,6 @@ export function PageRenderer({ content, lang, resolveAsset = noAssets, skipOpeni
             </main>
             {tap.layerEl}
             <footer className="mfy-footer">
-              {/* Always on: with no ads and no paid tier, this is the growth loop. */}
               {BRAND.domain ? <a href={`https://${BRAND.domain}`}>{BRAND.badgeText}</a> : <span>{BRAND.badgeText}</span>}
             </footer>
             {!isStatic && settings.music && <Music provider={settings.music.provider} id={settings.music.id} autoplay={gated} />}

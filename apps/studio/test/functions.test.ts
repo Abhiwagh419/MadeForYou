@@ -16,7 +16,7 @@ describe("shared pages", () => {
   it("the static rules cover invite links too", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const headers = readFileSync(join(process.cwd(), "public", "_headers"), "utf8"); // the tests run from apps/studio
+    const headers = readFileSync(join(process.cwd(), "public", "_headers"), "utf8");
     expect(headers).toMatch(/\/c\/\*\n\s+X-Robots-Tag: noindex/);
   });
 });
@@ -42,7 +42,7 @@ describe("security headers on pages the server produces itself", () => {
     const { join } = await import("node:path");
     const { HTML_SECURITY_HEADERS } = await import("@madeforyou/api");
     const file = readFileSync(join(process.cwd(), "public", "_headers"), "utf8");
-    const block = file.split(/\n\s*\n/)[0]!; // the rules for /*
+    const block = file.split(/\n\s*\n/)[0]!;
     const rule = (name: string) => new RegExp(`^\\s+${name}: (.*)$`, "im").exec(block)?.[1]?.trim();
     expect(rule("X-Content-Type-Options")).toBe(HTML_SECURITY_HEADERS["x-content-type-options"]);
     expect(rule("X-Frame-Options")).toBe(HTML_SECURITY_HEADERS["x-frame-options"]);
@@ -55,6 +55,7 @@ describe("addresses Clerk may send people to", () => {
   it("are not rewritten by a redirect rule (a rule to /index.html sent /sign-in to the home page)", async () => {
     const { existsSync, readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
+    // a catch-all rule here would send /sign-in to index.html
     const file = join(process.cwd(), "public", "_redirects");
     const rules = existsSync(file) ? readFileSync(file, "utf8") : "";
     expect(rules).not.toMatch(/index\.html/);

@@ -13,7 +13,7 @@ describe("editor operations", () => {
     expect(r.content.blocks.map((b) => b.type)).toEqual(["hero", "countdown", "text", "gallery", "signature"]);
     expect(r.content.blocks[1]!.id).toBe(r.id);
     expect(validateContent(r.content).ok).toBe(true);
-    expect(c.blocks).toHaveLength(4); // original untouched
+    expect(c.blocks).toHaveLength(4);
   });
   it("appends when nothing is selected", () => {
     const c = starterSkeleton();

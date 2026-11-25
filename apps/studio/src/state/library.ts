@@ -5,7 +5,6 @@ import { isRemote } from "../lib/config";
 import { fetchPublicTemplates } from "../lib/sync";
 import { useStore } from "./store";
 
-/** Your own templates, other people's approved public ones (when online), then the launch library. */
 export function useAllTemplates(): { all: Template[]; mineIds: Set<string> } {
   const mineMap = useStore((s) => s.templates);
   const [remote, setRemote] = useState<Template[]>([]);

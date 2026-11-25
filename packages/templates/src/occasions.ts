@@ -1,8 +1,3 @@
-/**
- * The controlled vocabulary behind search. Synonyms cover English, Roman-script Hindi
- * and Devanagari, so "maa", "mom", "amma" and "माँ" all reach Mother's Day.
- * This moves to the `occasions` table in Supabase later; the shape stays the same.
- */
 export interface Occasion {
   id: string;
   name: string;

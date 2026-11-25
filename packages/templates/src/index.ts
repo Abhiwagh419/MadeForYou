@@ -9,7 +9,6 @@ export { tpl, block } from "./build";
 
 const RAW = [mothersDay, birthday];
 
-/** Fails fast: a malformed launch template should break the build, never reach a user. */
 const fromJson: Template[] = RAW.map((raw) => {
   const r = validateTemplate(raw);
   if (!r.ok) {
@@ -18,7 +17,6 @@ const fromJson: Template[] = RAW.map((raw) => {
   return r.template;
 });
 
-/** The whole launch library. */
 export const templates: Template[] = [...fromJson, ...built];
 
 export const getTemplate = (id: string) => templates.find((t) => t.meta.id === id);

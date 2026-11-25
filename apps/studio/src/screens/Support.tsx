@@ -7,7 +7,6 @@ import { Button } from "../ui/Button";
 import { toast } from "../ui/Controls";
 import { Shell } from "../ui/Shell";
 
-/** A gentle way to say thanks. Nothing is unlocked by paying and nothing is hidden from anyone who does not. */
 export function Support() {
   const vpa = supportUpi();
   const [amount, setAmount] = useState<number | undefined>(undefined);

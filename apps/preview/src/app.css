@@ -26,13 +26,12 @@ small.richer { color: #8a7a70; }
 .phone { width: 390px; max-width: 100%; height: min(844px, calc(100svh - 3rem)); border-radius: 36px; background: #111; padding: 10px; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.6); }
 .phone-screen {
   position: relative; height: 100%; border-radius: 27px; overflow: hidden; background: #fff;
-  transform: translateZ(0); /* makes this box the containing block for position:fixed descendants */
-  --mfy-screen: calc(min(844px, 100svh - 3rem) - 20px); /* what "full screen" means inside the frame */
+  transform: translateZ(0);
+  --mfy-screen: calc(min(844px, 100svh - 3rem) - 20px);
 }
 .phone-scroll { height: 100%; overflow-y: auto; scrollbar-width: none; }
 .phone-scroll::-webkit-scrollbar { display: none; }
 
-/* On a real phone: show the page first, edge to edge, with the controls below it. */
 @media (max-width: 800px) {
   .shell { display: flex; flex-direction: column; }
   .stage { order: -1; padding: 0; display: block; }

@@ -4,7 +4,6 @@ export { slugStatus, type SlugStatus };
 
 export const uid = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
 
-/** "End message" from "endMessage". */
 export const humanize = (key: string) => {
   const s = key.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -35,7 +34,6 @@ export function slugSuggestions(base: string, isTaken: (s: string) => boolean): 
   return [`${b}-${year}`, `${b}-2`, `for-${b}`, `${b}-forever`].filter((s) => slugStatus(s, isTaken) === "ok").slice(0, 3);
 }
 
-/** Turns a pasted YouTube or Spotify link into provider + id. Anything else is rejected. */
 export function parseMusic(input: string): { provider: "youtube" | "spotify"; id: string } | null {
   let url: URL;
   try {
@@ -91,11 +89,9 @@ export function formatWhen(iso: string | null | undefined): string {
 }
 
 const IST_MS = 5.5 * 3600 * 1000;
-/** A stored date or date-time, shown in a datetime-local box as India time ("2027-02-14T18:30"). */
 export function toIstInput(v: unknown): string {
   if (typeof v !== "string" || !v) return "";
   const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00+05:30` : v);
   return Number.isNaN(t) ? "" : new Date(t + IST_MS).toISOString().slice(0, 16);
 }
-/** What the datetime-local box holds, saved as an India-time value. */
 export const fromIstInput = (v: string): string | null => (v ? `${v}:00+05:30` : null);

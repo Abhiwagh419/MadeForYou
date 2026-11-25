@@ -57,7 +57,7 @@ describe("reporting a page", () => {
     await publish();
     expect((await report({ reason: "nonsense" })).status).toBe(400);
     expect((await report({})).status).toBe(400);
-    expect((await report({ reason: "other" })).status).toBe(400); // "other" needs a few words
+    expect((await report({ reason: "other" })).status).toBe(400);
     expect((await report({ reason: "other", details: "x".repeat(900) })).status).toBe(200);
     expect(((await open())[0] as any).details).toHaveLength(600);
   });
@@ -68,7 +68,7 @@ describe("reporting a page", () => {
   });
   it("cannot be used on private, unpublished or missing pages", async () => {
     await call("PUT", "/pages/pg_safe0001", { user: "abhi", json: { title: "t", content: page() } });
-    expect((await report({ reason: "spam" })).status).toBe(404); // not published
+    expect((await report({ reason: "spam" })).status).toBe(404);
     await publish("abhi", "pg_safe0002", "secret-one");
     await call("POST", "/pages/pg_safe0002/publish", { user: "abhi", json: { slug: "secret-one", visibility: "private" } });
     expect((await report({ reason: "spam" }, "secret-one")).status).toBe(404);
@@ -97,7 +97,7 @@ describe("reporting a page", () => {
     expect(brevo[0].to[0].email).toBe("wabhi2009@gmail.com");
     expect(brevo[0].subject).toContain("For Priya");
     expect(brevo[0].htmlContent).toContain("copyright");
-    expect(brevo[0].headers).toBeUndefined(); // a note to the owner has no stop link
+    expect(brevo[0].headers).toBeUndefined();
 
     boot();
     await publish();
@@ -121,7 +121,7 @@ describe("the site owner's review", () => {
     expect((await call("POST", `/admin/reports/${first.id}/remove`, { headers: ADMIN })).status).toBe(200);
 
     expect((await call("GET", "/p/priya")).status).toBe(404);
-    expect(await open()).toHaveLength(0); // every open report on that page is closed
+    expect(await open()).toHaveLength(0);
     const mine = (await call("GET", "/me/pages", { user: "abhi" })).json.pages[0];
     expect(mine.status).toBe("draft");
     expect(mine.takenDown).toMatchObject({ reason: "Reported: abuse" });
@@ -129,7 +129,6 @@ describe("the site owner's review", () => {
     expect(again.status).toBe(403);
     expect(again.json.error).toContain("taken down");
 
-    // a mistake can be undone
     expect((await call("POST", "/admin/pages/pg_safe0001/restore", { headers: ADMIN })).json.changed).toBe(1);
     expect((await call("GET", "/me/pages", { user: "abhi" })).json.pages[0].takenDown).toBeUndefined();
     expect((await call("POST", "/pages/pg_safe0001/publish", { user: "abhi", json: { slug: "priya" } })).status).toBe(200);
@@ -164,7 +163,7 @@ describe("deleting an account", () => {
     expect((await call("DELETE", "/me", { json: { confirm: "DELETE" } })).status).toBe(401);
     expect((await call("DELETE", "/me", { user: "abhi", json: {} })).status).toBe(400);
     expect((await call("DELETE", "/me", { user: "abhi", json: { confirm: "yes" } })).status).toBe(400);
-    expect((await call("GET", "/p/priya")).status).toBe(200); // nothing happened
+    expect((await call("GET", "/p/priya")).status).toBe(200);
   });
 
   it("removes everything of theirs and nothing of anyone else's", async () => {
@@ -173,7 +172,7 @@ describe("deleting an account", () => {
     await seed("meera", "pg_safe0002", "meera-page", "ast_hers0001");
     await call("POST", "/pages/pg_safe0001/deliveries", { user: "abhi", json: { toEmail: "x@example.com", fromName: "Abhi", sendAt: new Date(t + D).toISOString() } });
     await report({ reason: "spam" });
-    await call("PUT", "/templates/my-template", { user: "abhi", json: { template: { id: "my-template", title: "T", description: "d", category: "x", version: 1 } } }); // may be refused; that is fine
+    await call("PUT", "/templates/my-template", { user: "abhi", json: { template: { id: "my-template", title: "T", description: "d", category: "x", version: 1 } } });
 
     const r = await call("DELETE", "/me", { user: "abhi", json: { confirm: " delete " } });
     expect(r.status).toBe(200);
@@ -188,7 +187,6 @@ describe("deleting an account", () => {
     expect(await count("SELECT COUNT(*) AS n FROM users WHERE id = 'dev_abhi'")).toBe(0);
     expect((await call("GET", "/p/priya")).status).toBe(404);
 
-    // Meera is untouched
     expect((await call("GET", "/p/meera-page")).status).toBe(200);
     expect(env.FILES.keys()).toContain("a/ast_hers0001");
     expect(await count("SELECT COUNT(*) AS n FROM pages WHERE owner_id = 'dev_meera'")).toBe(1);
@@ -210,7 +208,7 @@ describe("deleting an account", () => {
 
 describe("old deleted data goes after 30 days", () => {
   const tick = () => call("POST", "/cron/tick", { headers: { authorization: "Bearer cron-1" } });
-  beforeEach(() => boot({ CRON_SECRET: "cron-1" })); // email is NOT set up: the clean-up must still run
+  beforeEach(() => boot({ CRON_SECRET: "cron-1" }));
 
   it("removes a deleted page and its photo only after the grace period", async () => {
     await call("PUT", "/assets/ast_old00001", { user: "abhi", body: webp(), headers: { "content-type": "image/webp" } });
@@ -221,7 +219,7 @@ describe("old deleted data goes after 30 days", () => {
 
     t += 20 * D;
     await tick();
-    expect(await count("SELECT COUNT(*) AS n FROM pages")).toBe(1); // still within the 30 days
+    expect(await count("SELECT COUNT(*) AS n FROM pages")).toBe(1);
     expect(await count("SELECT COUNT(*) AS n FROM assets")).toBe(1);
 
     t += 12 * D;
@@ -259,9 +257,7 @@ describe("review fixes", () => {
   it("the admin token cannot be guessed by trying again and again", async () => {
     const same = { "cf-connecting-ip": "7.7.7.7" };
     for (let i = 0; i < 10; i++) expect((await call("GET", "/admin/reports", { headers: { ...same, "x-admin-token": `guess-${i}` } })).status).toBe(403);
-    // the 11th try is refused outright, even with the right token
     expect((await call("GET", "/admin/reports", { headers: { ...same, ...ADMIN } })).status).toBe(429);
-    // someone else is not affected, and a correct token from a calm visitor never counts against them
     for (let i = 0; i < 12; i++) expect((await call("GET", "/admin/reports", { headers: { "cf-connecting-ip": "8.8.8.8", ...ADMIN } })).status).toBe(200);
   });
 
@@ -280,7 +276,7 @@ describe("review fixes", () => {
     t += 2 * D + 3_600_000;
     await call("POST", "/cron/tick", { headers: { authorization: "Bearer cron-1" } });
     const rows = ((await env.DB.prepare("SELECT key FROM mail_log").all()) as any).results as { key: string }[];
-    expect(rows.some((r) => r.key.startsWith("end:"))).toBe(true); // the reminder was recorded
+    expect(rows.some((r) => r.key.startsWith("end:"))).toBe(true);
     expect(JSON.stringify(rows)).not.toContain("someone@example.com");
 
     t += 100 * D;
@@ -290,12 +286,11 @@ describe("review fixes", () => {
 
   it("never removes a photo that a live page still uses, even if its link was missed", async () => {
     boot({ CRON_SECRET: "cron-1" });
-    // the page is saved BEFORE its photo arrives, so no link is recorded
     const c = page();
     c.blocks[0]!.fields.cover = { asset: "ast_late0001" };
     await call("PUT", "/pages/pg_safe0001", { user: "abhi", json: { title: "t", content: c } });
     await call("PUT", "/assets/ast_late0001", { user: "abhi", body: webp(), headers: { "content-type": "image/webp" } });
-    await call("PUT", "/assets/ast_loose001", { user: "abhi", body: webp(), headers: { "content-type": "image/webp" } }); // really unused
+    await call("PUT", "/assets/ast_loose001", { user: "abhi", body: webp(), headers: { "content-type": "image/webp" } });
     expect(((await env.DB.prepare("SELECT COUNT(*) AS n FROM page_assets").first()) as any).n).toBe(0);
     t += 60 * D;
     await call("POST", "/cron/tick", { headers: { authorization: "Bearer cron-1" } });
@@ -331,7 +326,7 @@ describe("emails about a report", () => {
     await publish();
     await giveOwnerEmail();
     await report({ reason: "abuse", contact: "a@example.com" });
-    await report({ reason: "spam", contact: "A@example.com" }); // the same person again
+    await report({ reason: "spam", contact: "A@example.com" });
     await report({ reason: "spam", contact: "not an email" });
     brevo = [];
     const first = (await open()).find((x) => x.reason === "abuse");
@@ -365,7 +360,7 @@ describe("emails about a report", () => {
     expect((await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN })).status).toBe(200);
     expect(brevo.length).toBe(2);
 
-    boot(); // email off
+    boot();
     await publish("abhi", "pg_safe0002", "second");
     await report({ reason: "spam", contact: "c@example.com" }, "second");
     const [r2] = await open();
@@ -383,7 +378,7 @@ describe("emails about a report", () => {
     await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN });
     expect(to()).not.toContain("d@example.com");
     brevo = [];
-    await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN }); // again
+    await call("POST", `/admin/reports/${r.id}/dismiss`, { headers: ADMIN });
     expect(brevo).toHaveLength(0);
   });
 });

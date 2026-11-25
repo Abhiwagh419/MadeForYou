@@ -1,10 +1,5 @@
 import { useState } from "react";
 
-/**
- * The opening screen. Its job is also practical: the tap is the user gesture that
- * lets mobile browsers start background music. Only the envelope is designed so far;
- * gift box, curtain and diary fall back to it.
- */
 export function Opening({ text, onOpen }: { text: string; onOpen: () => void }) {
   const [opening, setOpening] = useState(false);
 

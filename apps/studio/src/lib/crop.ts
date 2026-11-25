@@ -1,11 +1,9 @@
-/** Crop geometry (pure, so it can be tested) and the canvas step that makes the cropped photo. */
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Corner = "nw" | "ne" | "sw" | "se";
 
 export const MIN_SIDE = 48;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** The biggest rectangle with this width/height ratio that fits the box, centred. No ratio = the whole box. */
 export function fitRect(bw: number, bh: number, ratio: number | null): Rect {
   if (!ratio) return { x: 0, y: 0, w: bw, h: bh };
   let w = bw;
@@ -14,12 +12,10 @@ export function fitRect(bw: number, bh: number, ratio: number | null): Rect {
   return { x: (bw - w) / 2, y: (bh - h) / 2, w, h };
 }
 
-/** Slide the rectangle without leaving the photo. */
 export function moveRect(r: Rect, dx: number, dy: number, bw: number, bh: number): Rect {
   return { ...r, x: clamp(r.x + dx, 0, bw - r.w), y: clamp(r.y + dy, 0, bh - r.h) };
 }
 
-/** Drag one corner; the opposite corner stays put. With a ratio the shape is kept. */
 export function resizeCorner(r: Rect, corner: Corner, px: number, py: number, ratio: number | null, bw: number, bh: number, min = MIN_SIDE): Rect {
   const west = corner === "nw" || corner === "sw";
   const north = corner === "nw" || corner === "ne";
@@ -43,14 +39,12 @@ export function resizeCorner(r: Rect, corner: Corner, px: number, py: number, ra
   return { x: sx > 0 ? ax : ax - w, y: sy > 0 ? ay : ay - h, w, h };
 }
 
-/** Keep the same part of the photo selected when the picture is shown at a different size. */
 export function scaleRect(r: Rect, kx: number, ky: number): Rect {
   return { x: r.x * kx, y: r.y * ky, w: r.w * kx, h: r.h * ky };
 }
 
 export const roundRatio = (r: number) => Math.round(clamp(r, 0.2, 5) * 1000) / 1000;
 
-/** Cut the chosen part out of the photo at full quality (long edge at most 1280 px) as WebP. */
 export async function cropToBlob(img: HTMLImageElement, r: Rect, shownW: number, shownH: number, maxEdge = 1280): Promise<{ blob: Blob; ratio: number }> {
   const kx = img.naturalWidth / shownW;
   const ky = img.naturalHeight / shownH;

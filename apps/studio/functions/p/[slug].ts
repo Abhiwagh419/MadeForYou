@@ -2,7 +2,6 @@ import { HTML_SECURITY_HEADERS, renderPageShell, type Env } from "@madeforyou/ap
 
 type Ctx = { request: Request; env: Env & { ASSETS: { fetch: (r: Request) => Promise<Response> } }; params: { slug?: string | string[] } };
 
-/** /p/<link>: the app, with this page's link-preview tags filled in so WhatsApp shows a proper card. */
 export async function onRequestGet({ request, env, params }: Ctx) {
   const url = new URL(request.url);
   const shell = await (await env.ASSETS.fetch(new Request(new URL("/", url)))).text();

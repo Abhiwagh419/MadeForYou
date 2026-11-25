@@ -7,7 +7,6 @@ import { App, preloadScreens } from "../src/App";
 import { sha256 } from "../src/lib/util";
 import { createPage, getState, resetStore, savePage } from "../src/state/store";
 
-// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
 beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 let root: Root | null = null;
@@ -93,7 +92,7 @@ describe("screens render and work", () => {
     await visit(window.location.hash);
     expect(text()).toContain("Who is this made for?");
     const next = button("Next") as HTMLButtonElement;
-    expect(next.disabled).toBe(true); // required
+    expect(next.disabled).toBe(true);
     await type(q('input[aria-label="Recipient"]') as HTMLInputElement, "Priya");
     expect((button("Next") as HTMLButtonElement).disabled).toBe(false);
     const page = Object.values(getState().pages)[0]!;
@@ -181,9 +180,9 @@ describe("screens render and work", () => {
     await visit(`#/template-from/${p.id}`);
     expect(text()).toContain("What stays private");
     expect(qa(".strip-list li").length).toBeGreaterThan(5);
-    expect((button("Create template") as HTMLButtonElement).disabled).toBe(true); // no title yet
+    expect((button("Create template") as HTMLButtonElement).disabled).toBe(true);
     const title = q('input[placeholder^="A birthday surprise"]') as HTMLInputElement;
-    await type(title, "A letter for Priya"); // a name from the page: refused
+    await type(title, "A letter for Priya");
     expect(text()).toContain("a name from your page");
     expect((button("Create template") as HTMLButtonElement).disabled).toBe(true);
     await type(title, "A warm thank-you page");
@@ -206,7 +205,7 @@ describe("screens render and work", () => {
     savePage(locked.id, { slug: "locked-one", status: "published", access: { visibility: "unlisted", unlockAt: new Date(Date.now() + 86400000 * 3).toISOString() } });
     await visit("#/p/locked-one");
     expect(text()).toContain("Not just yet");
-    expect(q(".mfy-page")).toBeNull(); // locked content is never rendered early
+    expect(q(".mfy-page")).toBeNull();
     await act(async () => root!.unmount()); host!.remove();
 
     const pw = createPage({ title: "Secret", content: base });

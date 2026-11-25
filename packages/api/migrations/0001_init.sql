@@ -1,4 +1,4 @@
--- MadeForYou, first schema. Apply with: wrangler d1 migrations apply madeforyou --remote
+-- first schema
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE users (
@@ -35,7 +35,7 @@ CREATE TABLE assets (
 );
 CREATE INDEX assets_owner ON assets (owner_id);
 
--- which photos a page uses; decides who may fetch a photo
+-- which photos a page uses
 CREATE TABLE page_assets (
   page_id  TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
   asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
@@ -55,7 +55,7 @@ CREATE TABLE templates (
 );
 CREATE INDEX templates_listing ON templates (visibility, status, created_at DESC);
 
--- password attempts and upload bursts; rows older than a day are swept
+-- rate limit counters
 CREATE TABLE throttle (
   key TEXT NOT NULL,
   at  INTEGER NOT NULL

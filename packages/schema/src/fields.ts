@@ -1,21 +1,11 @@
 import { z } from "zod";
 
-/**
- * The four tags every field can carry. They live in the code registry (not in
- * saved pages) and drive guided mode, template stripping and the publish check.
- */
 export interface FieldTags {
-  /** Removed when a page is shared as a template. Default is NOT personal, so mark user content explicitly. */
   personal?: boolean;
-  /** Asked as a question in guided mode. */
   guided?: boolean;
-  /** Must be filled (not left as a placeholder) before publishing. */
   required?: boolean;
-  /** The guided-mode question. */
   prompt?: string;
-  /** Sample value shown (greyed) until the user fills the field. */
   placeholder?: unknown;
-  /** Holds a person's name. Used to stop names leaking into public template titles and tags. */
   nameLike?: boolean;
 }
 
@@ -54,21 +44,17 @@ export const f = {
   }),
 };
 
-/** Images and audio are stored as references, never URLs (see schema notes). */
 export const AssetRefSchema = z.object({
   asset: z.string().regex(/^ast_[A-Za-z0-9_-]{4,64}$/, "Invalid asset reference"),
   alt: z.string().max(200).optional(),
-  /** Width divided by height of the photo as the author cropped it. Lets the page show the whole crop instead of centre-cropping it into a fixed frame. */
   ratio: z.number().min(0.2).max(5).optional(),
 });
 export type AssetRef = z.infer<typeof AssetRefSchema>;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
 
-/* ---------- links and video: only safe, known shapes are ever stored ---------- */
 const SAFE_PROTOCOLS = new Set(["https:", "http:", "mailto:", "tel:"]);
 
-/** "" (no link) or a link that cannot run script: https, http, mailto or tel only. */
 export function isSafeLink(v: string): boolean {
   if (v === "") return true;
   try {
@@ -78,7 +64,6 @@ export function isSafeLink(v: string): boolean {
   }
 }
 
-/** Turns what people type into a real link: a 10-digit number becomes tel:+91..., an email becomes mailto:, www. gets https. */
 export function normalizeLink(input: string): string {
   const v = input.trim();
   if (!v) return "";
@@ -94,7 +79,6 @@ export function normalizeLink(input: string): string {
 export const VideoSchema = z.object({ provider: z.enum(["youtube", "vimeo"]), id: z.string().regex(/^[A-Za-z0-9_-]{6,20}$/) });
 export type VideoRef = z.infer<typeof VideoSchema>;
 
-/** A pasted YouTube or Vimeo link becomes provider + id. Anything else is refused. */
 export function parseVideoUrl(input: string): VideoRef | null {
   let url: URL;
   try {
@@ -117,7 +101,6 @@ export function parseVideoUrl(input: string): VideoRef | null {
   return null;
 }
 
-/** A voice note: an asset id plus its length in seconds (at most a minute). */
 export const AudioRefSchema = z.object({
   asset: z.string().regex(/^ast_[A-Za-z0-9_-]{4,64}$/, "Invalid asset reference"),
   seconds: z.number().min(0).max(65).optional(),
@@ -131,10 +114,6 @@ const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
 const valid = (lat: number, lng: number): Geo | null =>
   Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat: round5(lat), lng: round5(lng) } : null;
 
-/**
- * Reads a place from what people paste: "19.0760, 72.8777", an OpenStreetMap link, or a long Google Maps link.
- * Short links (maps.app.goo.gl) cannot be read without visiting them, so they are refused with a hint in the editor.
- */
 export function parseGeo(input: string): Geo | null {
   const v = input.trim();
   if (!v) return null;
@@ -190,7 +169,6 @@ export function fieldToZod(def: FieldDef): z.ZodTypeAny {
   }
 }
 
-/** Unknown keys are dropped (zod's default), and every field is optional so drafts can be incomplete. */
 export function shapeToZod(fields: Record<string, FieldDef>) {
   return z.object(
     Object.fromEntries(Object.entries(fields).map(([k, d]) => [k, fieldToZod(d).optional()])),

@@ -18,7 +18,6 @@ function Heart({ size = 18 }: { size?: number }) {
   );
 }
 
-/* ---------------- Featured photo ---------------- */
 export function Featured({ block }: P) {
   const x = useFields(block);
   const url = x.url(x.raw("image"));
@@ -32,7 +31,6 @@ export function Featured({ block }: P) {
   );
 }
 
-/* ---------------- Timeline ---------------- */
 export function Timeline({ block }: P) {
   const x = useFields(block);
   const list = items(x.raw("items"));
@@ -57,7 +55,6 @@ export function Timeline({ block }: P) {
   );
 }
 
-/* ---------------- Days together ---------------- */
 function useMinute(): number | null {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -103,7 +100,6 @@ export function DaysTogether({ block }: P) {
   );
 }
 
-/* ---------------- Video (a poster first, the player only when asked) ---------------- */
 export function Video({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();
@@ -133,7 +129,6 @@ export function Video({ block }: P) {
   );
 }
 
-/* ---------------- Quote / shayari ---------------- */
 export function Quote({ block }: P) {
   const x = useFields(block);
   const lines = x.t("text").split("\n");
@@ -145,7 +140,6 @@ export function Quote({ block }: P) {
   );
 }
 
-/* ---------------- Reasons ---------------- */
 export function Reasons({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();
@@ -172,7 +166,6 @@ export function Reasons({ block }: P) {
   );
 }
 
-/* ---------------- Checklist ---------------- */
 export function Checklist({ block }: P) {
   const x = useFields(block);
   const list = items(x.raw("items"));
@@ -194,7 +187,6 @@ export function Checklist({ block }: P) {
   );
 }
 
-/* ---------------- Open when ---------------- */
 export function OpenWhen({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();
@@ -219,7 +211,6 @@ export function OpenWhen({ block }: P) {
   );
 }
 
-/* ---------------- Scratch card ---------------- */
 export function Reveal({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();
@@ -290,7 +281,6 @@ export function Reveal({ block }: P) {
   );
 }
 
-/* ---------------- The Ask ---------------- */
 export function Ask({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();
@@ -335,7 +325,6 @@ export function Ask({ block }: P) {
   );
 }
 
-/* ---------------- Quiz ---------------- */
 const LETTERS = ["A", "B", "C", "D"] as const;
 
 export function Quiz({ block }: P) {
@@ -385,7 +374,6 @@ export function Quiz({ block }: P) {
   );
 }
 
-/* ---------------- Memory match ---------------- */
 const SYMBOLS = ["♥", "✿", "★", "☾", "❀", "✦", "☀", "❖"];
 
 interface Tile { key: number; pair: number; url?: string; symbol: string }
@@ -408,7 +396,6 @@ export function Memory({ block }: P) {
     const all = [...base, ...base].map((t, k) => ({ ...t, key: k }));
     for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j]!, all[i]!]; }
     return all;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pairs, key]);
 
   useEffect(() => { setDeck(build()); setOpen([]); setMatched(new Set()); setMoves(0); }, [build]);
@@ -451,7 +438,6 @@ export function Memory({ block }: P) {
   );
 }
 
-/* ---------------- Event ---------------- */
 export function Event({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();
@@ -484,7 +470,6 @@ export function Event({ block }: P) {
   );
 }
 
-/* ---------------- Buttons ---------------- */
 export function Buttons({ block }: P) {
   const x = useFields(block);
   const list = items(x.raw("items")).filter((b) => str(b.label));
@@ -504,7 +489,6 @@ export function Buttons({ block }: P) {
   );
 }
 
-/* ---------------- Divider ---------------- */
 export function Divider({ block }: P) {
   const style = typeof block.fields.style === "string" ? block.fields.style : "rangoli";
   return (

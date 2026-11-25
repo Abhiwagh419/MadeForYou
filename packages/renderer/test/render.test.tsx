@@ -7,7 +7,6 @@ import { PageRenderer, parseTarget, splitRemaining } from "../src";
 const html = (content: Content, props: Partial<Parameters<typeof PageRenderer>[0]> = {}) =>
   renderToStaticMarkup(<PageRenderer content={content} skipOpening {...props} />);
 
-/** Visible text of the markup: tags removed, entities decoded, spaces collapsed. */
 const plain = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
 
 describe("PageRenderer", () => {
@@ -100,7 +99,6 @@ describe("editing and translations", () => {
     const out = html(next, { lang: "hi" });
     expect(plain(out)).toContain("Priya");
     expect(out).not.toContain("माँ</p>");
-    // template-authored Hindi that the user did not change is still shown
     expect(plain(out)).toContain("मातृ दिवस की शुभकामनाएँ");
   });
 });
@@ -139,7 +137,7 @@ describe("dynamic layer", () => {
     const out = html(mothers());
     expect(out).toContain('data-reveal="fade-up"');
     expect(out).toContain('data-in="false"');
-    expect(out).not.toContain("mfy-armed"); // content only hides after the page is armed on the client
+    expect(out).not.toContain("mfy-armed");
   });
 
   it("indexes letter paragraphs for the line-by-line unfold", () => {

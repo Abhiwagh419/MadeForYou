@@ -7,7 +7,6 @@ import { Icon } from "./Icon";
 const MAX_SECONDS = 60;
 const mmss = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
 
-/** Record a voice note in the browser (up to a minute), or upload an audio file. */
 export function VoiceRecorder({ value, onChange, large }: { value: AudioRef | null | undefined; onChange: (v: AudioRef | null) => void; large?: boolean }) {
   const [state, setState] = useState<"idle" | "recording" | "saving">("idle");
   const [seconds, setSeconds] = useState(0);

@@ -1,6 +1,5 @@
 import { BRAND } from "@madeforyou/ui";
 
-/** Arch (the jharokha window used across the product) with a heart cut into it. */
 export function Mark({ size = 28 }: { size?: number }) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">

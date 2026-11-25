@@ -4,14 +4,8 @@ import { apiBase, isRemote } from "./config";
 import { roundRatio } from "./crop";
 import { uid } from "./util";
 
-/**
- * Photos live in the browser's IndexedDB for now, referenced by id exactly like they will
- * be in R2 later, so pages never store URLs. If IndexedDB is missing (private tabs, tests)
- * a memory map takes over.
- */
 const urlCache = new Map<string, string>();
 
-/* Photos that are not on this device (a page pulled from the server) load through the API with a short-lived token. */
 let ownerToken: string | null = null;
 const tokenListeners = new Set<() => void>();
 export function setOwnerToken(t: string | null) {
@@ -25,7 +19,6 @@ const remoteUrl = (id: string, token?: string | null) => {
 };
 const memory = new Map<string, Blob>();
 
-/** Forgets every photo kept on this device. */
 export async function clearLocalAssets() {
   memory.clear();
   for (const u of urlCache.values()) URL.revokeObjectURL(u);
@@ -57,9 +50,7 @@ async function putBlob(id: string, blob: Blob) {
       tx.oncomplete = () => res();
       tx.onerror = () => rej(tx.error);
     });
-  } catch {
-    /* kept in memory for this session */
-  }
+  } catch {}
 }
 
 async function getBlob(id: string): Promise<Blob | undefined> {
@@ -82,12 +73,10 @@ export const getLocalBlob = (id: string) => getBlob(id);
 
 export const MAX_EDGE = 1280;
 
-/** Resize to at most 1280px on the long edge and re-encode as WebP, in the browser, before storing. */
 export async function compressImage(file: Blob): Promise<Blob> {
   return (await compressWithShape(file)).blob;
 }
 
-/** Same, and also reports width divided by height so the page can show the whole photo. */
 async function compressWithShape(file: Blob): Promise<{ blob: Blob; ratio?: number }> {
   if (typeof createImageBitmap !== "function") return { blob: file };
   const bmp = await createImageBitmap(file);
@@ -103,13 +92,11 @@ async function compressWithShape(file: Blob): Promise<{ blob: Blob; ratio?: numb
   return { blob, ratio: roundRatio(w / h) };
 }
 
-/** Throws a friendly message if the file cannot be used as a photo. */
 export function checkImageFile(file: File) {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image");
   if (file.size > 25 * 1024 * 1024) throw new Error("That photo is too large (25 MB max)");
 }
 
-/** The whole photo, uncropped. Its own shape is remembered so the page never centre-crops it. */
 export async function saveImage(file: File): Promise<AssetRef> {
   checkImageFile(file);
   const { blob, ratio } = await compressWithShape(file);
@@ -119,7 +106,6 @@ export async function saveImage(file: File): Promise<AssetRef> {
   return ratio ? { asset: id, ratio } : { asset: id };
 }
 
-/** A photo the author has already cropped (see CropDialog). */
 export async function saveCropped(blob: Blob, ratio: number): Promise<AssetRef> {
   const id = uid("ast");
   await putBlob(id, blob);
@@ -127,7 +113,6 @@ export async function saveCropped(blob: Blob, ratio: number): Promise<AssetRef> 
   return { asset: id, ratio };
 }
 
-/** A voice note is stored exactly as recorded (it is already small: about 30 KB per second). */
 export async function saveAudio(blob: Blob): Promise<AssetRef> {
   if (!/^audio\//.test(blob.type)) throw new Error("Please choose an audio file");
   if (blob.size > LIMITS.assetBytes) throw new Error("That recording is too large. Keep it under a minute, or under 1.5 MB.");
@@ -139,7 +124,6 @@ export async function saveAudio(blob: Blob): Promise<AssetRef> {
 
 const ID_RE = /ast_[A-Za-z0-9_-]{4,64}/g;
 
-/** Resolves asset references used in `content` to object URLs, re-rendering when they load. */
 export function useAssets(content: Content, token?: string | null): (ref: AssetRef) => string | undefined {
   const owner = useOwnerToken();
   const [version, bump] = useReducer((x: number) => x + 1, 0);
@@ -169,7 +153,6 @@ export function useAssets(content: Content, token?: string | null): (ref: AssetR
 
 export const assetUrl = (id: string) => urlCache.get(id);
 
-/** URL for one asset id (or undefined while loading / if it does not exist). */
 export function useAssetUrl(id?: string | null): string | undefined {
   const [, bump] = useReducer((x: number) => x + 1, 0);
   useOwnerToken();

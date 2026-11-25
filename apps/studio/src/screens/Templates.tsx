@@ -24,7 +24,6 @@ export function Templates() {
     (t) => (mood === "all" || t.meta.moods.includes(mood)) && (lang === "all" || t.meta.languages.includes("hi")),
   );
 
-  // For an occasion with no templates yet: the closest ones to start from.
   const similar: Template[] = useMemo(() => {
     const group = res.occasion?.group;
     const sameGroup = all.filter((t) => t.meta.occasions.some((o) => OCCASIONS.find((x) => x.id === o)?.group === group));

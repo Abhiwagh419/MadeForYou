@@ -14,17 +14,11 @@ const CORNERS: Corner[] = ["nw", "ne", "sw", "se"];
 
 type Drag = { kind: "move" | Corner; sx: number; sy: number; start: Rect };
 
-/**
- * Lets the author pick which part of a photo to show. Drag the box to move it, drag a corner to resize,
- * or choose a shape. The page then shows exactly this crop.
- */
 export function CropDialog({ src, onCancel, onDone, onWhole, lock }: {
   src: string;
   onCancel: () => void;
   onDone: (r: { blob: Blob; ratio: number }) => void;
-  /** Use the photo as it is (only offered for a photo that was just chosen). */
   onWhole?: () => void;
-  /** The photo will sit in a frame of this shape (width / height), so the box keeps it. */
   lock?: number;
 }) {
   const img = useRef<HTMLImageElement>(null);

@@ -1,4 +1,4 @@
--- Messages from guests: wishes, replies and RSVPs, plus a way to revoke a contributor link.
+-- guest wishes, replies and RSVPs
 ALTER TABLE pages ADD COLUMN contrib_epoch INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE submissions (

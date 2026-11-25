@@ -1,6 +1,5 @@
 import { BRAND } from "@madeforyou/ui";
 
-/** The words of the Terms and the Privacy page. Written to be read by anyone, so they say what really happens. */
 export interface Section { h: string; p?: string[]; ul?: string[] }
 export interface Legal { title: string; updated: string; summary: string; sections: Section[] }
 

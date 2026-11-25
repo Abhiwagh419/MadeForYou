@@ -9,7 +9,6 @@ import { parseTarget, shape } from "./util";
 type P = { block: Block };
 
 const paragraphs = (s: string) => s.split(/\n{2,}/).filter((p) => p.trim() !== "");
-/** Index used by CSS to stagger entrances: style="--i: 2". */
 const idx = (i: number) => ({ "--i": i }) as CSSProperties;
 
 export function Hero({ block }: P) {
@@ -117,7 +116,6 @@ export function splitRemaining(ms: number) {
 }
 
 function useNow(): number | null {
-  // null until mounted, so server and first client render match.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     setNow(Date.now());
@@ -181,11 +179,6 @@ export const COMPONENTS: Record<string, (p: P) => ReactElement> = {
   ...SOCIAL,
 };
 
-/**
- * Wraps every block. `data-in` flips to true once the block scrolls into view;
- * CSS uses it to play entrances at the moment they can be seen (not on page load,
- * when below-the-fold blocks would animate where nobody is looking).
- */
 export function BlockView({ block }: P) {
   const C = COMPONENTS[block.type];
   const ref = useRef<HTMLElement>(null);
@@ -211,7 +204,7 @@ export function BlockView({ block }: P) {
     return () => io.disconnect();
   }, []);
 
-  if (!C) return null; // validation rejects unknown types; this is only a safety net
+  if (!C) return null;
   const s = block.style;
   return (
     <section

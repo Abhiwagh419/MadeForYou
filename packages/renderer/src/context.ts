@@ -1,7 +1,6 @@
 import { createContext, useContext } from "react";
 import type { AssetRef, Block } from "@madeforyou/schema";
 
-/** What the host app (the website) lends the page: a way to send guests' messages, and the wishes already approved. */
 export interface Host {
   submit?: (
     blockId: string,
@@ -10,16 +9,13 @@ export interface Host {
     extra: { website: string; elapsedMs: number },
   ) => Promise<{ ok: boolean; status?: string; error?: string }>;
   wishes?: Record<string, { id: string; name: string; message: string }[]>;
-  /** True when the page may offer guests one email reminder before the event (the server decides). */
   canRemind?: boolean;
 }
 
 export interface RenderContext {
   lang: string;
   defaultLang: string;
-  /** The host app turns an asset reference into a URL (public, or signed for private pages). */
   resolveAsset: (ref: AssetRef) => string | undefined;
-  /** Thumbnail mode: blocks must not load embeds or run games. */
   isStatic: boolean;
   host?: Host;
 }
@@ -37,7 +33,6 @@ export const useRender = () => useContext(RenderCtx);
 const isRef = (v: unknown): v is AssetRef =>
   !!v && typeof v === "object" && typeof (v as AssetRef).asset === "string";
 
-/** Small accessor so block components stay free of casts and language logic. */
 export function useFields(block: Block) {
   const { lang, defaultLang, resolveAsset, isStatic, host } = useRender();
   const raw = (field: string): unknown => block.fields[field];
@@ -45,7 +40,6 @@ export function useFields(block: Block) {
     isStatic,
     host,
     raw,
-    /** Text for the current language, falling back to the page's default language. */
     t(field: string): string {
       const alt = lang !== defaultLang ? block.i18n?.[lang]?.[field] : undefined;
       const v = alt ?? raw(field);
@@ -55,7 +49,6 @@ export function useFields(block: Block) {
       const v = raw(field);
       return typeof v === "string" && v ? v : fallback;
     },
-    /** "mfy-ph" while the field still holds sample content, so it renders greyed. */
     ph: (field: string) => (block.ph.includes(field) ? "mfy-ph" : ""),
     ref: (v: unknown): AssetRef | null => (isRef(v) ? v : null),
     url: (v: unknown): string | undefined => (isRef(v) ? resolveAsset(v) : undefined),

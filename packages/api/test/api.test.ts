@@ -16,7 +16,6 @@ const webp = () => {
 };
 const jpeg = () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 74, 70, 73, 70, 0, 1]);
 
-/** A page that passes the publish check. */
 function ready(): Content {
   let c = starterSkeleton();
   const [hero, text, gallery, sig] = c.blocks;
@@ -127,7 +126,7 @@ describe("publishing", () => {
     expect((await publish("abhi", "pg_abcdef1", { slug: "Bad Link!" })).status).toBe(400);
     expect((await publish("abhi", "pg_abcdef1")).status).toBe(200);
     expect((await publish("sam", "pg_sam00001")).status).toBe(409);
-    expect((await publish("abhi", "pg_abcdef1")).status).toBe(200); // republishing your own link is fine
+    expect((await publish("abhi", "pg_abcdef1")).status).toBe(200);
   });
   it("validates dates and password length", async () => {
     await savePage("abhi", "pg_abcdef1");
@@ -230,7 +229,7 @@ describe("photos", () => {
     const fits = Math.floor(LIMITS.userBytes / chunk.byteLength);
     for (let i = 0; i < fits; i++) expect((await upload("abhi", `ast_fill${String(i).padStart(2, "0")}`, chunk)).status).toBe(200);
     expect((await upload("abhi", "ast_fill_over", chunk)).status).toBe(413);
-    expect((await upload("sam", "ast_samphoto", chunk)).status).toBe(200); // someone else is unaffected
+    expect((await upload("sam", "ast_samphoto", chunk)).status).toBe(200);
   });
   it("nobody can take over another person's photo id", async () => {
     await upload("abhi", "ast_photo1");
@@ -241,11 +240,11 @@ describe("photos", () => {
     await savePage("abhi", "pg_abcdef1");
     await publish("abhi", "pg_abcdef1", { password: "rose" });
 
-    expect((await call("GET", "/a/ast_photo1")).status).toBe(404); // no token
+    expect((await call("GET", "/a/ast_photo1")).status).toBe(404);
     expect((await call("GET", "/a/ast_photo1?t=garbage")).status).toBe(404);
 
     const gated = await call("GET", "/p/priya");
-    expect(gated.json.assetToken).toBeUndefined(); // the password gate hands out no token
+    expect(gated.json.assetToken).toBeUndefined();
 
     const open = await call("POST", "/p/priya/open", { json: { password: "rose" } });
     const img = await call("GET", `/a/ast_photo1?t=${encodeURIComponent(open.json.assetToken)}`);
@@ -280,7 +279,7 @@ describe("photos", () => {
   });
   it("a page cannot claim photos it does not own", async () => {
     await upload("abhi", "ast_photo1");
-    await savePage("mallory", "pg_mal00001"); // refers to ast_photo1 but does not own it
+    await savePage("mallory", "pg_mal00001");
     await publish("mallory", "pg_mal00001", { slug: "stolen" });
     const open = await call("GET", "/p/stolen");
     expect((await call("GET", `/a/ast_photo1?t=${encodeURIComponent(open.json.assetToken)}`)).status).toBe(404);
@@ -306,7 +305,6 @@ describe("templates", () => {
     expect((await call("PUT", "/templates/my-thanks", { user: "abhi", json: { template: own } })).status).toBe(200);
     const mine = await call("GET", "/me/templates", { user: "abhi" });
     expect(mine.json.templates).toHaveLength(1);
-    // first public template waits for review, so it is not listed yet
     expect(mine.json.templates[0].status).toBe("pending");
     expect((await call("GET", "/templates")).json.templates).toHaveLength(0);
     expect((await call("POST", "/admin/templates/my-thanks/approve", { headers: { "x-admin-token": "nope" } })).status).toBe(403);

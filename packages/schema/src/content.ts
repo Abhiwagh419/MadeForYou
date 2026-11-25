@@ -14,7 +14,6 @@ export const SettingsSchema = z
       })
       .prefault({}),
     theme: z.object({ preset: z.string().max(40).default("rose-garden") }).prefault({}),
-    // What happens where the visitor taps the page. Off by default: not every page is a happy one.
     tap: z.enum(["none", "hearts", "sparkles"]).default("none"),
     ambience: z
       .object({
@@ -28,7 +27,6 @@ export const SettingsSchema = z
         available: z.array(z.string().min(2).max(8)).max(8).default(["en"]),
       })
       .prefault({}),
-    // Embeds are stored as provider + id, never as raw URLs.
     music: z
       .object({
         provider: z.enum(["youtube", "spotify"]),
@@ -41,7 +39,6 @@ export const SettingsSchema = z
 export const StyleSchema = z.object({
   align: z.enum(["left", "center", "right"]).default("center"),
   space: z.enum(["sm", "md", "lg"]).default("md"),
-  // Revealed as the block scrolls into view. Motion is opt-in per block.
   anim: z.enum(["none", "fade", "fade-up", "zoom"]).default("none"),
   bg: z.enum(["default", "soft", "accent"]).default("default"),
 });
@@ -51,11 +48,9 @@ export const BlockSchema = z.object({
   type: z.string().min(1).max(40),
   v: z.number().int().positive(),
   fields: z.record(z.string(), z.unknown()),
-  /** Names of fields that still hold placeholder (sample) content. */
   ph: z.array(z.string()).default([]),
   style: StyleSchema.prefault({}),
   visible: z.boolean().default(true),
-  /** Second-language text: i18n[lang][fieldName]. The common single-language page never needs it. */
   i18n: z.record(z.string(), z.record(z.string(), z.string().max(5000))).optional(),
 });
 
@@ -76,10 +71,6 @@ export interface Issue {
 }
 export type ValidationResult = { ok: true; content: Content } | { ok: false; issues: Issue[] };
 
-/**
- * The single validation gate. Run it on the client before saving and again on the
- * server before storing. Unknown block types are rejected, unknown fields dropped.
- */
 export function validateContent(input: unknown): ValidationResult {
   let size = 0;
   try {

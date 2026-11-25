@@ -2,10 +2,6 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface State { failed: boolean }
 
-/**
- * If a screen crashes, show a calm message instead of a blank white page.
- * The App gives it a new key for every screen, so moving to another screen starts fresh.
- */
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { failed: false };
 

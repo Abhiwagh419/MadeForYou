@@ -68,7 +68,6 @@ function EditorInner({ page }: { page: PageRecord }) {
   const block = content.blocks.find((b) => b.id === selected) ?? null;
   const apply = (fn: (c: Content) => Content) => dispatch({ type: "apply", fn });
 
-  // autosave
   useEffect(() => {
     if (content === page.content) return;
     setSaving(true);
@@ -79,7 +78,6 @@ function EditorInner({ page }: { page: PageRecord }) {
     return () => clearTimeout(t);
   }, [content, page.content, page.id]);
 
-  // While signed in, changes also go to the server (a little after you pause), so a published page updates for visitors.
   useEffect(() => {
     if (!isRemote() || !session.userId || content === pushed.current) return;
     const t = setTimeout(async () => {
@@ -96,20 +94,16 @@ function EditorInner({ page }: { page: PageRecord }) {
       }
     }, 2500);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, session.userId, page.id]);
 
-  // keep the language valid if one is switched off
   useEffect(() => {
     if (!langs.includes(lang)) setLang(defaultLang);
   }, [langs, lang, defaultLang]);
 
-  // keep the preview on the block being edited
   useEffect(() => {
     if (selected) scrollToBlock(scroller.current, selected);
   }, [selected]);
 
-  // undo / redo from the keyboard, unless the user is typing
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;

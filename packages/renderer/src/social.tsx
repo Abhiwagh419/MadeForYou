@@ -6,7 +6,6 @@ import { label } from "./labels";
 type P = { block: Block };
 const idx = (i: number) => ({ "--i": i }) as CSSProperties;
 
-/** A hidden field real people never see; bots fill it. The server drops anything that does. */
 function Honeypot({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="mfy-hp" aria-hidden="true">
@@ -17,7 +16,6 @@ function Honeypot({ value, onChange }: { value: string; onChange: (v: string) =>
 
 type Kind = "wish" | "reply" | "rsvp";
 
-/** Shared sending logic for the three kinds of guest message. */
 function useSender(blockId: string, kind: Kind) {
   const { host, lang } = useRender();
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
@@ -43,7 +41,6 @@ function useSender(blockId: string, kind: Kind) {
   return { live, state, error, status, website, setWebsite, send, lang };
 }
 
-/* ---------------- Wishes wall ---------------- */
 export function Wishes({ block }: P) {
   const x = useFields(block);
   const s = useSender(block.id, "wish");
@@ -82,7 +79,6 @@ export function Wishes({ block }: P) {
   );
 }
 
-/* ---------------- Reply box ---------------- */
 export function ReplyBox({ block }: P) {
   const x = useFields(block);
   const s = useSender(block.id, "reply");
@@ -107,7 +103,6 @@ export function ReplyBox({ block }: P) {
   );
 }
 
-/* ---------------- RSVP ---------------- */
 export function Rsvp({ block }: P) {
   const x = useFields(block);
   const s = useSender(block.id, "rsvp");
@@ -156,7 +151,6 @@ export function Rsvp({ block }: P) {
   );
 }
 
-/* ---------------- Voice note ---------------- */
 const mmss = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
 
 export function VoiceNote({ block }: P) {
@@ -197,7 +191,6 @@ export function VoiceNote({ block }: P) {
   );
 }
 
-/* ---------------- Place on a map ---------------- */
 export function MapBlock({ block }: P) {
   const x = useFields(block);
   const { lang } = useRender();

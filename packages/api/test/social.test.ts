@@ -4,7 +4,6 @@ import { makeClient, makeEnv } from "../src/testing";
 
 const SECRET_TEXT = "A secret surprise plan for Priya's party.";
 
-/** A finished page with a wishes wall, a reply box and an RSVP. */
 function party(moderation: "review" | "auto" = "review"): Content {
   let c = starterSkeleton();
   const [hero, text, , sig] = c.blocks;
@@ -58,7 +57,7 @@ describe("wishes", () => {
     const r = await send(page.assetToken, "wish", ids(content).wall, { name: "Meera", message: "Happy birthday!" });
     expect(r.status).toBe(200);
     expect(r.json.status).toBe("pending");
-    expect((await open()).wishes[ids(content).wall] ?? []).toHaveLength(0); // not shown yet
+    expect((await open()).wishes[ids(content).wall] ?? []).toHaveLength(0);
 
     const [w] = await inbox();
     expect(w.kind).toBe("wish");
@@ -113,9 +112,9 @@ describe("what is accepted", () => {
     await publishParty();
     const { assetToken: tok } = await open();
     expect((await send(tok, "wish", "blk_nothere", { name: "A", message: "B" })).status).toBe(400);
-    expect((await send(tok, "reply", ids(content).wall, { message: "B" })).status).toBe(400); // wall takes wishes only
+    expect((await send(tok, "reply", ids(content).wall, { message: "B" })).status).toBe(400);
     expect((await send(tok, "wish", ids(content).wall, { name: "", message: "B" })).status).toBe(400);
-    expect((await send(tok, "wish", ids(content).wall, { name: "A", message: "x".repeat(900) })).status).toBe(200); // trimmed, not stored whole
+    expect((await send(tok, "wish", ids(content).wall, { name: "A", message: "x".repeat(900) })).status).toBe(200);
     expect((await inbox())[0].payload.message).toHaveLength(500);
     expect((await send(tok, "dance", ids(content).wall, {})).status).toBe(400);
   });
@@ -177,7 +176,7 @@ describe("replies and RSVPs", () => {
     await rsvp({ name: "Raj", response: "yes", guests: 3 });
     await rsvp({ name: "Sneha", response: "no" });
     await rsvp({ name: "Dev", response: "maybe", guests: 2 });
-    await rsvp({ name: "raj", response: "yes", guests: 2 }); // Raj answers again
+    await rsvp({ name: "raj", response: "yes", guests: 2 });
     const sum = (await call("GET", "/me/inbox/summary", { user: "abhi" })).json.pages.pg_party001;
     expect(sum).toMatchObject({ yes: 1, no: 1, maybe: 1, guests: 4 });
     expect((await inbox()).filter((s) => s.kind === "rsvp")).toHaveLength(3);
@@ -217,7 +216,7 @@ describe("contributor links (friends add wishes without seeing the page)", () =>
     expect(sent.json.status).toBe("pending");
     const [w] = await inbox();
     expect(w).toMatchObject({ source: "contributor", status: "pending", payload: { name: "Meera", message: "Surprise!" } });
-    expect((await call("GET", "/p/priya")).json.state).toBe("locked"); // the page itself is still locked
+    expect((await call("GET", "/p/priya")).json.state).toBe("locked");
   });
   it("refuses a missing, wrong or old link; resetting kills every link sent so far", async () => {
     await publishParty();
@@ -233,7 +232,7 @@ describe("contributor links (friends add wishes without seeing the page)", () =>
   });
   it("only the owner can make a link, only for a published page with a wishes wall", async () => {
     await call("PUT", "/pages/pg_party001", { user: "abhi", json: { title: "x", content } });
-    expect((await call("POST", "/pages/pg_party001/contributor-link", { user: "abhi" })).status).toBe(409); // not published
+    expect((await call("POST", "/pages/pg_party001/contributor-link", { user: "abhi" })).status).toBe(409);
     await call("POST", "/pages/pg_party001/publish", { user: "abhi", json: { slug: "priya" } });
     expect((await call("POST", "/pages/pg_party001/contributor-link", { user: "mallory" })).status).toBe(404);
     const plain = starterSkeleton();
@@ -246,12 +245,11 @@ describe("contributor links (friends add wishes without seeing the page)", () =>
     c = setField(c, c.blocks[3]!.id, "name", "W");
     await call("PUT", "/pages/pg_plain001", { user: "abhi", json: { title: "Plain", content: c } });
     await call("POST", "/pages/pg_plain001/publish", { user: "abhi", json: { slug: "plain" } });
-    expect((await call("POST", "/pages/pg_plain001/contributor-link", { user: "abhi" })).status).toBe(409); // no wall
+    expect((await call("POST", "/pages/pg_plain001/contributor-link", { user: "abhi" })).status).toBe(409);
   });
   it("a link stops working after 90 days, and a contributor cannot leave anything but a wish", async () => {
     await publishParty();
     const path = await link();
-    // the kind and the box are decided by the server, whatever the browser claims
     const sent = await call("POST", `/c/priya/submit?k=${k(path)}`, { json: { kind: "rsvp", blockId: ids(content).rsvp, payload: { name: "A", message: "Hello", response: "yes" } }, headers: fresh() });
     expect(sent.status).toBe(200);
     expect((await inbox())[0]).toMatchObject({ kind: "wish", blockId: ids(content).wall, payload: { name: "A", message: "Hello" } });

@@ -1,6 +1,5 @@
 export type MediaType = "image/webp" | "image/jpeg" | "image/png" | "audio/webm" | "audio/mp4" | "audio/ogg" | "audio/mpeg";
 
-/** Checks the first bytes of an upload really are the kind of file it claims. */
 export function sniffMedia(bytes: Uint8Array): MediaType | null {
   const ascii = (from: number, to: number) => String.fromCharCode(...bytes.slice(from, to));
   if (bytes.length > 12 && ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";

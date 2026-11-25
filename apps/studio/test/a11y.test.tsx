@@ -65,7 +65,7 @@ describe("a popup (Sheet)", () => {
   it("keeps Tab inside, both ways round", async () => {
     await mount(<Demo />);
     await act(async () => $("#opener").click());
-    const firstStop = $("[role=dialog]").querySelector("button")!; // the popup's own close button comes first
+    const firstStop = $("[role=dialog]").querySelector("button")!;
     $("#last").focus();
     await press("Tab");
     expect(document.activeElement).toBe(firstStop);

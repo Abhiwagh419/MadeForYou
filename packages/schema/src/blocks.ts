@@ -8,10 +8,6 @@ export interface BlockDef {
   fields: Record<string, FieldDef>;
 }
 
-/**
- * Starter set: 6 of the 26 planned blocks. Add the rest by adding an entry here
- * and a component in the renderer. Nothing else needs to change.
- */
 export const hero: BlockDef = {
   type: "hero",
   version: 1,
@@ -131,7 +127,6 @@ export const signature: BlockDef = {
   },
 };
 
-/* ===================== Memories ===================== */
 export const featured: BlockDef = {
   type: "featured", version: 1, category: "memories", label: "Featured photo",
   fields: {
@@ -183,7 +178,6 @@ export const video: BlockDef = {
   },
 };
 
-/* ===================== Words ===================== */
 export const quote: BlockDef = {
   type: "quote", version: 1, category: "words", label: "Quote or shayari",
   fields: {
@@ -246,7 +240,6 @@ export const openWhen: BlockDef = {
   },
 };
 
-/* ===================== Interactive ===================== */
 export const reveal: BlockDef = {
   type: "reveal", version: 1, category: "interactive", label: "Scratch card",
   fields: {
@@ -306,7 +299,6 @@ export const memory: BlockDef = {
   },
 };
 
-/* ===================== Utility ===================== */
 export const event: BlockDef = {
   type: "event", version: 1, category: "utility", label: "Event details",
   fields: {
@@ -334,7 +326,6 @@ export const divider: BlockDef = {
   fields: { style: f.enum(["rangoli", "floral", "stars", "line"], "rangoli") },
 };
 
-/* ===================== Messages from guests (stored by the server) ===================== */
 export const wishes: BlockDef = {
   type: "wishes", version: 1, category: "social", label: "Wishes wall",
   fields: {
@@ -364,7 +355,6 @@ export const rsvp: BlockDef = {
   },
 };
 
-/* ===================== Media ===================== */
 export const voiceNote: BlockDef = {
   type: "voiceNote", version: 1, category: "memories", label: "Voice note",
   fields: {

@@ -23,13 +23,11 @@ export function Field({ label, hint, right, children }: { label?: string; hint?:
   );
 }
 
-/* ---------- one image, with a description for screen readers ---------- */
 export function ImageInput({ value, onChange, large, showAlt = true, lock }: { value: AssetRef | null | undefined; onChange: (v: AssetRef | null) => void; large?: boolean; showAlt?: boolean; lock?: number }) {
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const url = useAssetUrl(value?.asset);
-  /* A photo that was just chosen waits here while the author picks the part to show. */
   const [pending, setPending] = useState<{ file: File; src: string } | null>(null);
   const [recrop, setRecrop] = useState(false);
 
@@ -99,7 +97,6 @@ export function ImageInput({ value, onChange, large, showAlt = true, lock }: { v
   );
 }
 
-/* ---------- a link, tidied as you leave the box ---------- */
 function LinkInput({ value, onChange, small, large, label }: { value: string; onChange: (v: string) => void; small?: boolean; large?: boolean; label: string }) {
   const [draft, setDraft] = useState(value);
   const bad = draft !== "" && !isSafeLink(normalizeLink(draft));
@@ -114,7 +111,6 @@ function LinkInput({ value, onChange, small, large, label }: { value: string; on
   );
 }
 
-/* ---------- a YouTube or Vimeo link, stored as provider + id ---------- */
 function EmbedInput({ value, onChange, large }: { value: VideoRef | null | undefined; onChange: (v: VideoRef | null) => void; large?: boolean }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
@@ -140,7 +136,6 @@ function EmbedInput({ value, onChange, large }: { value: VideoRef | null | undef
   );
 }
 
-/* ---------- a place: a pasted map link or "latitude, longitude" ---------- */
 function GeoInput({ value, onChange, large }: { value: Geo | null | undefined; onChange: (v: Geo | null) => void; large?: boolean }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
@@ -170,7 +165,6 @@ function GeoInput({ value, onChange, large }: { value: Geo | null | undefined; o
   );
 }
 
-/* ---------- list of items (gallery photos) ---------- */
 function Thumbnail({ id }: { id?: string }) {
   const url = useAssetUrl(id);
   return <div className="li-thumb">{url ? <img src={url} alt="" /> : <Icon name="image" size={18} />}</div>;
@@ -259,14 +253,12 @@ export function ListInput({ def, value, onChange, large, lock }: { def: Extract<
   );
 }
 
-/** The fixed frame shape a photo field is shown in, if there is one (the theme's cover frame, the memory cards). */
 export function frameLock(block: { type: string; fields: Record<string, unknown> }, field: string, preset: string): number | undefined {
   if (block.type === "hero" && field === "cover") return block.fields.layout === "fullbleed" ? 4 / 5 : frameRatio(preset);
   if (block.type === "memory" && field === "photos") return 1;
   return undefined;
 }
 
-/* ---------- any field, by kind ---------- */
 export function FieldInput({
   name, def, value, isPh, onChange, large, disabledNote, lock,
 }: {

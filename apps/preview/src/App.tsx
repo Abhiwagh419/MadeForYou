@@ -16,7 +16,6 @@ const SOURCES = [
 
 const PALETTES: [string, string][] = [["#fbcfe8", "#f43f5e"], ["#fde68a", "#f59e0b"], ["#ddd6fe", "#7c3aed"], ["#bbf7d0", "#16a34a"]];
 
-/** Stand-in for the real asset service: any asset reference becomes a gradient tile. */
 function demoAsset(ref: AssetRef): string {
   const n = [...ref.asset].reduce((a, c) => a + c.charCodeAt(0), 0);
   const [a, b] = PALETTES[n % PALETTES.length]!;
@@ -24,7 +23,6 @@ function demoAsset(ref: AssetRef): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-// Keyed "blockType.field" first, then "field", so a countdown's title is not "Happy Birthday".
 const DEMO_TEXT: Record<string, string> = {
   "countdown.title": "Until your day",
   recipient: "Priya", title: "Happy Birthday", subtitle: "Made with love, just for you",
@@ -32,7 +30,6 @@ const DEMO_TEXT: Record<string, string> = {
   salutation: "Dear Priya,", closing: "Always yours,", message: "With love,", name: "Abhi", endMessage: "Today is the day!",
 };
 
-/** Simulates a user answering every guided question. Goes through setField, like the real editor will. */
 function fillDemo(c: Content): Content {
   let next = c;
   for (const q of guidedQuestions(c)) {
@@ -133,8 +130,6 @@ export function App() {
 
       <main className="stage">
         <div className="phone">
-          {/* phone-screen is the containing block for the page's fixed layers (petals, music),
-              so they stay inside the frame instead of covering this whole window. */}
           <div className="phone-screen">
             <div className="phone-scroll">
               <PageRenderer

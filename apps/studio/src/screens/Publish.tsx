@@ -58,7 +58,6 @@ function PublishInner({ id }: { id: string }) {
   const errors = check.issues.filter((i) => i.severity === "error");
   const warnings = check.issues.filter((i) => i.severity === "warning");
   const localStatus = slugStatus(slug, (s) => slugTaken(s, id));
-  // Online, the server is the judge of who already has a link.
   const status: SlugStatus = localStatus !== "ok" ? localStatus : serverStatus ?? "ok";
   useEffect(() => {
     setServerStatus(null);
@@ -68,7 +67,6 @@ function PublishInner({ id }: { id: string }) {
     }, 350);
     return () => clearTimeout(t);
   }, [slug, id, localStatus]);
-  // A page that looks taken down may have been restored since this browser last heard: ask the server.
   const looksTakenDown = !!page.takenDown;
   useEffect(() => {
     if (isRemote() && looksTakenDown && session.userId) pullPages().catch(() => {});

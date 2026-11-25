@@ -16,7 +16,6 @@ interface Usage { users: number; pages: number; published: number; photos: numbe
 const KEY = "mfy:admin-token";
 const reasonLabel = (v: string) => REPORT_REASONS.find((r) => r.value === v)?.label ?? v;
 
-/** For the person who runs the site: reports to look at, and what to do about them. Needs the ADMIN_TOKEN secret. */
 export function Admin() {
   const [token, setToken] = useState(() => sessionStorage.getItem(KEY) ?? "");
   const [draft, setDraft] = useState("");
@@ -24,7 +23,6 @@ export function Admin() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [all, setAll] = useState(false);
   const [error, setError] = useState("");
-  /** The reason written for each open report. It goes in the emails to the reporter and the page's owner. */
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {

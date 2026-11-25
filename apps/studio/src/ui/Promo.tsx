@@ -2,7 +2,6 @@ import { BRAND } from "@madeforyou/ui";
 import { supportUpi } from "../lib/config";
 import { Button } from "./Button";
 
-/** The quiet "did it help?" card. Shows nothing until the support page is switched on. */
 export function SupportNudge() {
   if (!supportUpi()) return null;
   return (
@@ -16,7 +15,6 @@ export function SupportNudge() {
   );
 }
 
-/** Under a page someone was sent: a way to answer with a page of their own, all leading back to the site. */
 export function ViewerPromo() {
   return (
     <aside className="viewer-promo" aria-label={`About ${BRAND.name}`}>

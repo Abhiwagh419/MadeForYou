@@ -4,7 +4,6 @@ import { api, apiRaw, ApiError } from "./api";
 import { getLocalBlob, setOwnerToken } from "./assets";
 import { getState, savePage, upsertPages, type Access, type PageRecord } from "../state/store";
 
-/** The server's view of a page, as returned by the API. */
 export interface ServerPage {
   id: string; title: string; templateId?: string; content: Content; slug: string; status: "draft" | "published";
   createdAt: string; updatedAt: string; publishedAt?: string;
@@ -14,7 +13,7 @@ export interface ServerPage {
 
 export const toLocalAccess = (a: ServerPage["access"]): Access => ({
   visibility: a.visibility,
-  passwordHash: a.hasPassword ? "server" : undefined, // the real hash never leaves the server
+  passwordHash: a.hasPassword ? "server" : undefined,
   unlockAt: a.unlockAt,
   expiresAt: a.expiresAt,
 });
@@ -26,17 +25,12 @@ export const toLocalPage = (s: ServerPage): PageRecord => ({
 
 const sameTakedown = (a?: { at: string }, b?: { at: string }) => (a?.at ?? null) === (b?.at ?? null);
 
-/**
- * Last write wins: a server page replaces the local copy only if it is newer. Pure, so it is easy to test.
- * One exception: whether a page is taken down is decided by the server alone. If it differs here (a page was
- * restored, or taken down, while this browser held an older copy), that one field is brought into line even when
- * the local copy is newer, and the owner's edits are kept.
- */
 export function mergeServerPages(local: Record<string, PageRecord>, server: ServerPage[]): PageRecord[] {
   const out: PageRecord[] = [];
   for (const s of server) {
     const mine = local[s.id];
     if (!mine || Date.parse(s.updatedAt) > Date.parse(mine.updatedAt)) out.push(toLocalPage(s));
+    // takedown is decided by the server, keep the local edits
     else if (!sameTakedown(mine.takenDown, s.takenDown)) out.push({ ...mine, takenDown: s.takenDown });
   }
   return out;
@@ -59,7 +53,6 @@ const toBuffer = (blob: Blob) =>
     r.readAsArrayBuffer(blob);
   });
 
-/** Sends photos that only exist on this device. Photos pulled from the server are skipped. */
 export async function uploadAssets(content: Content) {
   const done = uploaded();
   for (const id of assetIds(content)) {
@@ -72,7 +65,6 @@ export async function uploadAssets(content: Content) {
   }
 }
 
-/** Saves a page (and its photos) to the server. */
 export async function pushPage(rec: PageRecord): Promise<ServerPage> {
   await uploadAssets(rec.content);
   const { page } = await api<{ page: ServerPage }>(`/pages/${rec.id}`, {
@@ -85,7 +77,6 @@ export async function pushPage(rec: PageRecord): Promise<ServerPage> {
 export interface PublishOptions {
   slug: string;
   visibility: "private" | "unlisted";
-  /** undefined keeps the current password, null removes it, a string sets it. */
   password?: string | null;
   unlockAt: string | null;
   expiresAt: string | null;
@@ -116,8 +107,6 @@ export async function removeRemote(id: string) {
   }
 }
 
-/* ---------- "the server did not accept my sign-in" ---------- */
-/** How long to wait before the one quiet retry of a refused login. Tests shorten it. */
 export const authRetry = { delayMs: 1200 };
 
 let authProblem: string | null = null;
@@ -128,7 +117,6 @@ export function setAuthProblem(msg: string | null) {
 }
 export const useAuthProblem = () => useSyncExternalStore((cb) => (problemListeners.add(cb), () => problemListeners.delete(cb)), () => authProblem, () => authProblem);
 
-/** Asks the server why it refused our login, in plain words. */
 export async function explainSignIn(): Promise<string> {
   try {
     const r = await apiRaw<{ ok: boolean; problem: string | null }>("/diag");
@@ -138,7 +126,6 @@ export async function explainSignIn(): Promise<string> {
   }
 }
 
-/** Call when a request failed. If it was a 401 while signed in, shows the reason in a banner. */
 export async function handleAuthError(e: unknown): Promise<boolean> {
   if (e instanceof ApiError && e.status === 401) {
     setAuthProblem(await explainSignIn());
@@ -148,7 +135,6 @@ export async function handleAuthError(e: unknown): Promise<boolean> {
 }
 
 let refresh: ReturnType<typeof setTimeout> | undefined;
-/** Photo links are signed for six hours; renew a little before they lapse. Throws if the server refuses the login. */
 export async function refreshOwnerToken() {
   clearTimeout(refresh);
   try {
@@ -174,17 +160,11 @@ export async function fetchPublicTemplates(): Promise<Template[]> {
 export interface SyncReport {
   pushed: number;
   republished: number;
-  /** Published here with a password, but missing on the server: publishing again must ask for the password. */
   needsRepublish: string[];
   failed: { title: string; reason: string }[];
   pulled: number;
 }
 
-/**
- * Brings the server and this device into line: saves every page here to the account, restores any
- * published page the server lost, and fetches pages made elsewhere. Never publishes a password-protected
- * page without its password (that would silently remove the protection).
- */
 export async function syncAll(): Promise<SyncReport> {
   const report: SyncReport = { pushed: 0, republished: 0, needsRepublish: [], failed: [], pulled: 0 };
   for (const rec of Object.values(getState().pages)) {

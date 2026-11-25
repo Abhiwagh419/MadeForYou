@@ -7,7 +7,6 @@ import { useInView } from "./Controls";
 const W = 390;
 const H = 600;
 
-/** A live, non-animated miniature of a page. Rendered only once it scrolls into view. */
 export function Thumb({ content, lang, className = "" }: { content: Content; lang?: string; className?: string }) {
   const [ref, seen] = useInView<HTMLDivElement>();
   const box = useRef<HTMLDivElement>(null);
@@ -36,7 +35,6 @@ export function Thumb({ content, lang, className = "" }: { content: Content; lan
   );
 }
 
-/** A phone bezel around a Thumb, for hero imagery. */
 export function PhoneThumb({ content, className = "", style }: { content: Content; className?: string; style?: CSSProperties }) {
   return (
     <div className={`phone-thumb ${className}`} style={style}>

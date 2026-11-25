@@ -1,18 +1,6 @@
 import type { Block, Content } from "./content";
 import { registry } from "./registry";
 
-/**
- * The ONE way the editor and guided mode write a field. Never assign block.fields
- * directly: this keeps placeholders and translations consistent.
- *
- *  - Writing in the page's default language fills the field (it stops being a
- *    placeholder) and DROPS that field's other-language versions, because they
- *    describe the old text. Without this, a template's Hindi "माँ" would keep
- *    overriding the name the user just typed.
- *  - Writing in another language only stores a translation; the default text stays.
- *
- * Returns a new Content; the input is not mutated.
- */
 export function setField(content: Content, blockId: string, field: string, value: unknown, lang?: string): Content {
   const defaultLang = content.settings.languages.default;
   const writingDefault = !lang || lang === defaultLang;

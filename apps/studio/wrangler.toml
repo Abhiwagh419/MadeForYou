@@ -1,4 +1,3 @@
-# Cloudflare Pages project: the website, the API (functions/) and the database and photo storage it uses.
 name = "madeforyou"
 compatibility_date = "2026-09-01"
 pages_build_output_dir = "./dist"
@@ -9,13 +8,11 @@ database_name = "madeforyou"
 database_id = "ce081e99-00ce-4972-a170-35210740392d"
 migrations_dir = "../../packages/api/migrations"
 
-# Photos are stored in the database by default, so no payment card is needed.
-# If you later enable R2 (Cloudflare asks for a card, though the free tier is 10 GB), create a bucket and
-# uncomment these three lines; new photos then go to R2 instead.
+# photos are stored in D1 by default. To use R2 instead, create a bucket and uncomment:
 # [[r2_buckets]]
 # binding = "FILES"
 # bucket_name = "madeforyou-files"
 
 [vars]
 ALLOW_DEV_AUTH = "0"
-# Set these as secrets, not here:  SESSION_SECRET  CLERK_JWKS_URL  CLERK_ISSUER  ADMIN_TOKEN
+# secrets (SESSION_SECRET, CLERK_ISSUER, ADMIN_TOKEN, ...) are set with wrangler, not here

@@ -11,7 +11,6 @@ import { authRetry, mergeServerPages, publishRemote, pullPages, pushPage, syncAl
 import { createPage, getState, resetStore, savePage } from "../src/state/store";
 import * as assets from "../src/lib/assets";
 
-// Creator screens load on demand on the real site; load them all once so each test sees them straight away.
 beforeAll(async () => { await preloadScreens(); }, 60_000);
 
 const SECRET_TEXT = "A secret message only Priya should read.";
@@ -27,7 +26,7 @@ function filled(): Content {
 }
 
 let env: ReturnType<typeof makeEnv>;
-let wire: string[]; // every response body the browser ever received
+let wire: string[];
 let root: Root | null = null;
 let host: HTMLElement | null = null;
 
@@ -98,10 +97,10 @@ describe("merging server pages", () => {
   it("brings a restore (or a takedown) across even when the local copy is newer, keeping local edits", () => {
     const down = { at: "2026-10-01T00:00:00Z", reason: "Reported: spam" };
     const local = { pg_aaaaaa: { ...toLocalPage(base("2026-10-03T00:00:00Z")), title: "mine", takenDown: down } };
-    const [restored] = mergeServerPages(local, [base("2026-10-02T00:00:00Z")]); // the server no longer has a takedown
+    const [restored] = mergeServerPages(local, [base("2026-10-02T00:00:00Z")]);
     expect(restored.takenDown).toBeUndefined();
     expect(restored.title).toBe("mine");
-    expect(mergeServerPages(local, [{ ...base("2026-10-02T00:00:00Z"), takenDown: down }])).toHaveLength(0); // already in line
+    expect(mergeServerPages(local, [{ ...base("2026-10-02T00:00:00Z"), takenDown: down }])).toHaveLength(0);
     const [taken] = mergeServerPages({ pg_aaaaaa: toLocalPage(base("2026-10-03T00:00:00Z")) }, [{ ...base("2026-10-02T00:00:00Z"), takenDown: down }]);
     expect(taken.takenDown).toEqual(down);
   });
@@ -132,7 +131,7 @@ describe("browser and server together", () => {
 
   it("opens an open page for a visitor on the real path /p/slug", async () => {
     await serverSidePublish();
-    setTokenGetter(async () => null); // a stranger
+    setTokenGetter(async () => null);
     await visit("/p/priya");
     expect(q(".mfy-page")).toBeTruthy();
     expect(text()).toContain(SECRET_TEXT);
@@ -159,7 +158,6 @@ describe("browser and server together", () => {
     const submit = async (pw: string, done: () => boolean) => {
       await type(q('input[aria-label="Password"]') as HTMLInputElement, pw);
       await act(async () => { q("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
-      // checking a password is deliberately slow on the server; wait for the answer instead of guessing how long it takes
       for (let i = 0; i < 200 && !done(); i++) await act(async () => { await new Promise((r) => setTimeout(r, 25)); });
     };
     await submit("nope-nope", () => text().includes("not the password"));
@@ -185,10 +183,9 @@ describe("browser and server together", () => {
   it("signed in, the publish screen checks the link with the server and publishes", async () => {
     const other = createPage({ title: "Other", content: filled() });
     await publishRemote(other.id, { slug: "priya", visibility: "unlisted", unlockAt: null, expiresAt: null });
-    resetStore(); // a different browser: it knows nothing locally
+    resetStore();
     const rec = createPage({ title: "Mine", content: filled() });
     await visit(`#/publish/${rec.id}`, "abhi");
-    // abhi owns "priya" already, so the same person republishing is fine; try as someone else:
     setTokenGetter(async () => "dev:sam");
     localStorage.setItem("mfy:dev-user", "sam");
     await act(async () => root!.unmount());
@@ -207,13 +204,13 @@ describe("browser and server together", () => {
 
   it("signing in on a new device brings your pages over", async () => {
     const rec = await serverSidePublish();
-    resetStore(); // new device
+    resetStore();
     expect(Object.keys(getState().pages)).toHaveLength(0);
     await visit("#/me", "abhi");
     await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
     expect(getState().pages[rec.id]?.title).toBe("For Priya");
     expect(text()).toContain("For Priya");
-    expect(await pullPages()).toBe(0); // nothing newer to bring
+    expect(await pullPages()).toBe(0);
   });
 
   it("reports server problems in plain words", async () => {
@@ -225,7 +222,7 @@ describe("browser and server together", () => {
   });
 
   it("when the server refuses a sign-in, says why on screen instead of a bare 'please sign in'", async () => {
-    env.ALLOW_DEV_AUTH = "0"; // the server no longer accepts the browser's login
+    env.ALLOW_DEV_AUTH = "0";
     const rec = createPage({ title: "For Priya", content: filled() });
     await visit("#/me", "abhi");
     await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
@@ -255,7 +252,7 @@ describe("browser and server together", () => {
 
     setTokenGetter(async () => null);
     expect((await apiRaw("/p/open-page")).data.state).toBe("open");
-    expect((await apiRaw("/p/secret-page")).status).toBe(404); // not exposed without its password
+    expect((await apiRaw("/p/secret-page")).status).toBe(404);
     expect(getState().pages[locked.id]!.status).toBe("draft");
     expect(getState().pages[draft.id]!.status).toBe("draft");
     expect((await apiRaw("/p/open-page")).data.content.blocks.length).toBe(4);

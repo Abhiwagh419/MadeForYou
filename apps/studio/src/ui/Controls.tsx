@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 
-/* ---------- Segmented control ---------- */
 export function Segmented<T extends string>({
   value, onChange, options, label, className = "",
 }: {
@@ -26,7 +25,6 @@ export function Segmented<T extends string>({
   );
 }
 
-/* ---------- Switch ---------- */
 export function Switch({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
   return (
     <label className="switch">
@@ -40,7 +38,6 @@ export function Switch({ checked, onChange, label, hint }: { checked: boolean; o
   );
 }
 
-/* ---------- Modal / bottom sheet ---------- */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function Sheet({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
@@ -51,11 +48,10 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
   useEffect(() => {
     if (!open) return;
     const before = document.activeElement as HTMLElement | null;
-    box.current?.focus(); // a screen reader announces the dialog; a keyboard user starts inside it
+    box.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") return onCloseRef.current();
       if (e.key !== "Tab" || !box.current) return;
-      // keep Tab inside the dialog
       const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => { const s = getComputedStyle(el); return s.display !== "none" && s.visibility !== "hidden"; });
       if (!items.length) { e.preventDefault(); return; }
       const first = items[0]!, last = items[items.length - 1]!;
@@ -65,7 +61,7 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      before?.focus?.(); // back to the button that opened it
+      before?.focus?.();
     };
   }, [open]);
   if (!open) return null;
@@ -83,7 +79,6 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
   );
 }
 
-/* ---------- Toasts ---------- */
 let toasts: { id: number; text: string }[] = [];
 const subs = new Set<() => void>();
 let n = 0;
@@ -105,7 +100,6 @@ export function Toaster() {
   );
 }
 
-/* ---------- media query hook ---------- */
 export function useMedia(query: string, fallback = false): boolean {
   const get = () => (typeof matchMedia === "function" ? matchMedia(query).matches : fallback);
   const [v, setV] = useState(get);
@@ -120,7 +114,6 @@ export function useMedia(query: string, fallback = false): boolean {
   return v;
 }
 
-/* ---------- in-view hook (lazy thumbnails) ---------- */
 export function useInView<T extends Element>(): [React.RefObject<T | null>, boolean] {
   const ref = useRef<T | null>(null);
   const [seen, setSeen] = useState(typeof IntersectionObserver === "undefined");

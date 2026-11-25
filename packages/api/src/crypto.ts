@@ -15,14 +15,8 @@ export function timingSafeEqual(a: string, b: string): boolean {
 
 export const randomHex = (bytes = 16) => hex(crypto.getRandomValues(new Uint8Array(bytes)).buffer as ArrayBuffer);
 
-/**
- * Page passwords: HMAC with a server-side secret and a per-page salt. Deliberately not PBKDF2:
- * the Workers free plan allows ~10 ms of CPU per request, which a slow hash would exceed.
- * The hashes never leave the server, and guessing is rate limited per visitor.
- */
 export const hashPassword = (secret: string, salt: string, password: string) => hmac(secret, `pw|${salt}|${password}`);
 
-/** `scope.expiry.signature`. Scopes: `pg:<pageId>` (a visitor who passed the gates) and `u:<userId>` (an owner viewing their photos). */
 export async function signToken(secret: string, scope: string, ttlSeconds: number, now: number): Promise<string> {
   const exp = Math.floor(now / 1000) + ttlSeconds;
   return `${scope}.${exp}.${await hmac(secret, `tok|${scope}|${exp}`)}`;
@@ -37,5 +31,4 @@ export async function readToken(secret: string, token: string | undefined | null
   return timingSafeEqual(sig, await hmac(secret, `tok|${scope}|${exp}`)) ? scope : null;
 }
 
-/** A visitor's address, hashed so the database never holds a raw IP. */
 export const hashIp = (secret: string, ip: string) => hmac(secret, `ip|${ip}`);

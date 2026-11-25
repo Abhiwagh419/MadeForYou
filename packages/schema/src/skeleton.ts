@@ -7,7 +7,6 @@ export function newId(): string {
   return `blk_${rnd}`;
 }
 
-/** A fresh block: every field holds its placeholder, and personal fields are flagged in `ph`. */
 export function createBlock(type: string, id: string = newId()): Block {
   const def = registry[type];
   if (!def) throw new Error(`Unknown block type "${type}"`);
@@ -24,10 +23,6 @@ export function defaultSettings() {
   return SettingsSchema.parse({});
 }
 
-/**
- * Where "Create the first one" starts when no template matches: never a blank
- * canvas, always Hero + Text + Gallery + Signature.
- */
 export function starterSkeleton(): Content {
   return {
     schemaVersion: 1,

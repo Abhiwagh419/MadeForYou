@@ -10,14 +10,9 @@ interface Props {
   device?: "phone" | "tablet";
   selectedId?: string | null;
   onSelectBlock?: (id: string) => void;
-  /** Changing this remounts the page so animations replay. */
   replayKey?: number;
 }
 
-/**
- * A phone-sized window onto a page. The inner box is the containing block for the page's
- * fixed layers (petals, music), so they stay inside the frame.
- */
 export const PhonePreview = forwardRef<HTMLDivElement, Props>(function PhonePreview(
   { content, lang, skipOpening, device = "phone", selectedId, onSelectBlock, replayKey = 0 }, scrollerRef,
 ) {

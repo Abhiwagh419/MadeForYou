@@ -3,10 +3,6 @@ import type { Deps, Env } from "./types";
 
 const JWKS_SUFFIX = "/.well-known/jwks.json";
 
-/**
- * Secrets pasted into a terminal often carry a stray space, newline, trailing slash, or the
- * wrong one of the two Clerk addresses. Accept all of those instead of failing silently.
- */
 export function clerkIssuer(env: Pick<Env, "CLERK_ISSUER" | "CLERK_JWKS_URL">): string {
   const clean = (v?: string) => (v ?? "").trim().replace(/\/\.well-known\/jwks\.json$/, "").replace(/\/+$/, "");
   return clean(env.CLERK_ISSUER) || clean(env.CLERK_JWKS_URL);
@@ -21,7 +17,6 @@ export function clerkJwksUrl(env: Pick<Env, "CLERK_ISSUER" | "CLERK_JWKS_URL">):
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 let jwksUrl = "";
 
-/** Production: a Clerk session token, checked against Clerk's public keys. */
 export const verifyClerk: Deps["verify"] = async (token, env) => {
   const url = clerkJwksUrl(env);
   if (!url) throw new Error("Sign-in is not configured on the server");
@@ -37,7 +32,6 @@ export const verifyClerk: Deps["verify"] = async (token, env) => {
 
 const DEV_RE = /^[a-z0-9_-]{3,40}$/;
 
-/** Returns a user id, or null if the request carries no valid login. */
 export async function authenticate(header: string | undefined, env: Env, deps: Deps): Promise<string | null> {
   const m = header?.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
@@ -63,13 +57,11 @@ export interface Diagnosis {
   problem: string | null;
 }
 
-/** Explains, in plain words, why a login token was not accepted. Reveals only public information. */
 export async function diagnose(header: string | undefined, env: Env, deps: Deps): Promise<Diagnosis> {
   const token = header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   const configuredIssuer = clerkIssuer(env) || null;
   const out: Diagnosis = { hasToken: !!token, serverConfigured: !!clerkJwksUrl(env), configuredIssuer, tokenIssuer: null, ok: false, problem: null };
 
-  // A test login (only used on a developer machine) is judged by its own switch, not by Clerk's settings.
   if (token?.startsWith("dev:")) {
     out.ok = env.ALLOW_DEV_AUTH === "1" && DEV_RE.test(token.slice(4));
     if (!out.ok) out.problem = "Test logins are switched off on this server. Add your Clerk publishable key to the build (.env.production), deploy again, and sign in with Clerk.";

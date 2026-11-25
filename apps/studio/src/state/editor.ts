@@ -1,7 +1,5 @@
 import { newId, createBlock, registry, type Block, type Content, type Settings, type Style } from "@madeforyou/schema";
 
-/* ---------- pure content operations (all return a new Content) ---------- */
-
 const mapBlock = (c: Content, id: string, fn: (b: Block) => Block): Content => ({
   ...c,
   blocks: c.blocks.map((b) => (b.id === id ? fn(b) : b)),
@@ -37,7 +35,6 @@ export const setStyle = (c: Content, id: string, patch: Partial<Style>): Content
 
 export const setSettings = (c: Content, patch: Partial<Settings>): Content => ({ ...c, settings: { ...c.settings, ...patch } });
 
-/** One line describing a block in the list: its first filled text field. */
 export function blockSummary(b: Block): string {
   const def = registry[b.type];
   if (!def) return "";
@@ -48,8 +45,6 @@ export function blockSummary(b: Block): string {
   }
   return "";
 }
-
-/* ---------- history ---------- */
 
 export interface EditorState {
   content: Content;
@@ -69,7 +64,6 @@ export const initEditor = (content: Content): EditorState => ({ content, past: [
 const LIMIT = 100;
 const COALESCE_MS = 900;
 
-/** Typing in one field becomes a single undo step; everything else is one step per action. */
 export function editorReducer(s: EditorState, a: EditorAction): EditorState {
   switch (a.type) {
     case "apply": {

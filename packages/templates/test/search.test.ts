@@ -66,6 +66,6 @@ describe("search", () => {
   it("measures edit distance", () => {
     expect(distance("kitten", "sitting", 5)).toBe(3);
     expect(distance("same", "same")).toBe(0);
-    expect(distance("birthdya", "birthday")).toBe(1); // a swap is one slip
+    expect(distance("birthdya", "birthday")).toBe(1);
   });
 });

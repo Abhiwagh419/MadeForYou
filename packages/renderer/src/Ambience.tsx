@@ -1,10 +1,5 @@
 import type { CSSProperties } from "react";
 
-/**
- * Decorative particles. Positions come from the index (no Math.random) so server and
- * client renders match. Hidden entirely for people who prefer reduced motion (see CSS).
- * "diyas" falls back to a warm twinkle until its own artwork exists.
- */
 export function Ambience({ kind, intensity }: { kind: string; intensity: "low" | "medium" }) {
   if (kind === "none") return null;
   const count = intensity === "medium" ? 18 : 10;

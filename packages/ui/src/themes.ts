@@ -1,10 +1,5 @@
-/**
- * A theme is a whole "look", not a palette swap: colour, type pairing, the shape of
- * the cover frame, corner style and how the letter sits on the page.
- */
 export interface ThemeTokens {
   label: string;
-  // colour
   bg: string;
   surface: string;
   soft: string;
@@ -13,24 +8,21 @@ export interface ThemeTokens {
   primary: string;
   accent: string;
   onPrimary: string;
-  // type
   fontHeading: string;
   fontBody: string;
   fontHand: string;
-  titleWeight: number;        // match the font: single-weight display faces must stay at 400
-  titleScale: number;         // optical size correction between typefaces
+  titleWeight: number;
+  titleScale: number;
   h2Weight: number;
   recipientStyle: "italic" | "normal";
-  // shape
   radius: string;
-  frame: "arch" | "circle" | "soft";  // cover photo frame
+  frame: "arch" | "circle" | "soft";
   letterTilt: string;
 }
 
 const HAND = `"Kalam", "Noto Sans Devanagari", cursive`;
 
 export const THEMES: Record<string, ThemeTokens> = {
-  // Romantic and soft: high-contrast serif, arched window frame, gently tilted paper.
   "rose-garden": {
     label: "Rose garden",
     bg: "#FFF8F0", surface: "#FFFDF9", soft: "#FCE9E4", text: "#4A0E1F", muted: "#8A5A66",
@@ -41,7 +33,6 @@ export const THEMES: Record<string, ThemeTokens> = {
     titleWeight: 700, titleScale: 1, h2Weight: 600, recipientStyle: "italic",
     radius: "14px", frame: "arch", letterTilt: "-0.4deg",
   },
-  // Festive and bold: heavy display face, round medallion frame, crisp corners, straight paper.
   "marigold-sun": {
     label: "Marigold sun",
     bg: "#FFF6DD", surface: "#FFFBEE", soft: "#FFE9B3", text: "#3B2300", muted: "#7C5A1F",
@@ -52,7 +43,6 @@ export const THEMES: Record<string, ThemeTokens> = {
     titleWeight: 400, titleScale: 0.92, h2Weight: 400, recipientStyle: "normal",
     radius: "4px", frame: "circle", letterTilt: "0deg",
   },
-  // Quiet and nocturnal: light elegant serif, rounded-square frame, generous curves.
   "midnight-stars": {
     label: "Midnight stars",
     bg: "#14102B", surface: "#1E1840", soft: "#251E52", text: "#F4EFFF", muted: "#B2A8D9",
@@ -73,7 +63,6 @@ const FRAMES: Record<ThemeTokens["frame"], { radius: string; ratio: string; widt
   soft: { radius: "var(--mfy-radius)", ratio: "4 / 5", width: "min(72%, 16rem)" },
 };
 
-/** Width divided by height of the cover frame this theme uses (arch 3:4, circle 1:1, soft 4:5). */
 export function frameRatio(preset: string): number {
   const t = THEMES[preset] ?? THEMES[DEFAULT_THEME]!;
   return { arch: 3 / 4, circle: 1, soft: 4 / 5 }[t.frame];

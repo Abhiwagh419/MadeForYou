@@ -22,8 +22,6 @@ function status(p: PageRecord): { label: string; tone: string } {
 }
 
 export function Dashboard() {
-  // Select the stable objects and derive lists here: a selector that builds a new array on every call
-  // makes useSyncExternalStore re-render forever.
   const pageMap = useStore((s) => s.pages);
   const templateMap = useStore((s) => s.templates);
   const pages = useMemo(() => Object.values(pageMap).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), [pageMap]);

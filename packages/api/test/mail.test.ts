@@ -5,13 +5,13 @@ import { ownerEmail } from "../src/mail";
 
 const H = 3_600_000;
 const D = 24 * H;
-const istLocal = (ms: number) => `${new Date(ms + 5.5 * H).toISOString().slice(0, 16)}:00+05:30`; // what the editor stores: India time with its offset
+const istLocal = (ms: number) => `${new Date(ms + 5.5 * H).toISOString().slice(0, 16)}:00+05:30`;
 
 let env: ReturnType<typeof makeEnv>;
 let call: ReturnType<typeof makeClient>;
 let t = 1_790_000_000_000;
 let sent: { headers: Record<string, string>; body: any }[] = [];
-let brevo: number[] = []; // status codes to answer with, in order; empty means 201
+let brevo: number[] = [];
 let clerkCalls = 0;
 let n = 0;
 const fresh = () => ({ "cf-connecting-ip": `10.1.0.${++n}` });
@@ -113,7 +113,7 @@ describe("a page sent on a date", () => {
     expect(m.body.subject).toBe("Abhi made a page for you");
     expect(m.body.htmlContent).toContain("http://localhost/p/priya");
     expect(m.body.htmlContent).toContain("password");
-    expect(m.body.htmlContent).not.toContain("<script>"); // the note is shown, never run
+    expect(m.body.htmlContent).not.toContain("<script>");
     expect(m.body.htmlContent).toContain("&lt;script&gt;");
     expect(m.body.textContent).toContain("http://localhost/p/priya");
     expect(m.body.headers["List-Unsubscribe"]).toMatch(/^<http:\/\/localhost\/api\/mail\/unsub\?t=/);
@@ -122,7 +122,7 @@ describe("a page sent on a date", () => {
 
     t += H;
     await tick();
-    expect(sent).toHaveLength(1); // never twice
+    expect(sent).toHaveLength(1);
   });
 
   it("with no date, sends straight away", async () => {
@@ -166,7 +166,7 @@ describe("a page sent on a date", () => {
 
   it("checks what it is given", async () => {
     await call("PUT", "/pages/pg_mail0001", { user: "abhi", json: { title: "For Priya", content: page() } });
-    expect((await deliver(good)).status).toBe(409); // saved, but not published yet
+    expect((await deliver(good)).status).toBe(409);
     await publish();
     expect((await deliver({ ...good, toEmail: "not an email" })).status).toBe(400);
     expect((await deliver({ ...good, toEmail: "a@b.com\r\nBcc: x@y.com" })).status).toBe(400);
@@ -228,7 +228,7 @@ describe("a page sent on a date", () => {
     await tick();
     expect(sent).toHaveLength(0);
     expect((await rowOf(r.json.delivery.id)).status).toBe("scheduled");
-    t += D; // a day later the log has aged out
+    t += D;
     await tick();
     expect(sent).toHaveLength(1);
   });
@@ -243,7 +243,7 @@ describe("stop emails like this", () => {
     const ask = await call("GET", `/mail/unsub?t=${t1}`);
     expect(ask.status).toBe(200);
     expect(ask.text).toContain("priya@example.com");
-    expect(await env.DB.prepare("SELECT 1 AS x FROM mail_blocks").first()).toBeNull(); // opening the link changes nothing
+    expect(await env.DB.prepare("SELECT 1 AS x FROM mail_blocks").first()).toBeNull();
     const done = await call("POST", `/mail/unsub?t=${t1}`);
     expect(done.status).toBe(200);
     expect(await env.DB.prepare("SELECT email FROM mail_blocks").first()).toEqual({ email: "priya@example.com" });
@@ -251,12 +251,12 @@ describe("stop emails like this", () => {
   });
   it("cancels what is still waiting for that address", async () => {
     await publish();
-    await deliver(good); // sent now: this gives us a real stop link
+    await deliver(good);
     const waiting = await deliver({ ...good, sendAt: new Date(t + D).toISOString() });
     const other = await deliver({ ...good, toEmail: "other@example.com", sendAt: new Date(t + D).toISOString() });
     await call("POST", `/mail/unsub?t=${tokenOf()}`);
     expect((await rowOf(waiting.json.delivery.id)).status).toBe("cancelled");
-    expect((await rowOf(other.json.delivery.id)).status).toBe("scheduled"); // a different address is untouched
+    expect((await rowOf(other.json.delivery.id)).status).toBe("scheduled");
   });
   it("rejects a forged or damaged link", async () => {
     expect((await call("GET", "/mail/unsub?t=nonsense")).status).toBe(400);
@@ -285,7 +285,7 @@ describe("one reminder for guests", () => {
     expect((await rsvp(yes)).status).toBe(200);
     const saved = (await env.DB.prepare("SELECT payload, remind_at FROM submissions").first()) as any;
     expect(JSON.parse(saved.payload).email).toBe("meera@example.com");
-    expect(saved.remind_at).toBe(new Date(Date.parse(istLocal(t + 3 * D)) - D).toISOString()); // a day before the event
+    expect(saved.remind_at).toBe(new Date(Date.parse(istLocal(t + 3 * D)) - D).toISOString());
 
     t += D;
     await tick();
@@ -321,8 +321,8 @@ describe("one reminder for guests", () => {
   it("follows the event if the owner moves it", async () => {
     await publish(page(t + 3 * D));
     await rsvp(yes);
-    await publish(page(t + 6 * D)); // moved three days later
-    t += 2 * D + H; // the old reminder time
+    await publish(page(t + 6 * D));
+    t += 2 * D + H;
     await tick();
     expect(sent).toHaveLength(0);
     t += 3 * D;
@@ -354,13 +354,13 @@ describe("this page ends soon", () => {
     await env.DB.prepare("UPDATE users SET email = 'owner@example.com', email_at = ? WHERE id = 'dev_abhi'").bind(new Date(t).toISOString()).run();
     await publish(page(), { expiresAt: new Date(t + 3 * D).toISOString() });
     await deliver(good);
-    expect(sent).toHaveLength(1); // the delivery itself
+    expect(sent).toHaveLength(1);
 
     t += D;
     await tick();
-    expect(sent).toHaveLength(1); // still two days to go
+    expect(sent).toHaveLength(1);
 
-    t += D + 2 * H; // 22 hours left
+    t += D + 2 * H;
     expect((await tick()).json).toMatchObject({ ending: 2 });
     const to = sent.slice(1).map((m) => m.body.to[0].email).sort();
     expect(to).toEqual(["owner@example.com", "priya@example.com"]);
@@ -371,7 +371,7 @@ describe("this page ends soon", () => {
     expect(recipientMail.body.htmlContent).toContain("http://localhost/p/priya");
 
     await tick();
-    expect(sent).toHaveLength(3); // not again
+    expect(sent).toHaveLength(3);
   });
 
   it("does nothing for a page with no end date", async () => {

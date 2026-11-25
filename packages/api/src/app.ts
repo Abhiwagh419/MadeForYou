@@ -16,7 +16,7 @@ type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
 const PAGE_ID = /^pg_[a-z0-9]{6,24}$/;
 const TEMPLATE_ID = /^[a-z0-9-]{2,40}$/;
-const GATE_TTL = 6 * 3600;
+const GATE_TTL = 6 * 3600; // photo pass lasts 6 hours
 const CONTRIB_TTL = 90 * 86400;
 const MAX_JSON_BYTES = 400_000;
 
@@ -27,7 +27,6 @@ interface PageRow {
   contrib_epoch: number; taken_down_at: string | null; takedown_reason: string | null;
 }
 
-/** A page as the owner's browser sees it. The password hash never leaves the server. */
 const toPage = (r: PageRow) => ({
   id: r.id, title: r.title, templateId: r.template_id ?? undefined, content: JSON.parse(r.content) as Content, slug: r.slug ?? "",
   status: r.status, createdAt: r.created_at, updatedAt: r.updated_at, publishedAt: r.published_at ?? undefined,
@@ -42,7 +41,6 @@ const isoOrNull = (v: unknown): string | null | undefined => {
   return new Date(v).toISOString();
 };
 
-/** Photo storage: R2 when a bucket is bound, otherwise the database itself. */
 async function putFile(env: Env, id: string, buf: ArrayBuffer, type: string): Promise<void> {
   if (env.FILES) {
     await env.FILES.put(`a/${id}`, buf, { httpMetadata: { contentType: type } });
@@ -65,10 +63,6 @@ class HttpError extends Error {
   }
 }
 
-/**
- * Reads a request body, stopping as soon as it passes `max` bytes. The Content-Length header is only a hint
- * (it can be missing, as with chunked uploads, or simply wrong), so the bytes that really arrive are counted.
- */
 async function readBody(c: Ctx, max: number, tooLarge: string): Promise<Uint8Array> {
   const declared = Number(c.req.header("content-length") ?? 0);
   if (declared > max) throw new HttpError(413, tooLarge);
@@ -135,7 +129,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
   };
   const iso = () => new Date(deps.now()).toISOString();
 
-  /** Counts hits in a window and refuses once over the limit. */
   const throttle = async (c: Ctx, key: string, windowSec: number, max: number, record = true) => {
     const since = deps.now() - windowSec * 1000;
     const row = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM throttle WHERE key = ? AND at > ?").bind(key, since).first<{ n: number }>();
@@ -156,10 +149,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  /** "Why was my sign-in not accepted?" Safe to expose: it only repeats public Clerk addresses. */
   app.get("/diag", async (c) => c.json({ ...(await diagnose(c.req.header("authorization"), c.env, deps)), secretOk: (c.env.SESSION_SECRET ?? "").length >= 24 }));
-
-  /* ------------------------------ owner: pages ------------------------------ */
 
   app.get("/me/pages", async (c) => {
     const userId = await need(c);
@@ -199,7 +189,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
         : c.env.DB.prepare("INSERT INTO pages (id, owner_id, title, template_id, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(id, userId, title, templateId, json, now, now),
       c.env.DB.prepare("DELETE FROM page_assets WHERE page_id = ?").bind(id),
     ];
-    // Link only photos the user really owns, so nobody can claim someone else's photo id.
     for (const a of assetIds(checked.content)) {
       stmts.push(c.env.DB.prepare("INSERT INTO page_assets (page_id, asset_id) SELECT ?, id FROM assets WHERE id = ? AND owner_id = ?").bind(id, a, userId));
     }
@@ -271,16 +260,12 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ page: toPage(await ownedPage(c, row.id, userId)) });
   });
 
-  /* ------------------------------ visitors ------------------------------ */
-
   const publicRow = (c: Ctx, slug: string) =>
     c.env.DB.prepare("SELECT * FROM pages WHERE slug = ? AND status = 'published' AND deleted_at IS NULL").bind(slug.toLowerCase()).first<PageRow>();
   const presetOf = (r: PageRow) => (JSON.parse(r.content) as Content).settings.theme.preset;
 
-  /** The only place page content leaves the server for a visitor. */
   const openPayload = async (c: Ctx, r: PageRow, owner: boolean) => {
     const content = JSON.parse(r.content) as Content;
-    // Only wishes the owner has approved are ever shown to visitors.
     const wishes: Record<string, { id: string; name: string; message: string; at: string }[]> = {};
     if (content.blocks.some((b) => b.type === "wishes")) {
       const { results } = await c.env.DB.prepare("SELECT id, block_id, payload, created_at FROM submissions WHERE page_id = ? AND kind = 'wish' AND status = 'approved' ORDER BY created_at DESC LIMIT 100")
@@ -297,13 +282,11 @@ export function createApp(overrides: Partial<Deps> = {}) {
       visibility: r.visibility,
       owner,
       wishes,
-      // true when a guest may leave an email on the RSVP to get one reminder before the event
       canRemind: remindersOn(c.env) && !!nextEvent(content, deps.now()),
       assetToken: await signToken(c.env.SESSION_SECRET, `pg:${r.id}`, GATE_TTL, deps.now()),
     };
   };
 
-  /** Decides what a visitor may receive. Locked, ended and password states carry NO content. */
   const gate = async (c: Ctx, r: PageRow | null, passwordOk: boolean) => {
     if (!r) return c.json({ state: "missing" }, 404);
     const owner = !!c.get("userId") && c.get("userId") === r.owner_id;
@@ -323,7 +306,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const { password } = await readJson<{ password?: unknown }>(c);
     if (!r?.password_hash || !r.password_salt) return gate(c, r, false);
     const ip = await ipOf(c);
-    await throttle(c, `pw:${r.id}:${ip}`, 600, 8, false); // refuse before doing any work once the limit is hit
+    await throttle(c, `pw:${r.id}:${ip}`, 600, 8, false);
     const ok = typeof password === "string" && timingSafeEqual(await hashPassword(c.env.SESSION_SECRET, r.password_salt, password), r.password_hash);
     if (!ok) {
       await c.env.DB.prepare("INSERT INTO throttle (key, at) VALUES (?, ?)").bind(`pw:${r.id}:${ip}`, deps.now()).run();
@@ -331,8 +314,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     }
     return gate(c, r, true);
   });
-
-  /* ------------------------------ photos ------------------------------ */
 
   const ALLOWED = new Set(["image/webp", "image/jpeg", "image/png", "audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg"]);
 
@@ -360,7 +341,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ id, bytes: buf.byteLength });
   });
 
-  /** A photo is served only to its owner, or to a visitor holding a token issued after the page's gates were passed. */
   app.get("/a/:id", async (c) => {
     const id = c.req.param("id");
     const notFound = () => c.json({ error: "Not found" }, 404);
@@ -373,7 +353,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (scope?.startsWith("u:")) allowed = scope === `u:${asset.owner_id}`;
     else if (scope?.startsWith("pg:")) {
       const hit = await c.env.DB.prepare(
-        // A pass is good for hours, so the page's CURRENT state is checked too: ended, re-locked or private pages stop serving photos at once.
         `SELECT 1 AS x FROM page_assets pa JOIN pages p ON p.id = pa.page_id
           WHERE pa.asset_id = ? AND pa.page_id = ? AND p.status = 'published' AND p.deleted_at IS NULL AND p.visibility != 'private'
             AND (p.expires_at IS NULL OR p.expires_at > ?) AND (p.unlock_at IS NULL OR p.unlock_at <= ?)`,
@@ -385,7 +364,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const bytes = await getFile(c.env, id);
     if (!bytes) return notFound();
     const headers: Record<string, string> = { "Content-Type": asset.content_type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Accept-Ranges": "bytes" };
-    // Safari will not play audio unless the server understands byte ranges.
+    // safari will not play audio without range support
     const range = c.req.header("range")?.match(/^bytes=(\d*)-(\d*)$/);
     if (range && (range[1] || range[2])) {
       const size = bytes.byteLength;
@@ -398,8 +377,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return new Response(bytes as unknown as BodyInit, { headers: { ...headers, "Content-Length": String(bytes.byteLength) } });
   });
 
-
-  /* ------------------------------ guest messages ------------------------------ */
 
   const verifyTurnstile = async (c: Ctx, token: unknown): Promise<boolean> => {
     if (!c.env.TURNSTILE_SECRET) return true;
@@ -416,7 +393,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     }
   };
 
-  /** The one place a guest's message is accepted, whether it comes from the page or a contributor link. */
   const accept = async (c: Ctx, r: PageRow, input: { blockId: unknown; kind: SubmissionKind; payload: unknown; source: "page" | "contributor"; website?: unknown; elapsedMs?: unknown; turnstile?: unknown }) => {
     if (r.expires_at && Date.parse(r.expires_at) <= deps.now()) throw new HttpError(410, "This page has ended");
     const content = JSON.parse(r.content) as Content;
@@ -424,7 +400,8 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const expected = block ? (SUBMISSION.blockKind as Record<string, SubmissionKind>)[block.type] : undefined;
     if (!block || expected !== input.kind) throw new HttpError(400, "That box is not on this page");
 
-    if (typeof input.website === "string" && input.website !== "") return { ok: true, status: "approved" as const }; // a bot filled the hidden field: pretend it worked
+    // hidden field, only bots fill it in
+    if (typeof input.website === "string" && input.website !== "") return { ok: true, status: "approved" as const };
     if (typeof input.elapsedMs === "number" && input.elapsedMs < SUBMISSION.minFillMs) throw new HttpError(429, "Please take a moment before sending");
     if (!(await verifyTurnstile(c, input.turnstile))) throw new HttpError(403, "We could not confirm you are a person. Please try again.");
 
@@ -443,7 +420,7 @@ export function createApp(overrides: Partial<Deps> = {}) {
       const email = String(cleaned.payload.email);
       const ev = remindersOn(c.env) ? nextEvent(content, deps.now()) : null;
       if (!ev || ev.at - deps.now() < 30 * 60_000 || (await isBlocked(c.env, email))) {
-        delete cleaned.payload.email; // nothing to remind about, so the address is not kept
+        delete cleaned.payload.email;
       } else {
         eventAt = new Date(ev.at).toISOString();
         remindAt = new Date(Math.max(deps.now(), ev.at - 86_400_000)).toISOString();
@@ -451,7 +428,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     }
     const stmts = [];
     if (input.kind === "rsvp") {
-      // answering again replaces the earlier answer instead of counting twice
       stmts.push(c.env.DB.prepare("DELETE FROM submissions WHERE page_id = ? AND block_id = ? AND kind = 'rsvp' AND lower(json_extract(payload, '$.name')) = ?").bind(r.id, block.id, String(cleaned.payload.name).toLowerCase()));
     }
     stmts.push(c.env.DB.prepare("INSERT INTO submissions (id, page_id, block_id, kind, payload, status, source, created_at, ip_hash, remind_at, event_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -466,7 +442,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const b = await readJson<{ blockId?: unknown; kind?: unknown; payload?: unknown; token?: unknown; website?: unknown; elapsedMs?: unknown; turnstile?: unknown }>(c);
     const owner = !!c.get("userId") && c.get("userId") === r.owner_id;
     if (r.visibility === "private" && !owner) throw new HttpError(404, "Page not found");
-    // The visitor must have been let in (past the lock and password) to leave a message.
     const scope = await readToken(c.env.SESSION_SECRET, typeof b.token === "string" ? b.token : "", deps.now());
     if (scope !== `pg:${r.id}`) throw new HttpError(403, "Open the page first, then send your message");
     if (b.kind !== "wish" && b.kind !== "reply" && b.kind !== "rsvp") throw new HttpError(400, "Unknown kind of message");
@@ -474,7 +449,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json(out);
   });
 
-  /* contributor links: friends add a wish without ever seeing the page (so a surprise stays a surprise) */
   const contribScope = (r: PageRow) => `c:${r.id}:${r.contrib_epoch}`;
   const contributorRow = async (c: Ctx, slug: string): Promise<PageRow> => {
     const r = await publicRow(c, slug);
@@ -492,7 +466,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ path: `/c/${row.slug}?k=${encodeURIComponent(token)}` });
   });
 
-  /** Switching off the old link: every link sent so far stops working. */
   app.post("/pages/:id/contributor-link/reset", async (c) => {
     const userId = await need(c);
     const row = await ownedPage(c, c.req.param("id"), userId);
@@ -519,16 +492,14 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json(await accept(c, r, { blockId: wall.id, kind: "wish", payload: b.payload, source: "contributor", website: b.website, elapsedMs: b.elapsedMs, turnstile: b.turnstile }));
   });
 
-  /* ------------------------------ reports, takedowns, deleting an account ------------------------------ */
-
   const REASONS = ["abuse", "private", "copyright", "spam", "other"] as const;
 
-  /** Anyone may report a published page. It goes to the site owner, who decides. */
   app.post("/p/:slug/report", async (c) => {
     const r = await publicRow(c, c.req.param("slug"));
     if (!r || r.visibility === "private") throw new HttpError(404, "Page not found");
     const b = await readJson<{ reason?: unknown; details?: unknown; contact?: unknown; website?: unknown; turnstile?: unknown }>(c);
-    if (typeof b.website === "string" && b.website !== "") return c.json({ ok: true }); // a bot filled the hidden field
+    // hidden field, only bots fill it in
+    if (typeof b.website === "string" && b.website !== "") return c.json({ ok: true });
     if (!(await verifyTurnstile(c, b.turnstile))) throw new HttpError(403, "We could not confirm you are a person. Please try again.");
     const reason = (REASONS as readonly string[]).includes(String(b.reason)) ? (b.reason as (typeof REASONS)[number]) : null;
     if (!reason) throw new HttpError(400, "Choose what is wrong with the page");
@@ -544,18 +515,15 @@ export function createApp(overrides: Partial<Deps> = {}) {
       .bind(`rp_${randomHex(8)}`, r.id, r.slug, reason, details || null, contact || null, ip, iso()).run();
     const count = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE page_id = ? AND status = 'open'").bind(r.id).first<{ n: number }>())?.n ?? 1;
     await notifyReport(c.env, deps, { origin: originOf(c), slug: r.slug!, title: r.title, reason, details, contact, count });
-    // The owner hears about it once, on the first open report, so a pile-on cannot fill their inbox.
     if (count === 1) await notifyOwnerReported(c.env, deps, { ownerId: r.owner_id, title: r.title, slug: r.slug!, reason, origin: originOf(c), contactEmail: contactAddress(c.env) });
     return c.json({ ok: true });
   });
 
-  /** Delete the account and everything in it. The person must type DELETE, so a stray tap does nothing. */
   app.delete("/me", async (c) => {
     const userId = await need(c);
     const b = await readJson<{ confirm?: unknown }>(c);
     if (typeof b.confirm !== "string" || b.confirm.trim().toUpperCase() !== "DELETE") throw new HttpError(400, "Type DELETE to confirm");
     const gone = await eraseUser(c.env, userId);
-    // Also remove the login itself when the server may (Clerk). If not, the person can do it from their profile.
     let loginRemoved = false;
     const secret = c.env.CLERK_SECRET_KEY?.trim();
     if (secret && !userId.startsWith("dev_")) {
@@ -569,14 +537,11 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ ok: true, ...gone, loginRemoved });
   });
 
-  /* ------------------------------ email ------------------------------ */
-
   const originOf = (c: Ctx) => (c.env.PUBLIC_URL?.trim().replace(/\/+$/, "") || new URL(c.req.url).origin);
 
   interface DeliveryRow { id: string; to_email: string; to_name: string | null; from_name: string; note: string | null; send_at: string; status: string; error: string | null; sent_at: string | null }
   const toDelivery = (d: DeliveryRow) => ({ id: d.id, toEmail: d.to_email, toName: d.to_name ?? "", fromName: d.from_name, note: d.note ?? "", sendAt: d.send_at, status: d.status, error: d.error ?? undefined, sentAt: d.sent_at ?? undefined });
 
-  /** Is email switched on? Lets the website say so instead of failing. */
   app.get("/mail/status", (c) => c.json({ email: !!mailConfig(c.env), reminders: remindersOn(c.env), dailyLimit: DAILY_CAP }));
 
   app.get("/pages/:id/deliveries", async (c) => {
@@ -625,7 +590,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ delivery: toDelivery(saved!) });
   });
 
-  /** Cancels one that is still waiting; removes the record of one that is done. */
   app.delete("/deliveries/:id", async (c) => {
     const userId = await need(c);
     const id = c.req.param("id");
@@ -637,7 +601,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ ok: true });
   });
 
-  /** The page that "Stop emails like this" opens. Asks first, so a mail scanner that opens links cannot unsubscribe anyone. */
   const unsubHtml = (title: string, body: string) =>
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml(title)}</title></head><body style="margin:0;background:#FFF8F0;font-family:Helvetica,Arial,sans-serif;color:#4A0E1F"><main style="max-width:420px;margin:12vh auto;padding:28px;background:#fff;border:1px solid #F3DCCB;border-radius:20px"><h1 style="font-family:Georgia,serif;font-size:24px;margin:0 0 14px">${escHtml(title)}</h1>${body}</main></body></html>`;
 
@@ -653,7 +616,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (!email) return c.html(unsubHtml("This link is not valid", "<p>It may have expired. If you keep getting emails you do not want, reply to one of them.</p>"), 400);
     return c.html(unsubHtml("Stop emails from MadeForYou?", `<p>${escHtml(email)} will not get any more emails sent through MadeForYou.</p><form method="post" action="/api/mail/unsub?t=${encodeURIComponent(t)}"><button type="submit" style="background:#E11D48;color:#fff;border:0;border-radius:999px;padding:12px 24px;font-size:16px;font-weight:600">Yes, stop them</button></form>`));
   });
-  // Also the target of the one-click unsubscribe button some mail apps show.
   app.post("/mail/unsub", async (c) => {
     lockedDown(c);
     const email = await readUnsub(c.env, c.req.query("t"), deps.now());
@@ -662,7 +624,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.html(unsubHtml("Done", `<p>${escHtml(email)} will not get any more emails sent through MadeForYou.</p>`));
   });
 
-  /** Called every 15 minutes by the scheduler Worker (apps/mailer). Not for browsers. */
   app.post("/cron/tick", async (c) => {
     const secret = c.env.CRON_SECRET?.trim();
     if (!secret) throw new HttpError(503, "The scheduler is not set up");
@@ -672,13 +633,11 @@ export function createApp(overrides: Partial<Deps> = {}) {
     try {
       cleaned = await purgeOld(c.env, deps.now());
     } catch (e) {
-      console.error("clean-up failed", e); // a problem here must never hold back the emails
+      console.error("clean-up failed", e);
       cleaned = { error: true };
     }
     return c.json({ ...(await runTick(c.env, deps, originOf(c))), cleaned });
   });
-
-  /* ------------------------------ the owner's inbox ------------------------------ */
 
   interface SubRow { id: string; page_id: string; block_id: string; kind: string; payload: string; status: string; source: string; read_at: string | null; created_at: string }
   const toSub = (s: SubRow) => ({ id: s.id, pageId: s.page_id, blockId: s.block_id, kind: s.kind, payload: JSON.parse(s.payload), status: s.status, source: s.source, read: !!s.read_at, createdAt: s.created_at });
@@ -731,8 +690,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ ok: true });
   });
 
-  /* ------------------------------ templates ------------------------------ */
-
   const rowToTemplate = (r: { meta: string; content: string }) => ({ meta: JSON.parse(r.meta), content: JSON.parse(r.content) });
 
   app.get("/templates", async (c) => {
@@ -755,7 +712,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     if (!checked.ok) throw new HttpError(400, "This template has a problem", { issues: checked.issues.slice(0, 10) });
     const { meta, content } = checked.template;
     if (!TEMPLATE_ID.test(id) || meta.id !== id) throw new HttpError(400, "The template id does not match");
-    // Photos are personal by nature: a template carries structure only.
     if (assetIds(content).length) throw new HttpError(400, "Templates cannot contain photos. Remove them and try again.");
 
     const existing = await c.env.DB.prepare("SELECT owner_id, status FROM templates WHERE id = ?").bind(id).first<{ owner_id: string; status: string }>();
@@ -764,12 +720,10 @@ export function createApp(overrides: Partial<Deps> = {}) {
       const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM templates WHERE owner_id = ?").bind(userId).first<{ n: number }>();
       if ((n?.n ?? 0) >= 50) throw new HttpError(403, "You can keep up to 50 templates");
     }
-    // New creators' public templates wait for a quick review until three have been approved.
     let status = "approved";
     if (meta.visibility === "public") {
       const ok = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM templates WHERE owner_id = ? AND visibility = 'public' AND status = 'approved' AND id != ?").bind(userId, id).first<{ n: number }>();
       status = (ok?.n ?? 0) >= 3 ? "approved" : "pending";
-      // Saving again must not undo the site owner's decision to reject it.
       if (existing?.status === "rejected") status = "rejected";
     }
     const fromPage = typeof body.fromPage === "string" && PAGE_ID.test(body.fromPage) ? body.fromPage : null;
@@ -785,7 +739,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ ok: true });
   });
 
-  /** The site owner's door. Wrong guesses are counted per visitor, so the token cannot be guessed by trying again and again. */
   const admin = async (c: Ctx) => {
     const t = c.req.header("x-admin-token") ?? "";
     const key = `adm:${await ipOf(c)}`;
@@ -802,7 +755,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const r = await c.env.DB.prepare("UPDATE templates SET status = ? WHERE id = ?").bind(action === "approve" ? "approved" : "rejected", c.req.param("id")).run();
     return c.json({ ok: true, changed: r.meta?.changes ?? 0 });
   });
-  /** A quick look at how full the free database is. */
   app.get("/admin/usage", async (c) => {
     await admin(c);
     const one = async (q: string) => (await c.env.DB.prepare(q).first<{ n: number }>())?.n ?? 0;
@@ -815,7 +767,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
       storage: c.env.FILES ? "r2" : "database (free limit 500 MB in total)",
     });
   });
-  /** Reports waiting for a decision, grouped by page. */
   app.get("/admin/reports", async (c) => {
     await admin(c);
     const status = c.req.query("status") === "all" ? "all" : "open";
@@ -829,7 +780,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ reports: results ?? [] });
   });
 
-  /** remove: take the page down (its owner cannot publish it again) and close every open report on it. dismiss: nothing wrong. */
   app.post("/admin/reports/:id/:action", async (c) => {
     await admin(c);
     const action = c.req.param("action");
@@ -839,7 +789,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const body = await readJson<{ note?: unknown }>(c).catch(() => ({}) as { note?: unknown });
     const note = typeof body.note === "string" ? body.note.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, 600) : "";
     const pageRow = await c.env.DB.prepare("SELECT title, slug, owner_id FROM pages WHERE id = ?").bind(rep.page_id).first<{ title: string; slug: string | null; owner_id: string }>();
-    // Who to write to: the reporter of this report, or every reporter whose open report this takes care of.
     const who = action === "dismiss"
       ? ((await c.env.DB.prepare("SELECT contact FROM reports WHERE id = ?").bind(rep.id).all<{ contact: string | null }>()).results ?? [])
       : ((await c.env.DB.prepare("SELECT contact FROM reports WHERE page_id = ? AND status = 'open'").bind(rep.page_id).all<{ contact: string | null }>()).results ?? []);
@@ -861,7 +810,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     return c.json({ ok: true });
   });
 
-  /** Let a page owner publish again after a mistake. */
   app.post("/admin/pages/:id/restore", async (c) => {
     await admin(c);
     const r = await c.env.DB.prepare("UPDATE pages SET taken_down_at = NULL, takedown_reason = NULL, updated_at = ? WHERE id = ?").bind(iso(), c.req.param("id")).run();

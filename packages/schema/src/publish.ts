@@ -31,7 +31,6 @@ function altIssues(def: FieldDef, value: unknown, blockId: string, field: string
   return out;
 }
 
-/** What the publish checklist shows. Errors block publishing; warnings are shown but allowed. */
 export function checkPublishable(content: Content): { canPublish: boolean; issues: PublishIssue[] } {
   const issues: PublishIssue[] = [];
   for (const block of content.blocks) {

@@ -1,7 +1,6 @@
 import type { Env } from "./types";
 import { injectMeta, pageMeta } from "./og";
 
-/** The HTML for /p/:slug: the app shell with this page's preview tags (or a generic card). */
 export async function renderPageShell(env: Env, shellHtml: string, origin: string, slug: string): Promise<string> {
   const clean = /^[a-z0-9-]{1,40}$/.test(slug) ? slug : "";
   const row = clean

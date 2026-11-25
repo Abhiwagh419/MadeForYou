@@ -7,11 +7,9 @@ export const TemplateMetaSchema = z.object({
   id: slug,
   title: z.string().min(3).max(80),
   titleI18n: z.record(z.string(), z.string().max(80)).optional(),
-  /** Controlled vocabulary slugs; synonyms (maa, mom, amma) live in the occasions table, not here. */
   occasions: z.array(slug).min(1).max(5),
   relationships: z.array(slug).max(5).default([]),
   moods: z.array(z.enum(["romantic", "emotional", "funny", "minimal", "festive"])).max(3).default([]),
-  /** Extra search words for this template. */
   tags: z.array(z.string().min(2).max(30)).max(30).default([]),
   languages: z.array(z.string().min(2).max(8)).min(1).max(8),
   visibility: z.enum(["private", "unlisted", "public"]).default("private"),

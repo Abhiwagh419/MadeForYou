@@ -12,10 +12,6 @@ import { HelpNote } from "./ui/HelpNote";
 import { NotFound } from "./ui/Shell";
 
 
-/**
- * A visitor opening a shared page needs the page viewer and nothing else, so every creator screen is fetched only
- * when someone goes there. (The viewer and the invite page stay in the main file: they are what most people open.)
- */
 const loaders = {
   Home: () => import("./screens/Home").then((m) => m.Home),
   Templates: () => import("./screens/Templates").then((m) => m.Templates),
@@ -38,14 +34,12 @@ const loaders = {
 
 const L = Object.fromEntries(Object.entries(loaders).map(([k, load]) => [k, lazy(() => load().then((c) => ({ default: c })))])) as unknown as { [K in keyof typeof loaders]: ComponentType<any> };
 
-/** Fetches every creator screen now. Used by the tests, so a screen shows up instantly. */
 export const preloadScreens = () => Promise.all(Object.values(loaders).map((load) => load()));
 
-/** When someone signs in: fetch their photo access, then bring their saved pages onto this device. */
 function SyncOnSignIn() {
   const { userId } = useSession();
   useEffect(() => {
-    if (!userId) setAuthProblem(null); // signed out: the "server did not accept your login" notice no longer applies
+    if (!userId) setAuthProblem(null);
     if (!isRemote() || !userId) return;
     let alive = true;
     (async () => {
@@ -53,7 +47,6 @@ function SyncOnSignIn() {
         try {
           await refreshOwnerToken();
         } catch (first) {
-          // one quiet retry: a login can take a moment to become usable right after sign-in
           await new Promise((r) => setTimeout(r, authRetry.delayMs));
           if (!alive) return;
           await refreshOwnerToken().catch(() => Promise.reject(first));
@@ -61,7 +54,6 @@ function SyncOnSignIn() {
         const n = await pullPages();
         if (alive && n) toast(`Brought ${n} page${n === 1 ? "" : "s"} from your account`);
       } catch (e) {
-        // A refused login is explained on screen; being offline is not an error: everything keeps working here.
         await handleAuthError(e);
       }
     })();
@@ -72,7 +64,6 @@ function SyncOnSignIn() {
   return null;
 }
 
-/** A deployed copy built without the server would silently keep everything on one phone. Say so. */
 function LocalModeBanner() {
   const host = window.location.hostname;
   const dev = host === "localhost" || host === "127.0.0.1" || /^192\.168\./.test(host) || /^10\./.test(host);

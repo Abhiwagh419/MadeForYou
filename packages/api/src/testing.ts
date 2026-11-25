@@ -1,3 +1,4 @@
+// node:sqlite needs Node 22 or newer
 import { DatabaseSync } from "node:sqlite";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,6 @@ import { jwtVerify } from "jose";
 import { createApp } from "./app";
 import type { D1Like, D1PreparedStatement, Deps, Env, R2Like } from "./types";
 
-/** A D1-shaped database on top of node:sqlite, running the real migration file. */
 export function makeDb(): D1Like {
   const db = new DatabaseSync(":memory:");
   const dir = join(dirname(fileURLToPath(import.meta.url)), "../migrations");
@@ -73,14 +73,11 @@ export function makeClient(env: Env, deps: Partial<Deps> = {}) {
     let json: any = null;
     try {
       json = JSON.parse(text);
-    } catch {
-      /* binary or empty */
-    }
+    } catch {}
     return { status: res.status, json, text, headers: res.headers };
   };
 }
 
-/** A real RS256 login token signed by a throwaway key, checked through a local key set. */
 export async function makeJwtSetup() {
   const { publicKey, privateKey } = await generateKeyPair("RS256");
   const jwk = { ...(await exportJWK(publicKey)), kid: "k1", alg: "RS256", use: "sig" };

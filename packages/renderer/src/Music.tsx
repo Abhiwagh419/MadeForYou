@@ -1,7 +1,3 @@
-/**
- * Background music. The iframe URL is built here from provider + id (the id is
- * validated by the schema); a user-typed URL never reaches an iframe.
- */
 export function Music({ provider, id, autoplay }: { provider: "youtube" | "spotify"; id: string; autoplay: boolean }) {
   if (provider === "youtube") {
     const src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=${autoplay ? 1 : 0}&loop=1&playlist=${id}&playsinline=1`;

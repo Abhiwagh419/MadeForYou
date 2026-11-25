@@ -3,7 +3,6 @@ import { placeholderValue } from "./fields";
 import { registry } from "./registry";
 
 export interface StripOptions {
-  /** Fields the template author chose to keep, by block id (the "keep" toggle on the review screen). */
   keep?: Record<string, string[]>;
 }
 export interface StripEntry {
@@ -13,11 +12,6 @@ export interface StripEntry {
   action: "stripped" | "kept";
 }
 
-/**
- * "Share as template": returns a copy with every personal field reset to its
- * placeholder, plus a report for the review screen. Personal is the safe default:
- * nothing becomes public unless the author explicitly keeps it.
- */
 export function stripPersonal(content: Content, opts: StripOptions = {}): { content: Content; report: StripEntry[] } {
   const report: StripEntry[] = [];
 
@@ -54,7 +48,6 @@ export function stripPersonal(content: Content, opts: StripOptions = {}): { cont
     };
   });
 
-  // Settings can be personal too: the chosen song is private to the page.
   const { music, ...settings } = content.settings;
   if (music) report.push({ blockId: "settings", type: "settings", field: "music", action: "stripped" });
 
@@ -66,11 +59,6 @@ const COMMON = new Set([
   "maa", "mom", "mummy", "papa", "dad", "bhaiya", "bhai", "didi", "behen", "sir", "madam", "mam", "friend", "yaar", "favourite", "person",
 ]);
 
-/**
- * Names the user actually typed (recipient, signature, salutation), lowercased. A public
- * template's title and search words are checked against these so "For Priya" cannot be
- * published as a template. A guard against slips, not a guarantee.
- */
 export function personalNames(content: Content): string[] {
   const out = new Set<string>();
   for (const b of content.blocks) {

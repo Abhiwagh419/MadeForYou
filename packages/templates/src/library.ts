@@ -3,7 +3,6 @@ import { block, tpl } from "./build";
 
 const sign = (message = "With love,") => block("signature", { fields: { message, name: "Your name" }, style: { anim: "fade" } });
 
-/** The launch library, built from the same blocks users get. Grows to 30-50 templates by the beta. */
 export const built: Template[] = [
   tpl({
     id: "fathers-day-note", abbr: "fday", title: "A note for Papa",

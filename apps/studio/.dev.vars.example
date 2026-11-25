@@ -1,4 +1,3 @@
-# Copy to .dev.vars for local testing with `pnpm --filter @madeforyou/studio cf:dev`. Never commit .dev.vars.
 SESSION_SECRET=change-me-to-a-long-random-string
 ALLOW_DEV_AUTH=1
 ADMIN_TOKEN=change-me-too

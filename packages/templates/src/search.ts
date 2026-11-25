@@ -1,7 +1,6 @@
 import type { Template } from "@madeforyou/schema";
 import { OCCASIONS, type Occasion } from "./occasions";
 
-/** Lowercase, drop Latin accents and apostrophes, collapse punctuation. Devanagari is left untouched. */
 export function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -13,7 +12,6 @@ export function normalize(s: string): string {
     .trim();
 }
 
-/** Edit distance where swapping two neighbours counts once ("birthdya" is one slip, not two). */
 export function distance(a: string, b: string, max = 3): number {
   if (Math.abs(a.length - b.length) > max) return max + 1;
   let prev2: number[] = [];
@@ -34,7 +32,6 @@ export function distance(a: string, b: string, max = 3): number {
   return prev[b.length]!;
 }
 
-/** 100 exact, 80 prefix, 60 contains, 60 minus 8 per typo; 0 for no match. */
 export function scoreTerm(q: string, term: string): number {
   if (!q || !term) return 0;
   if (q === term) return 100;
@@ -55,14 +52,12 @@ export function scoreOccasion(q: string, o: Occasion): number {
   const nq = normalize(q);
   let best = 0;
   for (const t of termsOf(o)) best = Math.max(best, scoreTerm(nq, t));
-  // multi-word queries: score the best single word too ("my mom birthday")
   if (nq.includes(" ")) {
     for (const w of nq.split(" ")) for (const t of termsOf(o)) best = Math.max(best, scoreTerm(w, t) - 10);
   }
   return best;
 }
 
-/** Typeahead: occasions that match, best first. */
 export function suggest(q: string, limit = 6): Occasion[] {
   if (!normalize(q)) return [];
   return OCCASIONS.map((o) => ({ o, s: scoreOccasion(q, o) }))
@@ -73,18 +68,11 @@ export function suggest(q: string, limit = 6): Occasion[] {
 }
 
 export interface SearchResult {
-  /** The occasion the query resolved to, if any. */
   occasion: Occasion | null;
   results: Template[];
-  /** Other occasions worth showing when nothing matched. */
   related: Occasion[];
 }
 
-/**
- * Empty query returns everything. Otherwise templates are ranked by how well their
- * occasions match, then by title and tags. Zero results is a normal outcome: the UI
- * answers it with "create the first one".
- */
 export function searchTemplates(q: string, templates: Template[]): SearchResult {
   const nq = normalize(q);
   if (!nq) return { occasion: null, results: templates, related: [] };

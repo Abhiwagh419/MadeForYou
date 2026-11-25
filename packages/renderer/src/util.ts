@@ -1,6 +1,3 @@
-/** Small pure helpers for the blocks. Kept free of the schema package so the page stays light. */
-
-/** The shape the author cropped a photo to. Without it the photo fills its frame and is centre-cropped. */
 export function shape(ref?: { ratio?: number } | null): { aspectRatio: string } | undefined {
   const r = ref?.ratio;
   return typeof r === "number" && r >= 0.2 && r <= 5 ? { aspectRatio: String(r) } : undefined;
@@ -8,7 +5,6 @@ export function shape(ref?: { ratio?: number } | null): { aspectRatio: string } 
 
 const SAFE = new Set(["https:", "http:", "mailto:", "tel:"]);
 
-/** A link that is safe to put in href, or "" if it is not. (Same rule as the schema's isSafeLink; a test keeps them in step.) */
 export function safeHref(v: string): string {
   if (!v) return "";
   try {
@@ -18,7 +14,6 @@ export function safeHref(v: string): string {
   }
 }
 
-/** A date-only value means midnight in India (IST). */
 export function parseTarget(v: string): number | null {
   if (!v) return null;
   const iso = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00+05:30` : v;
@@ -28,7 +23,6 @@ export function parseTarget(v: string): number | null {
 
 const IST_MS = 5.5 * 3600 * 1000;
 
-/** Calendar difference between a date (in IST) and now, as years, months, days, plus the total number of days. */
 export function togetherSince(since: string, nowMs: number): { y: number; m: number; d: number; days: number; future: boolean } | null {
   const m = since.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return null;
@@ -52,7 +46,6 @@ export function togetherSince(since: string, nowMs: number): { y: number; m: num
   return { y, m: mo, d, days, future: false };
 }
 
-/** "Saturday, 14 February 2027" and "6:30 pm", always shown in India time so every guest sees the same thing. */
 export function formatEvent(when: string): { date: string; time: string } | null {
   const t = parseTarget(when);
   if (t === null) return null;
@@ -67,7 +60,6 @@ export function formatEvent(when: string): { date: string; time: string } | null
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 const stamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 
-/** A calendar file (.ics) for the event, or "" if the date is not valid. */
 export function buildIcs(e: { title: string; when: string; place?: string; note?: string }, nowMs = Date.now()): string {
   const start = parseTarget(e.when);
   if (start === null) return "";

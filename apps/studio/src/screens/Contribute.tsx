@@ -8,7 +8,6 @@ import { Mark } from "../ui/Logo";
 
 interface Info { blockId: string; heading: string; prompt: string; recipient: string; theme: string }
 
-/** What a friend sees from an invite link: a single box to leave a wish, never the page itself. */
 export function Contribute() {
   const route = useRoute();
   const { slug = "" } = route.params;

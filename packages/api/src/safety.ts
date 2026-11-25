@@ -1,29 +1,19 @@
 import type { Env } from "./types";
 
-/* =============================================================================================
- * Deleting data. Two situations:
- *   - a person deletes their account: everything of theirs goes at once (eraseUser)
- *   - a deleted page, or a photo no page uses, is kept for 30 days in case of a mistake, then goes (purgeOld)
- * ============================================================================================= */
-
 export const KEEP_DELETED_DAYS = 30;
 export const KEEP_REPORT_DAYS = 365;
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** Removes photo files from R2 when a bucket is bound. Photos kept in the database go with their rows. */
 async function dropFiles(env: Env, ids: string[]) {
   if (!env.FILES || !ids.length) return;
   for (let i = 0; i < ids.length; i += 100) {
     try {
       await env.FILES.delete(ids.slice(i, i + 100).map((id) => `a/${id}`));
-    } catch {
-      /* a file that is already gone is fine */
-    }
+    } catch {}
   }
 }
 
-/** Everything a person has: pages, photos, guest messages, scheduled emails, templates and the account itself. */
 export async function eraseUser(env: Env, userId: string): Promise<{ pages: number; photos: number }> {
   const photos = ((await env.DB.prepare("SELECT id FROM assets WHERE owner_id = ?").bind(userId).all<{ id: string }>()).results ?? []).map((a) => a.id);
   const pages = (await env.DB.prepare("SELECT COUNT(*) AS n FROM pages WHERE owner_id = ?").bind(userId).first<{ n: number }>())?.n ?? 0;
@@ -44,7 +34,6 @@ export async function eraseUser(env: Env, userId: string): Promise<{ pages: numb
   return { pages, photos: photos.length };
 }
 
-/** Page ids and photo ids whose time has come. Small batches, so one run never takes long. */
 export async function purgeOld(env: Env, now: number): Promise<{ pages: number; photos: number; reports: number }> {
   const cutoff = iso(now - KEEP_DELETED_DAYS * DAY);
   let pageCount = 0;
@@ -61,8 +50,6 @@ export async function purgeOld(env: Env, now: number): Promise<{ pages: number; 
     pageCount++;
   }
 
-  // photos that no page uses any more (a deleted page, a replaced picture) after the same grace period
-  // The second check is a safety net: a photo that a live page still mentions is never removed, even if its link was missed.
   const loose = ((await env.DB.prepare(
     `SELECT id FROM assets a WHERE a.created_at < ?
         AND NOT EXISTS (SELECT 1 FROM page_assets p WHERE p.asset_id = a.id)
@@ -74,11 +61,8 @@ export async function purgeOld(env: Env, now: number): Promise<{ pages: number; 
     await env.DB.batch([env.DB.prepare("DELETE FROM asset_blobs WHERE id = ?").bind(id), env.DB.prepare("DELETE FROM assets WHERE id = ?").bind(id)]);
   }
 
-  // reports that have been dealt with are not kept for ever
   const rep = await env.DB.prepare("DELETE FROM reports WHERE status != 'open' AND handled_at IS NOT NULL AND handled_at < ?").bind(iso(now - KEEP_REPORT_DAYS * DAY)).run();
-  // the record of emails already sent is only needed until the thing it guards has passed
   await env.DB.prepare("DELETE FROM mail_log WHERE at < ?").bind(iso(now - 90 * DAY)).run();
-  // the visitor-limit counters only matter for the last day
   await env.DB.prepare("DELETE FROM throttle WHERE at < ?").bind(now - DAY).run();
   return { pages: pageCount, photos: loose.length, reports: rep.meta?.changes ?? 0 };
 }
