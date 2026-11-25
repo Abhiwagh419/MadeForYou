@@ -1,7 +1,6 @@
 import type { Template } from "@madeforyou/schema";
 import { block, tpl } from "./build";
-
-const sign = (message = "With love,") => block("signature", { fields: { message, name: "Your name" }, style: { anim: "fade" } });
+import { sign } from "./parts";
 
 export const built: Template[] = [
   tpl({

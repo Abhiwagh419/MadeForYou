@@ -1,4 +1,4 @@
--- guest wishes, replies and RSVPs
+
 ALTER TABLE pages ADD COLUMN contrib_epoch INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE submissions (

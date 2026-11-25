@@ -1,4 +1,3 @@
-// node:sqlite needs Node 22 or newer
 import { DatabaseSync } from "node:sqlite";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

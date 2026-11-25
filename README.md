@@ -28,11 +28,11 @@ The product name, the operator name and the contact email are all in one file: `
 ## Features
 
 - 26 blocks: hero, featured photo, gallery, timeline, days together, video, text, letter, quote or shayari, reasons list, promises or bucket list, open-when letters, countdown, scratch card, the ask, quiz, memory match, event details (with add to calendar), buttons and links, divider, signature, voice note, map, wishes wall, reply box and RSVP.
-- 76 templates (festivals, life events and a trending set inspired by Instagram formats) and 3 themes (Rose garden, Marigold sun, Midnight stars). Guided mode asks a few questions, and the editor (with a phone preview) is there for everything else.
+- 76 templates (festivals, life events and a trending set inspired by Instagram formats) and 3 themes (Rose garden, Marigold sun, Midnight stars). Guided mode asks a few questions, and the editor (with a phone preview) is there for everything else. Templates tagged `trending` get a badge, a row on the home page and a "Trending" filter on the templates page.
 - Photo cropping: the person picks the part of the photo to show and the page shows exactly that crop.
 - Sharing: link, WhatsApp card, QR code, a 1080 x 1920 story picture, a password, an "opens on" date, an end date and a private mode.
 - Guest messages: wishes (the owner approves them), replies and RSVPs, which the owner reads in an inbox. A friend can add a wish through an invite link without seeing the page.
-- Email (optional, free): send a page to someone on a date, one reminder to guests before an event, and a "this page ends soon" mail.
+- Email (optional, free): send a page to someone on a date, one reminder to guests before an event, and a "this page ends soon" mail. All of them share one designed HTML layout.
 - Safety: Terms and Privacy pages, "Report this page", a review page for the site owner, takedowns, and "Delete my account and all my data".
 - Support page (optional): people can give any amount by UPI.
 - If a screen crashes it shows an error message instead of a blank page, popups keep keyboard focus, and the creator screens load only when needed so a shared page opens fast.
@@ -82,13 +82,17 @@ Node 22 is needed because the test helper in `packages/api/src/testing.ts` uses 
 |---|---|
 | `packages/schema` | Block registry, Zod validation, template stripping, guided questions, publish check, guest message cleaning, email check, limits |
 | `packages/renderer` | Turns page JSON into the page. Imports the schema as types only |
-| `packages/templates` | The 76 templates, validated when loaded |
+| `packages/templates` | The 76 templates (`festivals.ts`, `moments.ts`, `trending.ts`, `library.ts` and the JSON files), the occasion list and search. Validated when loaded |
 | `packages/ui` | Brand constants and theme tokens |
 | `packages/api` | The server, plain TypeScript with no Cloudflare imports: pages, photos, guest messages, email, reports, account deletion and the scheduled job. Holds `migrations/` |
-| `apps/studio` | The website, the Pages Functions that wrap the API (`functions/`), the deploy scripts (`scripts/`) and the security headers (`public/_headers`) |
+| `apps/studio` | The website, the Pages Functions that wrap the API (`functions/`), the deploy scripts (`scripts/`) the security headers (`public/_headers`) and the script that finishes them at build time (`scripts/finalize-headers.mjs`) |
 | `apps/preview` | A phone-frame page for working on templates (`pnpm renderer-lab`) |
 | `workers/mailer` | The scheduler Worker (`index.js`, `wrangler.toml`) |
 | `.github/workflows/ci.yml` | Typecheck, tests and build on every push, then migrations and deploy on `main` |
+| `.github/workflows/backup.yml` | A weekly encrypted export of the database |
+| `.github/workflows/uptime.yml` | Checks the site and the API every 15 minutes |
+| `scripts/` | `preflight.mjs`, which checks a deployed site |
+| `docs/` | `go-live.md`, the launch checklist |
 
 ## Setup
 
@@ -167,6 +171,16 @@ VITE_TURNSTILE_SITE_KEY=0x4AAAA...
 
 With GitHub Actions, add `VITE_CLERK_PUBLISHABLE_KEY` as a repository secret, and `VITE_SUPPORT_UPI` and `VITE_TURNSTILE_SITE_KEY` as repository variables.
 
+The workflows also use these. Set them under Settings, Secrets and variables, Actions:
+
+| Name | Kind | What it does |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | secrets | Deploying and the database backup |
+| `BACKUP_PASSPHRASE` | secret | Encrypts the weekly backup |
+| `CLERK_FRONTEND_HOST` | variable | Your production Clerk domain, like `clerk.yourdomain.com`. The build puts it in the security policy |
+| `CSP_ENFORCE` | variable | `1` turns the security policy from report-only into enforced |
+| `SITE_URL` | variable | Your main address. Turns on the uptime check |
+
 ## Database
 
 The schema is the numbered files in `packages/api/migrations/`, applied in order by Wrangler. Do not edit an old one, add the next number instead.
@@ -195,7 +209,13 @@ pnpm exec wrangler d1 execute madeforyou --remote --command "SELECT id, status, 
 
 The tests build their database from these same files, so a migration that does not apply makes the tests fail.
 
-Photos are stored in D1 by default. The limits are 25 MB per person, 1.5 MB per photo and 30 pages per person, and the free database holds 500 MB in total. To use R2 instead, create a bucket and uncomment the `r2_buckets` lines in `wrangler.toml` (Cloudflare asks for a card to turn R2 on).
+Photos are stored in D1 by default. The limits are 25 MB per person, 1.5 MB per photo and 30 pages per person, and the free database holds 500 MB in total. To use R2 instead, create a bucket and add this to `wrangler.toml` (Cloudflare asks for a card to turn R2 on):
+
+```toml
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "madeforyou-files"
+```
 
 Backup: `pnpm exec wrangler d1 export madeforyou --remote --output backup.sql`. Photos are in the database, so this includes them.
 
@@ -233,6 +253,8 @@ First check `TICK_URL` in `workers/mailer/wrangler.toml` (your main address plus
 3. "This page ends soon", a day before a page's end date, to the owner (needs `CLERK_SECRET_KEY`) and to the people the page was emailed to.
 4. Report mails. When a page is reported, its owner is told once, on the first open report, without the reporter's details (needs `CLERK_SECRET_KEY`). When you dismiss a report, that reporter (if they left an email address) and the owner are told. When you take a page down, every reporter with an email address and the owner are told. The reason you type on the review page goes into these mails and is saved with the takedown. These mails have no stop link because they are one-off notices, but an address that asked for no emails is skipped. A failed send never undoes your decision. `REPORT_EMAIL` is shown in them as the contact address.
 
+**How the mails look.** Every mail is built by one function in `packages/api/src/mailLayout.ts`: a logo header, a coloured status badge, a heading, the message, an optional quote, an info table, a "good to know" box, a button and a footer (with the stop link where it applies). It uses tables and inline styles, which email apps handle best, and every mail also has a plain text version. Text from users is always escaped.
+
 **How it avoids double sends.** Every email has a stop link that opens a confirmation page first, so a mail scanner that opens links cannot unsubscribe anyone. Once an address has stopped it is never emailed again. A delivery is marked in the log before it is sent, so two overlapping runs, or a server that dies half way, never send a second copy (if the outcome is unknown it is shown as failed with an explanation instead of being sent again). The daily total is kept under 280. The same scheduled run also removes pages deleted more than 30 days ago, photos no page uses, handled reports older than a year, sent-email records older than 90 days and visitor-limit counters older than a day.
 
 Without your own domain, mail goes out from your verified address through Brevo and can end up in spam if it is a Gmail-style address.
@@ -261,7 +283,7 @@ For a live build: `VITE_REMOTE=1 pnpm --filter @madeforyou/studio build` (PowerS
 | Package | Tests | What they cover |
 |---|---|---|
 | `schema` | 43 | validation, templates, guest message cleaning, email checks |
-| `templates` | 92 | every template validates, search |
+| `templates` | 16 per template, plus search | every template validates, every occasion has a template, search |
 | `renderer` | 104 | every block, forms, locks |
 | `api` | 145 | the whole server: gates, photos, publishing, guest messages, email, reports, deletion, limits, clean-up |
 | `studio` | 106 | full journeys through the real server (publish, report, restore, delete account, support, spam check), popups, crash handling, deploy helpers |
@@ -319,7 +341,7 @@ After a deploy, a quick manual check of the main flows:
 - **Abuse limits** on guest forms, reports (5 an hour per visitor, 20 a day per page), uploads, password tries, admin guesses and email.
 - **Privacy.** Visitor addresses are only kept as a hash. Deleting an account removes the person's data at once, and deleted pages go after 30 days. The Privacy page says the same.
 - **Headers.** `nosniff`, no framing, a strict referrer policy and a permissions policy on every page. Shared pages and invite links are `noindex`. The stop-emails page has its own strict content security policy.
-- **The Content-Security-Policy is report-only** (`apps/studio/public/_headers`), so it does not block anything yet. Before enforcing it, open the sign-in popup and a page with a guest form on the live site with the browser console open, look for "Content-Security-Policy-Report-Only" messages, fix the policy for anything that should be allowed, then rename the header to `Content-Security-Policy`.
+- **The Content-Security-Policy is report-only** (`apps/studio/public/_headers`), so it does not block anything yet. Before enforcing it, open the sign-in popup and a page with a guest form on the live site with the browser console open, look for "Content-Security-Policy-Report-Only" messages, fix the policy for anything that should be allowed, then rename the header to `Content-Security-Policy`. The build can do that for you: with `CSP_ENFORCE` set to `1` (and `CLERK_FRONTEND_HOST` set), `apps/studio/scripts/finalize-headers.mjs` renames the header and swaps the Clerk development host for yours. `node scripts/preflight.mjs https://yourdomain.com` then checks the result.
 - **Dependencies.** The code that runs on the site has no known vulnerabilities in the last audit. The remaining advisories are in the test runner (`vitest` 3 and its `tinypool`), which only runs on a developer's machine. Moving to vitest 4 would need the studio tests' use of Node's built-in SQLite to be reworked.
 - **Secrets** are never committed (`.env.*` and `.dev.vars` are git-ignored). If one leaks, set a new value and deploy again.
 
@@ -353,6 +375,7 @@ After a deploy, a quick manual check of the main flows:
 
 ## Notes for developers
 
+- **Adding a template**: add it to `festivals.ts`, `moments.ts` or `trending.ts` in `packages/templates/src`, using `tpl()` from `build.ts` and the small helpers in `parts.ts`. New occasions go in `occasions.ts`, and every occasion needs at least one template. Tag a template `trending` to put it in the trending sections. The template tests check each new template on their own.
 - **Adding a block**: define it in `packages/schema/src/blocks.ts`, register it in `registry.ts`, add a component in `packages/renderer/src/blocks.tsx` or `more.tsx` (and its table), and add a description in `apps/studio/src/editor/blockInfo.ts`. The field tags (`personal`, `guided`, `required`, `prompt`, `placeholder`) drive guided mode, template stripping and the publish check automatically.
 - **Editing rule**: never assign `block.fields` directly. Use `setField()`, which clears the placeholder flag and drops old translations of that field.
 - **Store selectors** must return a stable value. Select `s.pages` and build lists with `useMemo`. A selector that makes a new array on every call re-renders forever.

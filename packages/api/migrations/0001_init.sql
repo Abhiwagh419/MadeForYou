@@ -1,4 +1,4 @@
--- first schema
+
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE users (
@@ -11,8 +11,8 @@ CREATE TABLE pages (
   owner_id      TEXT NOT NULL REFERENCES users(id),
   title         TEXT NOT NULL,
   template_id   TEXT,
-  content       TEXT NOT NULL,                        -- validated JSON (settings + blocks)
-  slug          TEXT UNIQUE,                          -- NULL until published; freed on delete
+  content       TEXT NOT NULL,
+  slug          TEXT UNIQUE,
   status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
   visibility    TEXT NOT NULL DEFAULT 'unlisted' CHECK (visibility IN ('private', 'unlisted')),
   password_hash TEXT,
@@ -35,7 +35,6 @@ CREATE TABLE assets (
 );
 CREATE INDEX assets_owner ON assets (owner_id);
 
--- which photos a page uses
 CREATE TABLE page_assets (
   page_id  TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
   asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
@@ -55,7 +54,6 @@ CREATE TABLE templates (
 );
 CREATE INDEX templates_listing ON templates (visibility, status, created_at DESC);
 
--- rate limit counters
 CREATE TABLE throttle (
   key TEXT NOT NULL,
   at  INTEGER NOT NULL

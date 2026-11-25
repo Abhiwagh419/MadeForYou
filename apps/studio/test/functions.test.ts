@@ -55,7 +55,6 @@ describe("addresses Clerk may send people to", () => {
   it("are not rewritten by a redirect rule (a rule to /index.html sent /sign-in to the home page)", async () => {
     const { existsSync, readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    // a catch-all rule here would send /sign-in to index.html
     const file = join(process.cwd(), "public", "_redirects");
     const rules = existsSync(file) ? readFileSync(file, "utf8") : "";
     expect(rules).not.toMatch(/index\.html/);

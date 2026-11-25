@@ -16,7 +16,7 @@ type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
 const PAGE_ID = /^pg_[a-z0-9]{6,24}$/;
 const TEMPLATE_ID = /^[a-z0-9-]{2,40}$/;
-const GATE_TTL = 6 * 3600; // photo pass lasts 6 hours
+const GATE_TTL = 6 * 3600;
 const CONTRIB_TTL = 90 * 86400;
 const MAX_JSON_BYTES = 400_000;
 
@@ -364,7 +364,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const bytes = await getFile(c.env, id);
     if (!bytes) return notFound();
     const headers: Record<string, string> = { "Content-Type": asset.content_type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Accept-Ranges": "bytes" };
-    // safari will not play audio without range support
     const range = c.req.header("range")?.match(/^bytes=(\d*)-(\d*)$/);
     if (range && (range[1] || range[2])) {
       const size = bytes.byteLength;
@@ -400,7 +399,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const expected = block ? (SUBMISSION.blockKind as Record<string, SubmissionKind>)[block.type] : undefined;
     if (!block || expected !== input.kind) throw new HttpError(400, "That box is not on this page");
 
-    // hidden field, only bots fill it in
     if (typeof input.website === "string" && input.website !== "") return { ok: true, status: "approved" as const };
     if (typeof input.elapsedMs === "number" && input.elapsedMs < SUBMISSION.minFillMs) throw new HttpError(429, "Please take a moment before sending");
     if (!(await verifyTurnstile(c, input.turnstile))) throw new HttpError(403, "We could not confirm you are a person. Please try again.");
@@ -498,7 +496,6 @@ export function createApp(overrides: Partial<Deps> = {}) {
     const r = await publicRow(c, c.req.param("slug"));
     if (!r || r.visibility === "private") throw new HttpError(404, "Page not found");
     const b = await readJson<{ reason?: unknown; details?: unknown; contact?: unknown; website?: unknown; turnstile?: unknown }>(c);
-    // hidden field, only bots fill it in
     if (typeof b.website === "string" && b.website !== "") return c.json({ ok: true });
     if (!(await verifyTurnstile(c, b.turnstile))) throw new HttpError(403, "We could not confirm you are a person. Please try again.");
     const reason = (REASONS as readonly string[]).includes(String(b.reason)) ? (b.reason as (typeof REASONS)[number]) : null;

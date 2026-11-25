@@ -8,11 +8,6 @@ database_name = "madeforyou"
 database_id = "REPLACE_WITH_THE_ID_PRINTED_BY_wrangler_d1_create"
 migrations_dir = "../../packages/api/migrations"
 
-# photos are stored in D1 by default. To use R2 instead, create a bucket and uncomment:
-# [[r2_buckets]]
-# binding = "FILES"
-# bucket_name = "madeforyou-files"
-
 [vars]
 ALLOW_DEV_AUTH = "0"
-# secrets (SESSION_SECRET, CLERK_ISSUER, ADMIN_TOKEN, ...) are set with wrangler, not here
+

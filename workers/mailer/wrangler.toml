@@ -7,4 +7,4 @@ crons = ["*/15 * * * *"]
 
 [vars]
 TICK_URL = "https://madeforyou-9pj.pages.dev/api/cron/tick"
-# CRON_SECRET is set with: pnpm run mailer:secret
+

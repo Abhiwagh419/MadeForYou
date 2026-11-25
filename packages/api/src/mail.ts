@@ -5,7 +5,7 @@ import type { Deps, Env } from "./types";
 
 export { escHtml };
 
-export const DAILY_CAP = 280; // brevo free plan is 300 a day
+export const DAILY_CAP = 280;
 const PER_TICK = 25;
 const DAY = 86_400_000;
 const MAX_TRIES = 4;
@@ -230,7 +230,6 @@ export async function deliverOne(env: Env, deps: Deps, origin: string, id: strin
     return "retry";
   }
 
-  // mark it as sent before sending, so a crash can never cause a second email
   const key = `dl:${id}`;
   if (!(await claim(env, key, now))) return fail("The server stopped while sending this, so we cannot tell if it arrived. Please check with them, then send it again if needed.");
   const unsubscribeUrl = `${origin}/api/mail/unsub?t=${await unsubToken(env, d.to_email, now)}`;

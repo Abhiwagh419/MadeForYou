@@ -1,15 +1,12 @@
--- email
 
--- owner email, looked up from Clerk
+
 ALTER TABLE users ADD COLUMN email TEXT;
 ALTER TABLE users ADD COLUMN email_at TEXT;
 
--- RSVP reminder: remind_at is one day before event_at (UTC)
 ALTER TABLE submissions ADD COLUMN remind_at TEXT;
 ALTER TABLE submissions ADD COLUMN event_at TEXT;
 CREATE INDEX submissions_remind ON submissions (remind_at) WHERE remind_at IS NOT NULL;
 
--- pages scheduled to be emailed
 CREATE TABLE deliveries (
   id         TEXT PRIMARY KEY,
   page_id    TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
@@ -29,7 +26,6 @@ CREATE TABLE deliveries (
 CREATE INDEX deliveries_due ON deliveries (status, send_at);
 CREATE INDEX deliveries_page ON deliveries (page_id);
 
--- one row per email, so nothing is sent twice and the daily limit can be counted
 CREATE TABLE mail_log (
   key  TEXT PRIMARY KEY,
   at   TEXT NOT NULL,
@@ -37,7 +33,6 @@ CREATE TABLE mail_log (
 );
 CREATE INDEX mail_log_at ON mail_log (at);
 
--- addresses that opted out
 CREATE TABLE mail_blocks (
   email TEXT PRIMARY KEY,
   at    TEXT NOT NULL

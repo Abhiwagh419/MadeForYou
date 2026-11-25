@@ -1,4 +1,4 @@
--- reports and takedowns
+
 
 CREATE TABLE reports (
   id         TEXT PRIMARY KEY,
@@ -15,6 +15,5 @@ CREATE TABLE reports (
 CREATE INDEX reports_open ON reports (status, created_at DESC);
 CREATE INDEX reports_page ON reports (page_id);
 
--- set when the site owner takes a page down
 ALTER TABLE pages ADD COLUMN taken_down_at TEXT;
 ALTER TABLE pages ADD COLUMN takedown_reason TEXT;
