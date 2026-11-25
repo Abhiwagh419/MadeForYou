@@ -18,7 +18,25 @@ const providerProps = () => ({
   afterSignOutUrl: CLERK_ROUTES.after,
 });
 
-const HIDE_SWITCH_LINK = { elements: { footerAction: { display: "none" } } } as const;
+const look = {
+  variables: {
+    colorPrimary: "#E11D48",
+    colorText: "#4A0E1F",
+    colorTextSecondary: "#6E4A53",
+    colorBackground: "transparent",
+    colorInputBackground: "#ffffff",
+    fontFamily: "Poppins, system-ui, sans-serif",
+    borderRadius: "0.75rem",
+  },
+  elements: {
+    rootBox: { width: "100%" },
+    cardBox: { width: "100%", boxShadow: "none", border: "none", background: "transparent" },
+    card: { boxShadow: "none", border: "none", background: "transparent", padding: "0.25rem 0 0" },
+    header: { display: "none" },
+    footer: { background: "transparent" },
+    footerAction: { display: "none" },
+  },
+} as const;
 
 const oauthFlow = () => (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? "redirect" : "popup") as "redirect" | "popup";
 
@@ -49,9 +67,9 @@ function Inner({ onState, open, onClose }: Props) {
   return (
     <Sheet open={open && !isSignedIn} onClose={onClose} title={mode === "in" ? "Sign in to MadeForYou" : "Create your MadeForYou account"}>
       {mode === "in" ? (
-        <SignIn routing="virtual" oauthFlow={flow} signUpUrl={CLERK_ROUTES.signUpUrl} forceRedirectUrl={here} appearance={HIDE_SWITCH_LINK} />
+        <SignIn routing="virtual" oauthFlow={flow} signUpUrl={CLERK_ROUTES.signUpUrl} forceRedirectUrl={here} appearance={look} />
       ) : (
-        <SignUp routing="virtual" oauthFlow={flow} signInUrl={CLERK_ROUTES.signInUrl} forceRedirectUrl={here} appearance={HIDE_SWITCH_LINK} />
+        <SignUp routing="virtual" oauthFlow={flow} signInUrl={CLERK_ROUTES.signInUrl} forceRedirectUrl={here} appearance={look} />
       )}
       <p className="auth-switch">
         {mode === "in" ? "New to MadeForYou? " : "Already have an account? "}
@@ -73,9 +91,9 @@ export function AuthPage({ mode }: { mode: "in" | "up" }) {
   return (
     <ClerkProvider {...providerProps()}>
       {mode === "in" ? (
-        <SignIn routing="hash" signUpUrl={CLERK_ROUTES.signUpUrl} fallbackRedirectUrl={CLERK_ROUTES.after} />
+        <SignIn routing="hash" signUpUrl={CLERK_ROUTES.signUpUrl} fallbackRedirectUrl={CLERK_ROUTES.after} appearance={{ variables: look.variables }} />
       ) : (
-        <SignUp routing="hash" signInUrl={CLERK_ROUTES.signInUrl} fallbackRedirectUrl={CLERK_ROUTES.after} />
+        <SignUp routing="hash" signInUrl={CLERK_ROUTES.signInUrl} fallbackRedirectUrl={CLERK_ROUTES.after} appearance={{ variables: look.variables }} />
       )}
     </ClerkProvider>
   );

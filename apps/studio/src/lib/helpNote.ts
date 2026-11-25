@@ -21,7 +21,7 @@ const write = (s: Seen) => {
 };
 
 export function shouldAsk(moment: HelpMoment, seen: Seen, now: number): boolean {
-  if (moment === "publish") return !seen.publish;
+  if (moment === "publish") return true;
   return !seen.export || now - seen.export > DAY;
 }
 

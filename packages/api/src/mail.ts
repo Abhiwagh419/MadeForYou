@@ -1,6 +1,9 @@
 import { cleanEmail, type Content } from "@madeforyou/schema";
 import { readToken, signToken } from "./crypto";
+import { escHtml, render, type Fact, type Tone } from "./mailLayout";
 import type { Deps, Env } from "./types";
+
+export { escHtml };
 
 export const DAILY_CAP = 280; // brevo free plan is 300 a day
 const PER_TICK = 25;
@@ -142,47 +145,24 @@ export async function ownerEmail(env: Env, deps: Deps, userId: string, now: numb
   }
 }
 
-export const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const nl = (s: string) => escHtml(s).replace(/\r?\n/g, "<br>");
-
-interface Layout { preheader: string; heading: string; paragraphs: string[]; quote?: string; button?: { label: string; url: string }; small?: string[]; footer: string; unsubscribeUrl: string }
-
-function render(l: Layout): { html: string; text: string } {
-  const p = (t: string) => `<p style="margin:0 0 14px;font-size:16px;line-height:1.55;color:#4A0E1F">${nl(t)}</p>`;
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#FFF8F0">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escHtml(l.preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8F0"><tr><td align="center" style="padding:28px 14px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:20px;border:1px solid #F3DCCB">
-<tr><td style="padding:30px 28px 26px;font-family:Helvetica,Arial,sans-serif">
-<div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#4A0E1F;margin:0 0 18px">${escHtml(l.heading)}</div>
-${l.paragraphs.map(p).join("")}
-${l.quote ? `<div style="margin:6px 0 18px;padding:12px 16px;border-left:3px solid #E11D48;background:#FFF8F0;border-radius:6px;font-family:Georgia,serif;font-style:italic;font-size:16px;line-height:1.5;color:#4A0E1F">${nl(l.quote)}</div>` : ""}
-${l.button ? `<p style="margin:22px 0"><a href="${escHtml(l.button.url)}" style="display:inline-block;background:#E11D48;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:13px 26px;border-radius:999px">${escHtml(l.button.label)}</a></p>` : ""}
-${(l.small ?? []).map((t) => `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#7E626A">${nl(t)}</p>`).join("")}
-</td></tr></table>
-<p style="max-width:520px;margin:16px auto 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#7E626A;text-align:center">${escHtml(l.footer)}<br><a href="${escHtml(l.unsubscribeUrl)}" style="color:#7E626A">Stop emails like this</a></p>
-</td></tr></table></body></html>`;
-  const text = [l.heading, "", ...l.paragraphs.flatMap((t) => [t, ""]), ...(l.quote ? [`"${l.quote}"`, ""] : []), ...(l.button ? [`${l.button.label}: ${l.button.url}`, ""] : []), ...(l.small ?? []), "", l.footer, `Stop emails like this: ${l.unsubscribeUrl}`].join("\n");
-  return { html, text };
-}
-
 interface PageLite { id: string; title: string; slug: string; password_hash?: string | null; unlock_at?: string | null; expires_at?: string | null }
 const pageUrl = (origin: string, p: PageLite) => `${origin}/p/${p.slug}`;
 
 export function deliveryEmail(o: { origin: string; page: PageLite; fromName: string; toName: string; note: string; unsubscribeUrl: string; now: number }) {
-  const small: string[] = [];
+  const notes: string[] = [];
   const unlock = o.page.unlock_at ? Date.parse(o.page.unlock_at) : NaN;
-  if (!Number.isNaN(unlock) && unlock > o.now) small.push(`It opens on ${fmtDate(unlock, true)}. Before that, it stays closed.`);
-  if (o.page.password_hash) small.push(`It is protected with a password. ${o.fromName} will tell you what it is.`);
+  if (!Number.isNaN(unlock) && unlock > o.now) notes.push(`It opens on ${fmtDate(unlock, true)}. Before that, it stays closed.`);
+  if (o.page.password_hash) notes.push(`It is protected with a password. ${o.fromName} will tell you what it is.`);
   const end = o.page.expires_at ? Date.parse(o.page.expires_at) : NaN;
-  if (!Number.isNaN(end)) small.push(`It can be opened until ${fmtDate(end, true)}.`);
+  if (!Number.isNaN(end)) notes.push(`It can be opened until ${fmtDate(end, true)}.`);
   const r = render({
     preheader: `${o.fromName} made a page just for you.`,
+    badge: { label: "A page for you", tone: "rose" },
     heading: o.toName ? `Hi ${o.toName},` : "Hello,",
-    paragraphs: [`${o.fromName} made a little page just for you.`],
-    quote: o.note || undefined,
+    paragraphs: [`${o.fromName} made a little page just for you.`, "It is a few minutes of something personal. Open it on your phone whenever you are ready."],
+    quote: o.note ? { label: `A note from ${o.fromName}`, text: o.note } : undefined,
+    notes,
     button: { label: "Open your page", url: pageUrl(o.origin, o.page) },
-    small,
     footer: `You got this because ${o.fromName} asked MadeForYou to send it to you. MadeForYou helps people make free personal pages.`,
     unsubscribeUrl: o.unsubscribeUrl,
   });
@@ -190,21 +170,23 @@ export function deliveryEmail(o: { origin: string; page: PageLite; fromName: str
 }
 
 export function eventReminderEmail(o: { origin: string; page: PageLite; ev: EventInfo; name: string; unsubscribeUrl: string }) {
-  const small: string[] = [];
-  if (o.ev.place) small.push(`Where: ${o.ev.place}`);
-  if (o.ev.mapsLink) small.push(`Map: ${o.ev.mapsLink}`);
-  if (o.ev.note) small.push(o.ev.note);
   const title = o.ev.title || o.page.title;
+  const when = fmtDate(o.ev.at, o.ev.hasTime);
+  const facts: Fact[] = [{ label: "What", value: title }, { label: "When", value: when }];
+  if (o.ev.place) facts.push({ label: "Where", value: o.ev.place });
+  if (o.ev.mapsLink) facts.push({ label: "Map", value: "Open in Maps", href: o.ev.mapsLink });
+  if (o.ev.note) facts.push({ label: "Note", value: o.ev.note });
   const r = render({
-    preheader: `${title}: ${fmtDate(o.ev.at, o.ev.hasTime)}`,
-    heading: `Hi ${o.name}, a reminder`,
-    paragraphs: [`${title} is coming up on ${fmtDate(o.ev.at, o.ev.hasTime)}.`, "You asked us to remind you when you replied on the page."],
+    preheader: `${title}: ${when}`,
+    badge: { label: "Reminder", tone: "amber" },
+    heading: `Hi ${o.name}, it is almost time`,
+    paragraphs: [`${title} is coming up on ${when}.`, "You asked us to remind you when you replied on the page."],
+    facts,
     button: { label: "Open the page", url: pageUrl(o.origin, o.page) },
-    small,
     footer: "This is the only reminder you will get for this event. MadeForYou helps people make free personal pages.",
     unsubscribeUrl: o.unsubscribeUrl,
   });
-  return { subject: `Reminder: ${title}, ${fmtDate(o.ev.at, o.ev.hasTime)}`, ...r };
+  return { subject: `Reminder: ${title}, ${when}`, ...r };
 }
 
 export function endingEmail(o: { origin: string; page: PageLite; endsAt: number; audience: "owner" | "recipient"; fromName?: string; unsubscribeUrl: string }) {
@@ -212,10 +194,12 @@ export function endingEmail(o: { origin: string; page: PageLite; endsAt: number;
   const when = fmtDate(o.endsAt, true);
   const r = render({
     preheader: `${owner ? "Your page" : "A page for you"} switches off on ${when}.`,
+    badge: { label: "Ending soon", tone: "amber" },
     heading: owner ? "Your page ends soon" : "This page ends soon",
     paragraphs: owner
       ? [`“${o.page.title}” switches off on ${when}. After that, anyone who opens the link sees that it has ended.`, "To keep it open longer, change the end date and update the page."]
       : [`${o.fromName ? `The page ${o.fromName} made for you` : "The page made for you"} switches off on ${when}. Open it before then if you want to see it again.`],
+    facts: [{ label: "Page", value: o.page.title }, { label: "Switches off", value: when }],
     button: owner ? { label: "Change the end date", url: `${o.origin}/#/publish/${o.page.id}` } : { label: "Open the page", url: pageUrl(o.origin, o.page) },
     footer: "MadeForYou helps people make free personal pages.",
     unsubscribeUrl: o.unsubscribeUrl,
@@ -363,10 +347,24 @@ export async function notifyReport(env: Env, deps: Deps, o: { origin: string; sl
   const to = cleanEmail(env.REPORT_EMAIL ?? "") ?? mailConfig(env)?.from;
   if (!to || !mailConfig(env)) return;
   const link = `${o.origin}/#/admin`;
-  const lines = [`Page: ${o.title} (${o.origin}/p/${o.slug})`, `Reason: ${o.reason}`, o.details ? `Details: ${o.details}` : "", o.contact ? `Reporter: ${o.contact}` : "", `Reports on this page so far: ${o.count}`].filter(Boolean);
-  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#4A0E1F;line-height:1.5"><h2 style="font-family:Georgia,serif">A page was reported</h2>${lines.map((l) => `<p style="margin:0 0 8px">${escHtml(l)}</p>`).join("")}<p><a href="${escHtml(link)}">Open the review page</a></p></div>`;
+  const facts: Fact[] = [
+    { label: "Page", value: o.title, href: `${o.origin}/p/${o.slug}` },
+    { label: "Reason", value: o.reason },
+  ];
+  if (o.details) facts.push({ label: "Details", value: o.details });
+  if (o.contact) facts.push({ label: "Reporter", value: o.contact, href: cleanEmail(o.contact) ? `mailto:${o.contact}` : undefined });
+  facts.push({ label: "Reports so far", value: String(o.count) });
+  const mail = render({
+    preheader: `${o.title} was reported: ${o.reason}`,
+    badge: { label: "Needs review", tone: "rose" },
+    heading: "A page was reported",
+    paragraphs: ["Someone flagged a page on MadeForYou. Have a look and decide whether it stays online."],
+    facts,
+    button: { label: "Open the review page", url: link },
+    footer: "You get this because you look after MadeForYou.",
+  });
   try {
-    await sendMail(env, deps, { to, subject: `Page reported: ${o.title}`.slice(0, 120), html, text: `${lines.join("\n")}\n\nReview: ${link}` });
+    await sendMail(env, deps, { to, subject: `Page reported: ${o.title}`.slice(0, 120), html: mail.html, text: mail.text });
   } catch {}
 }
 
@@ -381,11 +379,21 @@ export const contactAddress = (env: Env) => cleanEmail(env.REPORT_EMAIL ?? "") ?
 
 export const reportReasonWords = (reason: string) => REPORT_REASON_WORDS[reason] ?? reason;
 
-async function sendNotice(env: Env, deps: Deps, to: string, subject: string, heading: string, paragraphs: string[], quote?: { label: string; text: string }): Promise<void> {
-  const html = `<div style="font-family:Helvetica,Arial,sans-serif;color:#4A0E1F;line-height:1.55;max-width:520px"><h2 style="font-family:Georgia,serif;margin:0 0 14px">${escHtml(heading)}</h2>${paragraphs.map((p) => `<p style="margin:0 0 12px">${nl(p)}</p>`).join("")}${quote ? `<p style="margin:0 0 4px;font-size:13px;color:#7E626A">${escHtml(quote.label)}</p><div style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #E11D48;background:#FFF8F0">${nl(quote.text)}</div>` : ""}</div>`;
-  const text = [heading, "", ...paragraphs.flatMap((p) => [p, ""]), ...(quote ? [`${quote.label}`, quote.text] : [])].join("\n");
+interface Notice { badge: { label: string; tone: Tone }; facts?: Fact[]; button?: { label: string; url: string } }
+
+async function sendNotice(env: Env, deps: Deps, to: string, subject: string, heading: string, paragraphs: string[], quote: { label: string; text: string } | undefined, extra: Notice): Promise<void> {
+  const mail = render({
+    preheader: paragraphs[0] ?? heading,
+    badge: extra.badge,
+    heading,
+    paragraphs,
+    quote,
+    facts: extra.facts,
+    button: extra.button,
+    footer: "MadeForYou helps people make free personal pages.",
+  });
   try {
-    await sendMail(env, deps, { to, subject: subject.slice(0, 120), html, text });
+    await sendMail(env, deps, { to, subject: subject.slice(0, 120), html: mail.html, text: mail.text });
   } catch {}
 }
 
@@ -397,7 +405,11 @@ export async function notifyOwnerReported(env: Env, deps: Deps, o: { ownerId: st
     `Your page “${o.title}” (${o.origin}/p/${o.slug}) was reported because ${reportReasonWords(o.reason)}.`,
     "It is still online while we take a look. We will write to you again with what we decide, and why.",
     ...(o.contactEmail ? [`If you have something to tell us about it, write to ${o.contactEmail}.`] : []),
-  ]);
+  ], undefined, {
+    badge: { label: "Report received", tone: "amber" },
+    facts: [{ label: "Page", value: o.title, href: `${o.origin}/p/${o.slug}` }, { label: "Status", value: "Still online while we review it" }],
+    button: { label: "Open your page", url: `${o.origin}/p/${o.slug}` },
+  });
 }
 
 export async function notifyDecision(
@@ -425,6 +437,10 @@ export async function notifyDecision(
         ...(note ? [] : ["We did not add a note."]),
       ],
       note ? { label: "Our reason", text: note } : undefined,
+      {
+        badge: removed ? { label: "Page removed", tone: "rose" } : { label: "Report reviewed", tone: "green" },
+        facts: [{ label: "Page", value: o.title }, { label: "Decision", value: removed ? "Taken down" : "Left online" }],
+      },
     );
   }
 
@@ -438,6 +454,11 @@ export async function notifyDecision(
         ? [`After a report, we looked at “${o.title}” and took it down. It can no longer be opened, and it cannot be published again for now.`, ...(o.contactEmail ? [`If you think this was a mistake, write to ${o.contactEmail}.`] : [])]
         : [`Someone reported “${o.title}” (${o.origin}/p/${o.slug}). We looked at it and decided there was nothing wrong. It stays online and you do not need to do anything.`],
       note ? { label: "Our reason", text: note } : undefined,
+      {
+        badge: removed ? { label: "Page removed", tone: "rose" } : { label: "Page stays online", tone: "green" },
+        facts: [{ label: "Page", value: o.title }, { label: "Decision", value: removed ? "Taken down" : "Left online" }],
+        button: removed ? undefined : { label: "Open your page", url: `${o.origin}/p/${o.slug}` },
+      },
     );
   }
 }

@@ -292,9 +292,9 @@ describe("Support us", () => {
 
 describe("promos and the help note", () => {
   const DAY = 86_400_000;
-  it("asks once after a first publish, and at most once a day after downloads", () => {
+  it("asks after every publish, and at most once a day after downloads", () => {
     expect(shouldAsk("publish", {}, 1)).toBe(true);
-    expect(shouldAsk("publish", { publish: 1 }, 99 * DAY)).toBe(false);
+    expect(shouldAsk("publish", { publish: 1 }, 99 * DAY)).toBe(true);
     expect(shouldAsk("export", {}, 1)).toBe(true);
     expect(shouldAsk("export", { export: 1000 }, 1000 + DAY / 2)).toBe(false);
     expect(shouldAsk("export", { export: 1000 }, 1000 + DAY + 1)).toBe(true);
@@ -320,7 +320,8 @@ describe("promos and the help note", () => {
     expect(([...dialog.querySelectorAll("a")].find((a) => a.textContent?.includes("Help keep it running")) as HTMLAnchorElement).getAttribute("href")).toBe("#/support");
     await act(async () => closeHelpNote());
     await act(async () => askForHelp("publish"));
-    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("A small favour");
+    await act(async () => closeHelpNote());
   });
 
   it("opens after the QR code is downloaded on the share screen", async () => {
