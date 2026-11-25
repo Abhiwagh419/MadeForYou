@@ -6,7 +6,7 @@ export interface Legal { title: string; updated: string; summary: string; sectio
 
 const who = `${BRAND.name}, run by ${BRAND.operator} in Mumbai, India`;
 const mail = BRAND.contactEmail;
-export const LEGAL_UPDATED = "15 November 2026";
+export const LEGAL_UPDATED = "25 November 2026";
 
 export const TERMS: Legal = {
   title: "Terms of use",
@@ -50,7 +50,7 @@ export const PRIVACY: Legal = {
       "Your pages. The words, photos, voice notes, dates, music and video links, and settings you add, so that your page can open for the people you share it with. A page password is kept only in scrambled form.",
       "Messages from visitors. If you add a wishes wall, reply box or RSVP, visitors can send a name, a message, an answer, the number of guests and a note. If a guest asks for an event reminder, they can also add an email address. You, the page owner, can see these.",
       "Emails you send. The address you send to, their name, your name, your note and the send time, so that we can send it and honour a request to stop.",
-      "Reports. If someone reports a page, we keep the reason, what they wrote and the contact they chose to give.",
+      "Reports. If someone reports a page, we keep the reason, what they wrote and the contact they chose to give. We email the page's owner to say it was reported (without saying who reported it), and when we decide, we email the owner and anyone who gave an email address, with our reason. These are one-off notes about that report, not a mailing.",
       "Support payments. If you choose to support MadeForYou, you pay through your own UPI app. We never see your bank details. We only see what appears on a bank statement, such as your name or UPI ID and the amount, and we use it only to say thank you.",
       "Visitor addresses. To stop spam and guessing of passwords we use a visitor's internet address, but we keep it only in a scrambled form that cannot be turned back into the address.",
     ] },

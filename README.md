@@ -138,7 +138,7 @@ Set each one with `pnpm exec wrangler pages secret put NAME --project-name madef
 | `MAIL_FROM_NAME` | optional | The sender name. Default: MadeForYou |
 | `CRON_SECRET` | for email and clean-up | A long random text, also given to the scheduler (below) |
 | `CLERK_SECRET_KEY` | optional | Lets the server find an owner's email for "ends soon", and remove the Clerk login when an account is deleted |
-| `REPORT_EMAIL` | optional | Where "page reported" notes go. Default: `MAIL_FROM` |
+| `REPORT_EMAIL` | optional | Where "page reported" notes go, and the contact address shown in report emails. Default: `MAIL_FROM` |
 | `PUBLIC_URL` | recommended | Your main address, such as `https://madeforyou-9pj.pages.dev`. Used in email links so they never show a one-off deploy address |
 | `TURNSTILE_SECRET` | optional | The Turnstile secret key. Set it together with `VITE_TURNSTILE_SITE_KEY` |
 | `ALLOWED_ORIGIN` | optional | One extra origin allowed to call the API (only if the website is served from a different address) |
@@ -227,6 +227,7 @@ Check `TICK_URL` in `workers/mailer/wrangler.toml` first (your main address plus
 1. A page emailed to someone, now or on a date you choose (Share screen). Up to 5 people per page and 10 emails a day per owner.
 2. One reminder for guests who left an email on the RSVP, a day before the event. The address is asked for only for that, and only from guests who said yes or maybe. It stays with the guest's reply, which the page's owner can see, until the reply, the page or the account is deleted.
 3. "This page ends soon", a day before a page's end date, to the owner (needs `CLERK_SECRET_KEY`) and to people the page was emailed to.
+4. **Report notes.** When a page is reported, its owner is told once, on the first open report, without the reporter's details (needs `CLERK_SECRET_KEY` to find the owner's email). When you dismiss a report, that reporter (if they left an email address) and the owner are told. When you take a page down, every reporter with an email address and the owner are told. The reason you type on the review page goes in these emails and is stored with the takedown. They have no stop link, because they are one-off notices about something that happened, but an address that asked for no emails is skipped. A failed send never undoes your decision. `REPORT_EMAIL` is also shown in them as the contact address.
 
 **How it stays safe.** Every email has a stop link that opens a confirmation page, so mail scanners cannot trigger it; a stopped address is never emailed again by anyone. A delivery is marked in the log *before* it is sent, so two overlapping runs, or a server that stops half-way, can never send a second copy (a delivery whose outcome is unknown is shown as failed with an explanation, rather than being sent again). The daily total is held under 280. The same scheduled run also removes pages deleted more than 30 days ago, photos no page uses, handled reports older than a year, sent-email records older than 90 days and visitor-limit counters older than a day.
 
@@ -263,6 +264,10 @@ For a live build: `VITE_REMOTE=1 pnpm --filter @madeforyou/studio build` (PowerS
 
 There is no separate linter or formatter. `pnpm typecheck` includes the compiler's unused-code checks, which is what keeps dead code out. Check the dependencies with `pnpm audit --prod` (the code that runs on the site) and `pnpm audit` (adds the build and test tools).
 
+### The help pop-up and promos
+
+If `VITE_SUPPORT_UPI` is set, a small "A small favour" pop-up explains that the site runs on limited resources and links to the support page. It opens once after a first publish, and after the story picture or QR code is downloaded (at most once a day per device). It is controlled by `apps/studio/src/lib/helpNote.ts`. Pages people receive end with "Reply with a page" and "Create a page like this" links back to the site, and the support card also appears on the home page and My pages. With no UPI ID set, none of the support prompts appear.
+
 ## Deployment
 
 **By hand** (the usual way), in `apps/studio`:
@@ -282,7 +287,8 @@ pnpm run cf:deploy
 
 - **Your review page**: `#/admin`, with your `ADMIN_TOKEN`. Open a reported page, dismiss the report, take the page down (its owner cannot publish it again) or restore it. It also shows how many people, pages and photos there are, and how full the database is. The same numbers: `GET /api/admin/usage` with the header `x-admin-token`.
 - **Public templates** made by users go through you: `GET /api/admin/templates/pending`, then `POST /api/admin/templates/<id>/approve` or `reject`. A rejected template stays rejected when its owner saves it again.
-- **Reports** arrive by email (if email is on) and wait in the review page.
+- **Reports** arrive by email (if email is on) and wait in the review page. Each report has a reason box: what you write is emailed to the reporter and the page's owner when you dismiss or take down, and is kept with the takedown.
+- **Restoring** a page clears the takedown on the server. Owners' browsers pick this up the next time they open their pages or the Publish screen, so a restored page can be published again without clearing anything.
 - **Weekly**: take a backup (see Database setup).
 - **Updating**: copy the new files over the project, `pnpm install`, `pnpm test`, `pnpm run cf:deploy`.
 - **Terms and Privacy** are the pages `#/terms` and `#/privacy`; the words are in `apps/studio/src/lib/legal.ts`. **If you change what the app stores or which companies handle data, change the Privacy page too.**

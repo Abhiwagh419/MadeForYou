@@ -39,7 +39,7 @@ export function ReportDialog({ slug, onClose }: { slug: string; onClose: () => v
     <Sheet open onClose={onClose} title="Report this page">
       {state === "done" ? (
         <div className="report">
-          <p>Thank you. We have your report and will look at it. If you wrote an email or phone number we may contact you.</p>
+          <p>Thank you. We have your report and will look at it. If you gave an email address, we will write to you with what we decided and why. A phone number is only used if we need to ask you something.</p>
           <div><Button onClick={onClose}>Close</Button></div>
         </div>
       ) : (
