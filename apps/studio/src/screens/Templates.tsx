@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Template } from "@madeforyou/schema";
-import { OCCASIONS, searchTemplates } from "@madeforyou/templates";
+import { OCCASIONS, isTrending, searchTemplates } from "@madeforyou/templates";
 import { useRoute } from "../lib/router";
 import { startFromScratch } from "../lib/actions";
 import { useAllTemplates } from "../state/library";
@@ -16,12 +16,13 @@ export function Templates() {
   const q = useRoute().query.get("q") ?? "";
   const [mood, setMood] = useState<Mood>("all");
   const [lang, setLang] = useState<"all" | "hi">("all");
+  const [show, setShow] = useState<"all" | "trending">("all");
 
   const { all, mineIds } = useAllTemplates();
   const res = useMemo(() => searchTemplates(q, all), [q, all]);
 
   const shown = res.results.filter(
-    (t) => (mood === "all" || t.meta.moods.includes(mood)) && (lang === "all" || t.meta.languages.includes("hi")),
+    (t) => (mood === "all" || t.meta.moods.includes(mood)) && (lang === "all" || t.meta.languages.includes("hi")) && (show === "all" || isTrending(t)),
   );
 
   const similar: Template[] = useMemo(() => {
@@ -39,6 +40,8 @@ export function Templates() {
         <div className="filters">
           <Segmented<Mood> value={mood} onChange={setMood} label="Mood"
             options={[{ value: "all", label: "All moods" }, { value: "romantic", label: "Romantic" }, { value: "emotional", label: "Emotional" }, { value: "festive", label: "Festive" }, { value: "funny", label: "Funny" }]} />
+          <Segmented<"all" | "trending"> value={show} onChange={setShow} label="Show"
+            options={[{ value: "all", label: "Everything" }, { value: "trending", label: "Trending" }]} />
           <Segmented<"all" | "hi"> value={lang} onChange={setLang} label="Language"
             options={[{ value: "all", label: "Any language" }, { value: "hi", label: "हिन्दी" }]} />
         </div>
@@ -61,7 +64,7 @@ export function Templates() {
             </p>
             <div className="empty-actions">
               {q && <Button icon="plus" size="lg" onClick={() => startFromScratch(q)}>Create the first one</Button>}
-              {!q && <Button variant="secondary" onClick={() => { setMood("all"); setLang("all"); }}>Clear filters</Button>}
+              {!q && <Button variant="secondary" onClick={() => { setMood("all"); setLang("all"); setShow("all"); }}>Clear filters</Button>}
             </div>
             {q && similar.length > 0 && (
               <>

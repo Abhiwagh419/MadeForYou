@@ -23,6 +23,7 @@ export interface TemplateSpec {
   tags?: string[];
   theme: string;
   opening?: string | null;
+  openingKind?: "envelope" | "giftbox" | "curtain" | "diary";
   ambience?: Settings["ambience"]["kind"];
   tap?: Settings["tap"];
   blocks: BlockSpec[];
@@ -44,7 +45,7 @@ export function tpl(spec: TemplateSpec): Template {
   });
 
   const settings = SettingsSchema.parse({
-    opening: spec.opening ? { kind: "envelope", text: spec.opening } : { kind: "none" },
+    opening: spec.opening ? { kind: spec.openingKind ?? "envelope", text: spec.opening } : { kind: "none" },
     theme: { preset: spec.theme },
     ambience: { kind: spec.ambience ?? "none", intensity: "low" },
     tap: spec.tap ?? "none",

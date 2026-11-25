@@ -28,7 +28,7 @@ The product name, the operator name and the contact email are all in one file: `
 ## Features
 
 - 26 blocks: hero, featured photo, gallery, timeline, days together, video, text, letter, quote or shayari, reasons list, promises or bucket list, open-when letters, countdown, scratch card, the ask, quiz, memory match, event details (with add to calendar), buttons and links, divider, signature, voice note, map, wishes wall, reply box and RSVP.
-- 19 templates and 3 themes (Rose garden, Marigold sun, Midnight stars). Guided mode asks a few questions, and the editor (with a phone preview) is there for everything else.
+- 76 templates (festivals, life events and a trending set inspired by Instagram formats) and 3 themes (Rose garden, Marigold sun, Midnight stars). Guided mode asks a few questions, and the editor (with a phone preview) is there for everything else.
 - Photo cropping: the person picks the part of the photo to show and the page shows exactly that crop.
 - Sharing: link, WhatsApp card, QR code, a 1080 x 1920 story picture, a password, an "opens on" date, an end date and a private mode.
 - Guest messages: wishes (the owner approves them), replies and RSVPs, which the owner reads in an inbox. A friend can add a wish through an invite link without seeing the page.
@@ -82,7 +82,7 @@ Node 22 is needed because the test helper in `packages/api/src/testing.ts` uses 
 |---|---|
 | `packages/schema` | Block registry, Zod validation, template stripping, guided questions, publish check, guest message cleaning, email check, limits |
 | `packages/renderer` | Turns page JSON into the page. Imports the schema as types only |
-| `packages/templates` | The 19 templates, validated when loaded |
+| `packages/templates` | The 76 templates, validated when loaded |
 | `packages/ui` | Brand constants and theme tokens |
 | `packages/api` | The server, plain TypeScript with no Cloudflare imports: pages, photos, guest messages, email, reports, account deletion and the scheduled job. Holds `migrations/` |
 | `apps/studio` | The website, the Pages Functions that wrap the API (`functions/`), the deploy scripts (`scripts/`) and the security headers (`public/_headers`) |
@@ -199,6 +199,8 @@ Photos are stored in D1 by default. The limits are 25 MB per person, 1.5 MB per 
 
 Backup: `pnpm exec wrangler d1 export madeforyou --remote --output backup.sql`. Photos are in the database, so this includes them.
 
+A weekly encrypted backup also runs from `.github/workflows/backup.yml` (Sundays, and on demand from the Actions tab). Add a `BACKUP_PASSPHRASE` secret first, keep the repository private because the backup holds user data, and download the file now and then to keep a copy outside GitHub. To restore: `openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_PASSPHRASE -in backup.sql.enc -out backup.sql`.
+
 ## Login (Clerk)
 
 1. Create an application at dashboard.clerk.com and turn on the sign-in methods you want (email and Google work out of the box).
@@ -268,7 +270,7 @@ There is no separate linter or formatter. `pnpm typecheck` already includes the 
 
 ### Help pop-up and promos
 
-When `VITE_SUPPORT_UPI` is set, a small "A small favour" pop-up says the site runs on limited resources and links to the support page. It opens once after a first publish, and after the story picture or QR code is downloaded (at most once a day per device). The rules are in `apps/studio/src/lib/helpNote.ts`. Pages people receive end with a "Made with MadeForYou" block with "Reply with a page" and "Create a page like this" links back to the site (the owner does not see it on their own page in live mode). The support card also shows on the home page, My pages and the Share screen. With no UPI ID set, none of the support prompts appear.
+When `VITE_SUPPORT_UPI` is set, a small "A small favour" pop-up says the site runs on limited resources and links to the support page. It opens after every publish, and after the story picture or QR code is downloaded (at most once a day per device). The rules are in `apps/studio/src/lib/helpNote.ts`. Pages people receive end with a "Made with MadeForYou" block with "Reply with a page" and "Create a page like this" links back to the site (the owner does not see it on their own page in live mode). The support card also shows on the home page, My pages and the Share screen. With no UPI ID set, none of the support prompts appear.
 
 "Create a page like this" goes to the template list (`/#/templates`), not to the exact template, because the public page data does not include the template id.
 
@@ -358,3 +360,7 @@ After a deploy, a quick manual check of the main flows:
 - **Link previews**: `/p/<link>` is rendered by `functions/p/[slug].ts`, which fills in the WhatsApp card. Locked, private and password pages get a generic card.
 - **Links** are stored only as https, http, mailto or tel. Videos are stored only as provider and id, and YouTube loads only when tapped.
 - **The server has no Cloudflare imports**, so it can run and be tested against a D1-shaped SQLite. New routes go in `packages/api/src/app.ts` with a test next to the existing ones.
+
+## Going live
+
+See `docs/go-live.md` for the full checklist (domain, Clerk, email, Turnstile, mailer, security headers, backups, monitoring). `node scripts/preflight.mjs https://yourdomain.com` checks a deployment against it.

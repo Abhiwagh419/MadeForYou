@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getTemplate, templates } from "@madeforyou/templates";
+import { getTemplate, isTrending, templates } from "@madeforyou/templates";
 import { Button } from "../ui/Button";
 import { SupportNudge } from "../ui/Promo";
 import { Shell } from "../ui/Shell";
@@ -8,7 +8,8 @@ import { PhoneThumb } from "../ui/Thumb";
 import { TemplateCard } from "../ui/TemplateCard";
 import { startFromScratch } from "../lib/actions";
 
-const CHIPS = ["Mother's Day", "Girlfriend's Day", "Birthday", "Raksha Bandhan", "Diwali", "Anniversary", "Farewell", "Thank you", "Sorry"];
+const CHIPS = ["Trending", "Mother's Day", "Girlfriend's Day", "Birthday", "Raksha Bandhan", "Diwali", "Navratri", "Karwa Chauth", "Anniversary", "Wrapped", "Farewell", "Thank you", "Sorry"];
+const TRENDING = ["our-wrapped", "green-flags-list", "soft-launch-reveal", "photo-dump-of-the-year", "yes-but-loving-roast", "story-of-us-documentary"];
 const HERO = ["raksha-bandhan-bond", "mothers-day-letter", "girlfriends-day-love"];
 const POPULAR = ["mothers-day-letter", "girlfriends-day-love", "birthday-countdown", "raksha-bandhan-bond", "fathers-day-note", "diwali-wishes"];
 
@@ -21,6 +22,7 @@ const STEPS = [
 export function Home() {
   const hero = useMemo(() => HERO.map((id) => getTemplate(id)).filter(Boolean), []);
   const popular = useMemo(() => POPULAR.map((id) => getTemplate(id)).filter(Boolean), []);
+  const trendingNow = useMemo(() => TRENDING.map((id) => getTemplate(id)).filter((t) => t && isTrending(t)), []);
 
   return (
     <Shell>
@@ -56,6 +58,18 @@ export function Home() {
       </section>
 
       <section className="section section-tint">
+        <div className="wrap">
+          <div className="section-head">
+            <h2>Trending right now</h2>
+            <Button href="#/templates?q=trending" variant="ghost" iconRight="right">See all trending</Button>
+          </div>
+          <div className="tgrid">
+            {trendingNow.map((t) => t && <TemplateCard key={t.meta.id} template={t} />)}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
         <div className="wrap">
           <h2 className="center">Three minutes, start to finish</h2>
           <ol className="steps">

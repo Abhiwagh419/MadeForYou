@@ -370,11 +370,11 @@ describe("Signing in stays on our site", () => {
 describe("The spam check on guest forms", () => {
   const KEY = "1x00000000000000000000AA";
   let rendered: Record<string, any>[] = [];
-  const fakeTurnstile = (answer: "pass" | "fail") => {
+  const fakeTurnstile = (answer: "pass" | "fail", delay = 5) => {
     rendered = [];
     window.turnstile = {
       render: (_el, opts) => { rendered.push(opts); return `w${rendered.length}`; },
-      execute: () => { setTimeout(() => (answer === "pass" ? rendered.at(-1)!.callback("good") : rendered.at(-1)!["error-callback"]()), 5); },
+      execute: () => { setTimeout(() => (answer === "pass" ? rendered.at(-1)!.callback("good") : rendered.at(-1)!["error-callback"]()), delay); },
       remove: () => {},
     };
   };
@@ -425,7 +425,7 @@ describe("The spam check on guest forms", () => {
 
   it("shows the box only if Cloudflare needs the person to tick something", async () => {
     vi.stubEnv("VITE_TURNSTILE_SITE_KEY", KEY);
-    fakeTurnstile("pass");
+    fakeTurnstile("pass", 60);
     const { humanToken } = await import("../src/lib/turnstile");
     const pending = humanToken();
     await act(async () => { await new Promise((r) => setTimeout(r, 1)); });

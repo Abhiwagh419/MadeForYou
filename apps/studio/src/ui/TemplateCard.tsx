@@ -1,5 +1,5 @@
 import type { Template } from "@madeforyou/schema";
-import { getOccasion } from "@madeforyou/templates";
+import { getOccasion, isTrending } from "@madeforyou/templates";
 import { THEMES } from "@madeforyou/ui";
 import { Icon } from "./Icon";
 import { Thumb } from "./Thumb";
@@ -14,6 +14,7 @@ export function TemplateCard({ template, mine }: { template: Template; mine?: bo
         <Thumb content={content} />
         <span className="tcard-hover"><Icon name="eye" size={16} />Preview</span>
         {mine && <span className="badge badge-rose">Yours</span>}
+        {isTrending(template) && <span className="badge badge-trend">Trending</span>}
       </div>
       <div className="tcard-body">
         <h2>{meta.title}</h2>

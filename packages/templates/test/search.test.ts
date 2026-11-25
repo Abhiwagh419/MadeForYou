@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OCCASIONS, getOccasion, normalize, searchTemplates, suggest, templates, distance } from "../src";
+import { OCCASIONS, getOccasion, isTrending, normalize, searchTemplates, suggest, templates, distance } from "../src";
 
 const ids = (q: string) => searchTemplates(q, templates).results.map((t) => t.meta.id);
 
@@ -14,6 +14,13 @@ describe("library", () => {
   it("covers the occasions the product was started for", () => {
     const covered = new Set(templates.flatMap((t) => t.meta.occasions));
     for (const o of ["mothers-day", "fathers-day", "girlfriends-day", "birthday", "raksha-bandhan", "diwali"]) expect(covered.has(o)).toBe(true);
+  });
+  it("has a template for every occasion in the vocabulary", () => {
+    const covered = new Set(templates.flatMap((t) => t.meta.occasions));
+    for (const o of OCCASIONS) expect(covered.has(o.id), o.id).toBe(true);
+  });
+  it("has a good set of trending templates", () => {
+    expect(templates.filter(isTrending).length).toBeGreaterThanOrEqual(12);
   });
   it("has unique occasion ids and synonyms that do not repeat across occasions", () => {
     expect(new Set(OCCASIONS.map((o) => o.id)).size).toBe(OCCASIONS.length);
@@ -35,6 +42,16 @@ describe("search", () => {
     expect(ids("gf")).toContain("girlfriends-day-love");
     expect(ids("valentine")).toContain("girlfriends-day-love");
   });
+  it("finds festivals, life events and trends by the words people use", () => {
+    expect(ids("garba")).toContain("navratri-nine-nights");
+    expect(ids("karva chauth")).toContain("karwa-chauth-promise");
+    expect(ids("sagai")).toContain("engagement-we-said-yes");
+    expect(ids("griha pravesh")).toContain("housewarming-invite");
+    expect(ids("all the best")).toContain("good-luck-you-got-this");
+    expect(ids("wrapped")).toContain("our-wrapped");
+    expect(ids("photo dump")).toContain("photo-dump-of-the-year");
+    expect(ids("trending").length).toBeGreaterThanOrEqual(12);
+  });
   it("forgives typos", () => {
     expect(ids("birthdya")).toContain("birthday-countdown");
     expect(ids("anniversery")).toContain("anniversary-letter");
@@ -54,7 +71,7 @@ describe("search", () => {
     expect(r.related.length).toBeGreaterThan(0);
   });
   it("resolves an occasion even when no template exists for it yet", () => {
-    const r = searchTemplates("holi", templates);
+    const r = searchTemplates("holi", []);
     expect(r.occasion?.id).toBe("holi");
     expect(r.results).toHaveLength(0);
   });

@@ -1,0 +1,238 @@
+import type { Template } from "@madeforyou/schema";
+import { block, tpl } from "./build";
+import { cover, list, sign } from "./parts";
+
+const quiz = (title: string, questions: Record<string, string>[]) =>
+  block("quiz", { style: { anim: "fade-up" }, fields: { title, questions } });
+
+export const trending: Template[] = [
+  tpl({
+    id: "our-wrapped", abbr: "wrap", title: "Our Wrapped",
+    occasions: ["year-wrapped", "new-year", "anniversary"], relationships: ["partner", "friend"], moods: ["romantic", "funny"],
+    tags: ["trending", "instagram", "wrapped", "spotify wrapped", "year in review", "recap", "our year", "couple", "story"],
+    theme: "midnight-stars", opening: "Your year, wrapped", openingKind: "curtain", ambience: "confetti", tap: "sparkles",
+    blocks: [
+      cover("Our Wrapped", "Their name", "The year we spent together, in numbers and moments"),
+      block("daysTogether", { style: { bg: "soft", anim: "zoom" }, fields: { label: "Days of us so far" } }),
+      block("reasons", { style: { anim: "fade-up" }, fields: { title: "Our top moments", style: "flip", items: list("Top moment: the trip nobody planned", "Most replayed: the song from the car", "Top inside joke: you know the one", "Biggest surprise: the dinner you did not expect") } }),
+      block("timeline", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Month by month" } }),
+      block("checklist", { style: { anim: "fade-up" }, fields: { title: "Next year, we are going to", style: "bucket" } }),
+      sign("Yours, again,"),
+    ],
+  }),
+  tpl({
+    id: "friends-wrapped", abbr: "fwrap", title: "Bestie Wrapped",
+    occasions: ["year-wrapped", "friendship-day", "new-year"], relationships: ["friend"], moods: ["funny", "festive"],
+    tags: ["trending", "instagram", "wrapped", "bestie", "friends", "year in review", "group", "recap", "story"],
+    theme: "marigold-sun", opening: "Your year with me, wrapped", ambience: "confetti", tap: "sparkles",
+    blocks: [
+      cover("Bestie Wrapped", "Their name", "Our year in plans cancelled and memories made"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Your top five, this year", style: "cards", items: list("Most used phrase: \"just five minutes\"", "Top snack: the one you always steal", "Most late night: the one we talked till 4 am", "Best plan: the one that went wrong") } }),
+      quiz("How well do you know our year?", [
+        { question: "Where did we end up on that unplanned trip?", optionA: "A beach", optionB: "A hill station", optionC: "A random dhaba", optionD: "Nowhere, we got lost", correct: "C" },
+        { question: "Who always cancels the plan first?", optionA: "Me", optionB: "You", optionC: "Both of us", optionD: "The weather", correct: "C" },
+      ]),
+      block("gallery", { style: { bg: "soft" }, fields: { layout: "masonry" } }),
+      sign("Your bestie,"),
+    ],
+  }),
+  tpl({
+    id: "green-flags-list", abbr: "gflag", title: "Green flags I found in you",
+    occasions: ["green-flags", "valentines", "girlfriends-day", "boyfriends-day"], relationships: ["partner", "friend"], moods: ["romantic", "funny"],
+    tags: ["trending", "instagram", "green flags", "green flag", "love", "couple", "partner", "list", "reels"],
+    theme: "rose-garden", opening: "A list about you", ambience: "petals", tap: "hearts",
+    blocks: [
+      cover("Green flags", "Their name", "A list of everything I noticed and loved"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Green flags I found in you", style: "flip", items: list("You text back, and you mean it", "You are kind to waiters", "You remember small things", "You apologise first, sometimes", "You make me braver") } }),
+      block("featured", { style: { anim: "zoom" }, fields: { frame: "polaroid", caption: "The first time I knew" } }),
+      block("ask", { style: { bg: "soft", anim: "fade-up" }, fields: { question: "Is there a green flag I missed?", yes: "Yes, add one", no: "No, you got them all", celebration: "Then tell me. I am listening." } }),
+      sign("Yours,"),
+    ],
+  }),
+  tpl({
+    id: "soft-launch-reveal", abbr: "slaunch", title: "Soft launching my person",
+    occasions: ["soft-launch", "valentines", "girlfriends-day", "boyfriends-day"], relationships: ["partner"], moods: ["romantic", "funny"],
+    tags: ["trending", "instagram", "soft launch", "hard launch", "relationship", "reveal", "couple", "insta official"],
+    theme: "rose-garden", opening: "Something is about to be revealed", ambience: "petals", tap: "hearts",
+    blocks: [
+      cover("A soft launch", "Their name", "Hard launch loading in three, two, one"),
+      block("reveal", { style: { bg: "soft", anim: "zoom" }, fields: { title: "Guess who is behind this", message: "It is you. It was always going to be you.", hint: "Scratch to see", style: "scratch" } }),
+      block("featured", { style: { anim: "fade-up" }, fields: { frame: "tape", caption: "The photo that started it all" } }),
+      block("text", { style: { align: "left", bg: "soft", anim: "fade-up" }, fields: { heading: "Why I am posting about you", body: "Say it plainly: you are proud to be with them, and you want everyone to know.\n\nKeep a funny line or two." } }),
+      sign("Yours, publicly,"),
+    ],
+  }),
+  tpl({
+    id: "couple-quiz-challenge", abbr: "cquiz", title: "How well do you know me? Couple edition",
+    occasions: ["green-flags", "valentines", "anniversary", "girlfriends-day"], relationships: ["partner"], moods: ["romantic", "funny"],
+    tags: ["trending", "instagram", "couple quiz", "quiz", "challenge", "how well do you know me", "couple", "game"],
+    theme: "marigold-sun", opening: "Take the test", ambience: "confetti", tap: "sparkles",
+    blocks: [
+      cover("How well do you know me?", "Their name", "Five questions. No cheating. No Googling"),
+      quiz("The couple quiz", [
+        { question: "What is my comfort food?", optionA: "Maggi", optionB: "Biryani", optionC: "Dal chawal", optionD: "Pizza", correct: "B" },
+        { question: "Where did we first meet?", optionA: "College", optionB: "A wedding", optionC: "Online", optionD: "Through friends", correct: "A" },
+        { question: "What is my biggest fear?", optionA: "Cockroaches", optionB: "Exams", optionC: "Heights", optionD: "Being late", correct: "A" },
+      ]),
+      block("memory", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Match our memories" } }),
+      block("replyBox", { style: { anim: "fade-up" }, fields: { title: "Tell me your score", prompt: "How many did you get?" } }),
+      sign("Yours, the quiz master,"),
+    ],
+  }),
+  tpl({
+    id: "photo-dump-of-the-year", abbr: "pdump", title: "Photo dump",
+    occasions: ["photo-dump", "birthday", "friendship-day", "new-year"], relationships: ["friend", "partner", "family"], moods: ["funny", "festive"],
+    tags: ["trending", "instagram", "photo dump", "carousel", "camera roll", "memories", "reels", "aesthetic"],
+    theme: "marigold-sun", ambience: "none", tap: "sparkles",
+    blocks: [
+      cover("Photo dump", "Their name", "Swipe through the best of us"),
+      block("gallery", { style: { anim: "fade-up" }, fields: { layout: "masonry" } }),
+      block("text", { style: { align: "left", bg: "soft", anim: "fade-up" }, fields: { heading: "Caption this", body: "Write a caption the way you would for a carousel: short, funny, a little sentimental.\n\nPick three favourites and say why." } }),
+      block("video", { style: { anim: "fade-up" }, fields: { title: "The one video I could not skip" } }),
+      sign("Swipe left for more,"),
+    ],
+  }),
+  tpl({
+    id: "time-capsule-future-me", abbr: "tcap", title: "A time capsule for next year",
+    occasions: ["time-capsule", "new-year", "birthday"], relationships: ["partner", "friend", "family"], moods: ["emotional", "minimal"],
+    tags: ["trending", "instagram", "time capsule", "letter to future self", "dear future me", "new year", "open in a year", "lock"],
+    theme: "midnight-stars", opening: "Do not open before the date", openingKind: "diary", ambience: "stars", tap: "none",
+    blocks: [
+      cover("A time capsule", "Their name", "Written today, to be opened later"),
+      block("countdown", { style: { bg: "soft", anim: "zoom" }, fields: { title: "Until we open this", endMessage: "It is time. Read on." } }),
+      block("letter", { style: { align: "left", anim: "fade-up" }, fields: { salutation: "Dear future us,", closing: "From the past,", paper: "plain", body: "Where are we right now? What are we worried about, and what are we excited for?\n\nWrite what you want to remember, and what you hope has changed." } }),
+      block("checklist", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "What I hope is true by then", style: "bucket" } }),
+      sign("See you in a year,"),
+    ],
+  }),
+  tpl({
+    id: "yes-but-loving-roast", abbr: "roast", title: "Yes, but: a loving roast",
+    occasions: ["roast", "birthday", "friendship-day"], relationships: ["friend", "partner", "family"], moods: ["funny"],
+    tags: ["trending", "instagram", "yes but", "roast", "friends", "birthday", "funny", "teasing", "reels"],
+    theme: "marigold-sun", opening: "Brace yourself", ambience: "confetti", tap: "sparkles",
+    blocks: [
+      cover("Yes, but", "Their name", "A loving roast, delivered with affection"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Yes, but", style: "cards", items: list("Yes, you are very smart, but you cannot find your own keys", "Yes, you are a great cook, but you leave the kitchen like a crime scene", "Yes, you are always on time, but only for your own plans", "Yes, you give the best advice, but you never follow it") } }),
+      block("text", { style: { align: "left", anim: "fade-up" }, fields: { heading: "But seriously", body: "End with one honest line that shows the teasing comes from love.\n\nThat is what makes a roast land." } }),
+      block("wishes", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Add your own roast", prompt: "Say something nice but cheeky", moderation: "review" } }),
+      sign("With love, and a little teasing,"),
+    ],
+  }),
+  tpl({
+    id: "five-star-review", abbr: "review", title: "Five stars, would recommend",
+    occasions: ["roast", "birthday", "thank-you", "anniversary"], relationships: ["friend", "partner", "family"], moods: ["funny", "emotional"],
+    tags: ["trending", "instagram", "review", "five star", "5 star", "would recommend", "rating", "funny", "customer review"],
+    theme: "marigold-sun", opening: "A review is waiting", ambience: "none", tap: "sparkles",
+    blocks: [
+      cover("5 out of 5 stars", "Their name", "Would recommend. Would keep"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Verified customer reviews", style: "cards", items: list("★★★★★ Always shows up on time, eventually", "★★★★★ Excellent listener, terrible at replying", "★★★★★ Makes every plan better, even the bad ones", "★★★★★ Cannot imagine my life without this person") } }),
+      block("quote", { style: { anim: "fade-up" }, fields: { text: "Customer satisfaction: 100%.\nReturns: not accepted.", author: "Management", style: "quote" } }),
+      block("gallery", { style: { bg: "soft" }, fields: { layout: "polaroid" } }),
+      sign("Your most loyal customer,"),
+    ],
+  }),
+  tpl({
+    id: "tier-list-of-you", abbr: "tier", title: "The tier list of us",
+    occasions: ["roast", "friendship-day", "birthday"], relationships: ["friend", "partner"], moods: ["funny"],
+    tags: ["trending", "instagram", "tier list", "ranking", "s tier", "friends", "funny", "reels"],
+    theme: "midnight-stars", opening: "Ranking in progress", ambience: "stars", tap: "sparkles",
+    blocks: [
+      cover("The tier list", "Their name", "A very serious and scientific ranking"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Ranked, no appeals", style: "flip", items: list("S tier: your laugh at the wrong moment", "A tier: your food recommendations", "B tier: your sense of direction", "C tier: your punctuality") } }),
+      block("text", { style: { align: "left", anim: "fade-up" }, fields: { heading: "How I ranked these", body: "Explain your highly unscientific method.\n\nAdd one honest line: you would put them in a tier above S if it existed." } }),
+      sign("Your judge,"),
+    ],
+  }),
+  tpl({
+    id: "this-is-your-sign", abbr: "sign", title: "This is your sign",
+    occasions: ["this-is-your-sign", "good-luck", "get-well", "just-because"], relationships: ["friend", "partner", "family"], moods: ["emotional", "minimal"],
+    tags: ["trending", "instagram", "this is your sign", "reminder", "affirmation", "you got this", "pep talk", "reels"],
+    theme: "midnight-stars", opening: "A sign for you", ambience: "stars", tap: "sparkles",
+    blocks: [
+      cover("This is your sign", "Their name", "To take a breath and keep going"),
+      block("reveal", { style: { bg: "soft", anim: "zoom" }, fields: { title: "Tap to see your sign", message: "You are doing better than you think. Rest if you need to, then carry on.", hint: "Tap to reveal", style: "tap" } }),
+      block("quote", { style: { anim: "fade-up" }, fields: { text: "You do not have to have it all figured out.\nYou just have to keep going.", author: "A reminder", style: "quote" } }),
+      block("buttons", { style: { bg: "soft", anim: "fade-up" }, fields: { layout: "stack" } }),
+      sign("Rooting for you,"),
+    ],
+  }),
+  tpl({
+    id: "teeny-tiny-message", abbr: "tiny", title: "A teeny tiny message",
+    occasions: ["just-because", "this-is-your-sign", "thank-you"], relationships: ["friend", "partner", "family"], moods: ["minimal"],
+    tags: ["trending", "instagram", "teeny tiny", "short", "minimal", "small message", "note", "aesthetic"],
+    theme: "rose-garden", ambience: "none", tap: "hearts",
+    blocks: [
+      cover("A tiny message", "Their name", "It is short, but it is meant"),
+      block("text", { style: { align: "center", anim: "fade-up" }, fields: { heading: "", body: "Write one or two lines.\n\nThe smaller the message, the more it is read." } }),
+      sign("Yours,"),
+    ],
+  }),
+  tpl({
+    id: "ten-out-of-ten", abbr: "tenten", title: "10 out of 10 things about you",
+    occasions: ["just-because", "birthday", "thank-you", "this-is-your-sign"], relationships: ["friend", "partner", "family"], moods: ["emotional", "festive"],
+    tags: ["trending", "instagram", "10/10", "habits", "list", "reasons", "save this", "reels"],
+    theme: "marigold-sun", opening: "Ten reasons", ambience: "confetti", tap: "sparkles",
+    blocks: [
+      cover("10 out of 10", "Their name", "Ten things about you, all full marks"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Ten out of ten", style: "cards", items: list("The way you listen", "How you remember birthdays", "The way you make plans happen", "Your terrible jokes", "How you show up, every time") } }),
+      block("text", { style: { align: "left", anim: "fade-up" }, fields: { heading: "Extra marks", body: "Add the one thing nobody else would know to put on this list." } }),
+      sign("Full marks,"),
+    ],
+  }),
+  tpl({
+    id: "reasons-not-to-panic", abbr: "panic", title: "Reasons you do not need to panic",
+    occasions: ["this-is-your-sign", "good-luck", "get-well"], relationships: ["friend", "partner", "family"], moods: ["emotional", "minimal"],
+    tags: ["trending", "instagram", "reasons you do not need to", "calm", "reassurance", "exam", "anxious", "pep talk", "reminder"],
+    theme: "rose-garden", opening: "Take a breath first", ambience: "none", tap: "hearts",
+    blocks: [
+      cover("You do not need to panic", "Their name", "A few reasons, just in case"),
+      block("reasons", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Reasons you are okay", style: "cards", items: list("You have handled worse and come through", "People who love you are right here", "Nobody else is watching as closely as you think", "One bad day does not decide the year") } }),
+      block("quote", { style: { anim: "fade-up" }, fields: { text: "Breathe in. Breathe out.\nYou have got this.", author: "A small reminder", style: "quote" } }),
+      sign("Right beside you,"),
+    ],
+  }),
+  tpl({
+    id: "vision-board-new-year", abbr: "vboard", title: "Our vision board",
+    occasions: ["vision-board", "new-year"], relationships: ["friend", "partner", "family"], moods: ["festive", "emotional"],
+    tags: ["trending", "instagram", "vision board", "goals", "manifest", "resolutions", "new year", "bucket list", "glow up"],
+    theme: "midnight-stars", opening: "Manifesting", ambience: "stars", tap: "sparkles",
+    blocks: [
+      cover("Our vision board", "Our names", "Everything we are calling in this year"),
+      block("gallery", { style: { anim: "fade-up" }, fields: { layout: "masonry" } }),
+      block("checklist", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "Goals for this year", style: "bucket", items: list("One trip we will actually take", "One habit we will actually keep", "One big thing we will finally start") } }),
+      block("quote", { style: { anim: "fade-up" }, fields: { text: "We are not waiting for the right time.\nWe are making it.", author: "This year", style: "quote" } }),
+      sign("See you at the finish,"),
+    ],
+  }),
+  tpl({
+    id: "story-of-us-documentary", abbr: "docu", title: "The Story of Us: a documentary",
+    occasions: ["anniversary", "friendship-day", "birthday"], relationships: ["partner", "friend"], moods: ["romantic", "funny", "emotional"],
+    tags: ["trending", "instagram", "netflix", "documentary", "story of us", "our story", "couple", "reels", "timeline"],
+    theme: "midnight-stars", opening: "Now streaming", openingKind: "curtain", ambience: "stars", tap: "sparkles",
+    blocks: [
+      cover("The Story of Us", "Their name", "A documentary in several awkward chapters"),
+      block("video", { style: { bg: "soft", anim: "zoom" }, fields: { title: "Official trailer" } }),
+      block("timeline", { style: { anim: "fade-up" }, fields: { title: "The chapters", items: [
+        { date: "Chapter 1", title: "The first meeting", text: "Nobody knew what was coming." },
+        { date: "Chapter 2", title: "The plot thickens", text: "The inside jokes begin." },
+        { date: "Chapter 3", title: "The season finale, for now", text: "And somehow, it keeps getting better." },
+      ] } }),
+      block("quote", { style: { bg: "soft", anim: "fade-up" }, fields: { text: "Critics say: 5 stars.\nThe lead actors agree.", author: "The reviews are in", style: "quote" } }),
+      sign("Starring us,"),
+    ],
+  }),
+  tpl({
+    id: "main-character-birthday", abbr: "mchar", title: "Main character birthday",
+    occasions: ["birthday"], relationships: ["friend", "partner"], moods: ["funny", "festive"],
+    tags: ["trending", "instagram", "main character", "birthday", "bday", "reels", "party", "wishes", "story"],
+    theme: "midnight-stars", opening: "Today you are the main character", openingKind: "curtain", ambience: "confetti", tap: "sparkles",
+    blocks: [
+      cover("Happy Birthday", "Their name", "Today you are the main character"),
+      block("countdown", { style: { bg: "soft", anim: "zoom" }, fields: { title: "Until your day", endMessage: "Cue the music. It is your day." } }),
+      block("reasons", { style: { anim: "fade-up" }, fields: { title: "Main character energy", style: "flip", items: list("Walks in, the room gets louder", "Remembers everyone's order", "Has a story for every occasion") } }),
+      block("wishes", { style: { bg: "soft", anim: "fade-up" }, fields: { title: "The supporting cast says", prompt: "Wish them something good", moderation: "review" } }),
+      block("gallery", { fields: { layout: "polaroid" } }),
+      sign("Your biggest fan,"),
+    ],
+  }),
+];

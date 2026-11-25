@@ -15,6 +15,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - name: Check dependencies for known problems
+        run: pnpm audit --prod --audit-level high
+        continue-on-error: true
       - run: pnpm test
       - run: pnpm --filter @madeforyou/studio build
         env:
@@ -22,6 +25,8 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_SUPPORT_UPI: ${{ vars.VITE_SUPPORT_UPI }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          CLERK_FRONTEND_HOST: ${{ vars.CLERK_FRONTEND_HOST }}
+          CSP_ENFORCE: ${{ vars.CSP_ENFORCE }}
 
   deploy:
     needs: test
@@ -41,6 +46,8 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_SUPPORT_UPI: ${{ vars.VITE_SUPPORT_UPI }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          CLERK_FRONTEND_HOST: ${{ vars.CLERK_FRONTEND_HOST }}
+          CSP_ENFORCE: ${{ vars.CSP_ENFORCE }}
       - name: Apply database migrations
         uses: cloudflare/wrangler-action@v3
         with:
